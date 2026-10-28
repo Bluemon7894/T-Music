@@ -1,15 +1,19 @@
-import { useState } from 'react';
-import { Activity, CheckCircle2, XCircle, Download } from 'lucide-react';
-import { api } from '../api.js';
+import { useRef, useState } from 'react';
+import { Activity, CheckCircle2, XCircle, Link2, Download, Upload, FolderOpen, Gauge, Library, Keyboard, Info } from 'lucide-react';
+import { api } from '../lib/api.js';
 import { useAsync } from '../components/common.jsx';
-import { importPlaylist } from '../components/Sidebar.jsx';
+import { importPlaylist } from '../components/layout/Sidebar.jsx';
 import { useLibrary } from '../store/library.js';
+import { useDownloads, openDownloads } from '../store/downloads.js';
 import { toast } from '../store/ui.js';
+import { fmtBytes } from '../lib/util.js';
+import { useEnter } from '../lib/motion.js';
+import logo from '../assets/logo-mark.png';
 
 const METHOD_LABEL = {
-  IOS: 'InnerTube (iOS 앱으로 요청)',
-  ANDROID_VR: 'InnerTube (안드로이드 VR 앱으로 요청)',
-  VISIONOS: 'InnerTube (visionOS 앱으로 요청)',
+  IOS: 'InnerTube · iOS',
+  ANDROID_VR: 'InnerTube · Android VR',
+  VISIONOS: 'InnerTube · visionOS',
   'yt-dlp': 'yt-dlp (자동 업데이트)',
 };
 
@@ -18,6 +22,9 @@ export default function Settings() {
   const [diag, setDiag] = useState(null);
   const [running, setRunning] = useState(false);
   const lib = useLibrary();
+  const dl = useDownloads();
+  const ref = useRef(null);
+  useEnter(ref, [], { step: 50 });
 
   const runDiag = async () => {
     setRunning(true);
@@ -30,6 +37,7 @@ export default function Settings() {
     a.href = URL.createObjectURL(blob);
     a.download = `t-music-library-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
+    toast('백업 파일을 저장했습니다');
   };
   const importLib = () => {
     const input = document.createElement('input');
@@ -38,10 +46,8 @@ export default function Settings() {
     input.onchange = async () => {
       try {
         const data = JSON.parse(await input.files[0].text());
-        useLibrary.setState({
-          liked: data.liked || [], playlists: data.playlists || [], savedAlbums: data.savedAlbums || [], followed: data.followed || [],
-        });
-        toast('라이브러리를 복원했습니다');
+        useLibrary.setState({ liked: data.liked || [], playlists: data.playlists || [], savedAlbums: data.savedAlbums || [], followed: data.followed || [] });
+        toast('보관함을 복원했습니다');
       } catch {
         toast('파일을 읽을 수 없습니다');
       }
@@ -50,59 +56,80 @@ export default function Settings() {
   };
 
   return (
-    <div className="page settings">
-      <h1>설정</h1>
+    <div className="page settings" ref={ref}>
+      <div className="page-title" data-enter><h1>설정</h1></div>
 
-      <section>
-        <h2>재생 엔진</h2>
-        <p className="muted">곡을 재생할 때 아래 방법을 순서대로 시도합니다. 최근에 실패한 방법은 몇 시간 동안 뒤로 밀렸다가 다시 시도됩니다.</p>
-        <div className="method-list">
-          {status.data?.methods.map((m, i) => (
-            <div key={m.name} className="method">
-              <span className="method-order">{i + 1}</span>
-              <span className="method-name">{METHOD_LABEL[m.name] || m.name}</span>
-              <span className="muted">성공 {m.ok} · 실패 {m.fail}</span>
-            </div>
-          ))}
-        </div>
-        {status.data?.ytdlp && (
-          <p className="muted">yt-dlp: {status.data.ytdlp.status}{status.data.ytdlp.version ? ` (버전 ${status.data.ytdlp.version})` : ''}{status.data.ytdlp.error ? ` · ${status.data.ytdlp.error}` : ''}</p>
-        )}
-        <button className="pill white" onClick={runDiag} disabled={running}><Activity size={16} /> {running ? '진단 중… (최대 1분)' : '재생 진단 실행'}</button>
-        {diag && (
+      <div className="settings-grid">
+        <section className="set-card" data-enter>
+          <h2><Gauge size={18} /> 재생 엔진</h2>
+          <p className="muted">곡마다 아래 방법을 순서대로 시도해요. 최근에 실패한 방법은 몇 시간 동안 뒤로 밀렸다가 다시 시도됩니다.</p>
           <div className="method-list">
-            {diag.map((d) => (
-              <div key={d.name} className="method">
-                {d.ok ? <CheckCircle2 size={18} color="var(--accent)" /> : <XCircle size={18} color="#f15e6c" />}
-                <span className="method-name">{METHOD_LABEL[d.name] || d.name}</span>
-                <span className="muted">{d.ok ? `${d.ms}ms` : d.error}</span>
+            {status.data?.methods.map((m, i) => (
+              <div key={m.name} className="method">
+                <span className="method-order">{i + 1}</span>
+                <span className="method-name">{METHOD_LABEL[m.name] || m.name}</span>
+                <span className="muted small">성공 {m.ok} · 실패 {m.fail}</span>
               </div>
             ))}
           </div>
-        )}
-      </section>
+          <button className="btn grad" onClick={runDiag} disabled={running}><Activity size={15} /> {running ? '진단 중… (최대 1분)' : '재생 진단 실행'}</button>
+          {diag && (
+            <div className="method-list">
+              {diag.map((d) => (
+                <div key={d.name} className="method">
+                  {d.ok ? <CheckCircle2 size={17} className="ok" /> : <XCircle size={17} className="bad" />}
+                  <span className="method-name">{METHOD_LABEL[d.name] || d.name}</span>
+                  <span className="muted small">{d.ok ? `${d.ms}ms` : d.error}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
-      <section>
-        <h2>라이브러리</h2>
-        <p className="muted">좋아요, 플레이리스트는 이 컴퓨터에만 저장됩니다. 유튜브 계정과 연결되지 않습니다.</p>
-        <div className="row-btns">
-          <button className="pill" onClick={importPlaylist}><Download size={16} /> YouTube 재생목록 가져오기</button>
-          <button className="pill" onClick={exportLib}>라이브러리 백업</button>
-          <button className="pill" onClick={importLib}>백업에서 복원</button>
-        </div>
-      </section>
+        <section className="set-card" data-enter>
+          <h2><Library size={18} /> 보관함</h2>
+          <p className="muted">좋아요와 플레이리스트는 이 PC에만 저장돼요. 유튜브 계정과는 연결되지 않습니다.</p>
+          <div className="set-stats">
+            <div><b>{lib.liked.length}</b><span>좋아요</span></div>
+            <div><b>{lib.playlists.length}</b><span>플레이리스트</span></div>
+            <div><b>{lib.savedAlbums.length}</b><span>앨범</span></div>
+            <div><b>{lib.followed.length}</b><span>아티스트</span></div>
+          </div>
+          <div className="row-btns">
+            <button className="btn" onClick={importPlaylist}><Link2 size={15} /> 재생목록 가져오기</button>
+            <button className="btn" onClick={exportLib}><Download size={15} /> 백업</button>
+            <button className="btn" onClick={importLib}><Upload size={15} /> 복원</button>
+          </div>
+        </section>
 
-      <section>
-        <h2>단축키</h2>
-        <div className="shortcuts">
-          <span><kbd>Space</kbd> 재생 / 일시정지</span>
-          <span><kbd>Ctrl</kbd>+<kbd>→</kbd> 다음 곡</span>
-          <span><kbd>Ctrl</kbd>+<kbd>←</kbd> 이전 곡</span>
-          <span><kbd>Ctrl</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> 볼륨</span>
-          <span><kbd>Ctrl</kbd>+<kbd>K</kbd> 검색</span>
-          <span><kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> 뒤로 / 앞으로</span>
-        </div>
-      </section>
+        <section className="set-card" data-enter>
+          <h2><Download size={18} /> 다운로드</h2>
+          <p className="muted">{dl.items.length}곡 · {fmtBytes(dl.totalSize)}</p>
+          <p className="muted small path">{dl.dir}</p>
+          <button className="btn" onClick={openDownloads}><FolderOpen size={15} /> 폴더 열기</button>
+        </section>
+
+        <section className="set-card" data-enter>
+          <h2><Keyboard size={18} /> 단축키</h2>
+          <div className="shortcuts">
+            <span><kbd>Space</kbd> 재생 / 일시정지</span>
+            <span><kbd>Ctrl</kbd> <kbd>→</kbd> 다음 곡</span>
+            <span><kbd>Ctrl</kbd> <kbd>←</kbd> 이전 곡</span>
+            <span><kbd>Ctrl</kbd> <kbd>↑</kbd> <kbd>↓</kbd> 볼륨</span>
+            <span><kbd>Ctrl</kbd> <kbd>K</kbd> 검색</span>
+            <span><kbd>Alt</kbd> <kbd>←</kbd> <kbd>→</kbd> 뒤로 / 앞으로</span>
+            <span><kbd>Esc</kbd> 전체 화면 닫기</span>
+          </div>
+        </section>
+
+        <section className="set-card about-app" data-enter>
+          <img src={logo} alt="" />
+          <div>
+            <h2><Info size={18} /> T-Music {status.data?.version ? `v${status.data.version}` : ''}</h2>
+            <p className="muted">광고 없는 나만의 음악 플레이어. 개인 학습·사용 목적으로 만들었어요.</p>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

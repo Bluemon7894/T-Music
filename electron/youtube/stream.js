@@ -18,10 +18,11 @@ async function innertube(id, clientName) {
   return { url, headers: {}, mime: fmt.mime_type, bitrate: fmt.bitrate };
 }
 
+// Default order: fastest and most reliable first (measured).
 const METHODS = {
+  VISIONOS: (id) => innertube(id, 'VISIONOS'),
   IOS: (id) => innertube(id, 'IOS'),
   ANDROID_VR: (id) => innertube(id, 'ANDROID_VR'),
-  VISIONOS: (id) => innertube(id, 'VISIONOS'),
   'yt-dlp': (id) => ytdlp.resolve(id),
 };
 const DEFAULT_ORDER = Object.keys(METHODS);
@@ -44,16 +45,17 @@ function saveStats() {
 }
 function mark(name, ok, error) {
   const s = (loadStats()[name] ??= { ok: 0, fail: 0 });
-  if (ok) { s.ok++; s.lastOk = Date.now(); } else { s.fail++; s.lastFail = Date.now(); s.lastError = String(error || '').slice(0, 200); }
+  if (ok) { s.ok++; s.lastOk = Date.now(); s.streak = 0; } else { s.fail++; s.lastFail = Date.now(); s.streak = (s.streak || 0) + 1; s.lastError = String(error || '').slice(0, 200); }
   saveStats();
 }
 
 function order() {
   const now = Date.now();
   const st = loadStats();
+  // One odd video shouldn't sink a method; two failures in a row do.
   const demoted = (n) => {
     const s = st[n];
-    return s?.lastFail && s.lastFail > (s.lastOk || 0) && now - s.lastFail < DEMOTE_MS;
+    return s?.streak >= 2 && now - s.lastFail < DEMOTE_MS;
   };
   return [...DEFAULT_ORDER.filter((n) => !demoted(n)), ...DEFAULT_ORDER.filter(demoted)];
 }

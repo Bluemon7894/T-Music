@@ -1,25 +1,33 @@
 // Album, YouTube playlist, liked songs and local playlist pages share one layout.
-import { useState } from 'react';
-import { Heart, ListMusic, Shuffle, PlusCircle, CheckCircle2, Pencil, Trash2, Search as SearchIcon } from 'lucide-react';
-import { api } from '../api.js';
+import { useRef, useState } from 'react';
+import { Heart, ListMusic, Shuffle, PlusCircle, CheckCircle2, Pencil, Trash2, Search as SearchIcon, Radio } from 'lucide-react';
+import { api } from '../lib/api.js';
 import { usePlayer } from '../store/player.js';
 import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { useUI, toast } from '../store/ui.js';
-import { totalTime, colorFor } from '../util.js';
-import { useAsync, Thumb, PlayButton, ArtistLinks, Loading, ErrorMsg } from '../components/common.jsx';
-import TrackList from '../components/TrackList.jsx';
+import { totalTime, colorFor } from '../lib/util.js';
+import { useEnter, useTilt } from '../lib/motion.js';
+import { useAsync, Thumb, PlayButton, ArtistLinks, PageSkeleton, ErrorMsg, Empty } from '../components/common.jsx';
+import TrackList, { startRadio } from '../components/TrackList.jsx';
+import { DownloadAllButton } from '../components/DownloadButton.jsx';
 import { Shelf } from '../components/Cards.jsx';
 
 function Header({ kind, title, thumb, art, color, meta, description }) {
+  const artRef = useRef(null);
+  useTilt(artRef, { max: 10, scale: 1.02 });
   return (
     <div className="page-header" style={{ '--hdr': color }}>
-      {art || <Thumb src={thumb} className="ph-art" />}
+      {thumb && <div className="ph-backdrop" style={{ backgroundImage: `url("${thumb}")` }} />}
+      <div className="ph-art-wrap" ref={artRef} data-enter>
+        {art || <Thumb src={thumb} className="ph-art" />}
+        <span className="glare" />
+      </div>
       <div className="ph-text">
-        <span className="ph-kind">{kind}</span>
-        <h1 className={title.length > 24 ? 'long' : ''}>{title}</h1>
-        {description && <p className="ph-desc">{description}</p>}
-        <div className="ph-meta">{meta}</div>
+        <span className="ph-kind" data-enter>{kind}</span>
+        <h1 className={title.length > 22 ? 'long' : ''} data-enter>{title}</h1>
+        {description && <p className="ph-desc" data-enter>{description}</p>}
+        <div className="ph-meta" data-enter>{meta}</div>
       </div>
     </div>
   );
@@ -29,19 +37,22 @@ function ActionBar({ tracks, context, children }) {
   const playing = usePlayer((s) => s.playing);
   const ctxName = usePlayer((s) => s.context?.name);
   const isThis = ctxName === context.name;
-  const p = usePlayer.getState();
   const playAll = () => {
+    const p = usePlayer.getState();
     if (isThis) return p.toggle();
     p.playList(tracks, 0, context);
   };
   const shuffleAll = () => {
+    const p = usePlayer.getState();
     if (!p.shuffle) p.toggleShuffle();
     p.playList(tracks, Math.floor(Math.random() * tracks.length), context);
   };
   return (
-    <div className="action-bar">
-      <PlayButton size={56} playing={isThis && playing} onClick={playAll} />
-      <button className="icon-btn big" title="셔플 재생" onClick={shuffleAll}><Shuffle size={26} /></button>
+    <div className="action-bar" data-enter>
+      <PlayButton size={58} playing={isThis && playing} onClick={playAll} />
+      <button className="icon-btn big" title="셔플 재생" onClick={shuffleAll}><Shuffle size={24} /></button>
+      {tracks[0] && <button className="icon-btn big" title="비슷한 곡 라디오" onClick={() => startRadio(tracks[0])}><Radio size={24} /></button>}
+      <DownloadAllButton tracks={tracks} />
       {children}
     </div>
   );
@@ -63,31 +74,38 @@ function Filterable({ tracks, children }) {
   );
 }
 
+function usePage(deps) {
+  const ref = useRef(null);
+  useEnter(ref, deps);
+  return ref;
+}
+
 export function Album({ id }) {
   const res = useAsync(() => api.album(id), [id]);
   const saved = useLibrary((s) => s.savedAlbums.some((a) => a.id === id));
   const toggleSaved = useLibrary((s) => s.toggleSavedAlbum);
-  if (res.loading && !res.data) return <Loading />;
-  if (res.error) return <ErrorMsg error={res.error} />;
+  const ref = usePage([res.data ? 1 : 0]);
+  if (res.loading && !res.data) return <PageSkeleton />;
+  if (res.error) return <ErrorMsg error={res.error} onRetry={res.retry} />;
   const a = res.data;
   const context = { name: a.title };
   return (
-    <div className="page collection">
+    <div className="page collection" ref={ref}>
       <Header
         kind={a.type}
         title={a.title}
         thumb={a.thumb}
         color={colorFor(a.id)}
-        meta={<><ArtistLinks artists={a.artists} className="strong" />{a.year && <span> • {a.year}</span>}<span> • {a.tracks.length}곡, {totalTime(a.tracks)}</span></>}
+        meta={<><ArtistLinks artists={a.artists} className="strong" />{a.year && <span> · {a.year}</span>}<span> · {a.tracks.length}곡, {totalTime(a.tracks)}</span></>}
       />
       <div className="page-body">
         <ActionBar tracks={a.tracks} context={context}>
-          <button className={`icon-btn big ${saved ? 'on' : ''}`} title={saved ? '라이브러리에서 삭제' : '라이브러리에 저장'} onClick={() => { toggleSaved(a); toast(saved ? '라이브러리에서 삭제했습니다' : '라이브러리에 저장했습니다'); }}>
-            {saved ? <CheckCircle2 size={30} /> : <PlusCircle size={30} />}
+          <button className={`icon-btn big ${saved ? 'on' : ''}`} title={saved ? '보관함에서 삭제' : '보관함에 저장'} onClick={() => { toggleSaved(a); toast(saved ? '보관함에서 삭제했습니다' : '보관함에 저장했습니다'); }}>
+            {saved ? <CheckCircle2 size={28} /> : <PlusCircle size={28} />}
           </button>
         </ActionBar>
         <TrackList tracks={a.tracks} context={context} showAlbum={false} showThumb={false} />
-        {a.description && <p className="album-desc">{a.description}</p>}
+        {a.description && <p className="album-desc" data-enter>{a.description}</p>}
         {a.more.map((s) => <Shelf key={s.title} title={s.title} items={s.items} />)}
       </div>
     </div>
@@ -98,24 +116,25 @@ export function Playlist({ id }) {
   const res = useAsync(() => api.playlist(id), [id]);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const go = useNav((s) => s.go);
-  if (res.loading && !res.data) return <Loading />;
-  if (res.error) return <ErrorMsg error={res.error} />;
+  const ref = usePage([res.data ? 1 : 0]);
+  if (res.loading && !res.data) return <PageSkeleton />;
+  if (res.error) return <ErrorMsg error={res.error} onRetry={res.retry} />;
   const pl = res.data;
   const context = { name: pl.title };
   return (
-    <div className="page collection">
+    <div className="page collection" ref={ref}>
       <Header
         kind="플레이리스트"
         title={pl.title}
         thumb={pl.thumb}
         color={colorFor(pl.id)}
         description={pl.description?.slice(0, 160)}
-        meta={<>{pl.author && <b>{pl.author} • </b>}<span>{pl.tracks.length}곡, {totalTime(pl.tracks)}</span></>}
+        meta={<>{pl.author && <b>{pl.author} · </b>}<span>{pl.tracks.length}곡, {totalTime(pl.tracks)}</span></>}
       />
       <div className="page-body">
         <ActionBar tracks={pl.tracks} context={context}>
-          <button className="icon-btn big" title="내 라이브러리에 복사" onClick={() => { const nid = createPlaylist(pl.title, pl.tracks, { source: pl.id, thumb: pl.thumb }); toast('내 라이브러리에 저장했습니다'); go('local', { id: nid }); }}>
-            <PlusCircle size={30} />
+          <button className="icon-btn big" title="내 보관함에 복사" onClick={() => { const nid = createPlaylist(pl.title, pl.tracks, { source: pl.id, thumb: pl.thumb }); toast('내 플레이리스트로 저장했습니다'); go('local', { id: nid }); }}>
+            <PlusCircle size={28} />
           </button>
         </ActionBar>
         <Filterable tracks={pl.tracks}>{(shown) => <TrackList tracks={shown} context={context} />}</Filterable>
@@ -126,15 +145,17 @@ export function Playlist({ id }) {
 
 export function Liked() {
   const liked = useLibrary((s) => s.liked);
+  const go = useNav((s) => s.go);
+  const ref = usePage([]);
   const context = { name: '좋아요 표시한 곡' };
   return (
-    <div className="page collection">
+    <div className="page collection" ref={ref}>
       <Header
         kind="플레이리스트"
         title="좋아요 표시한 곡"
-        color="hsl(250 55% 45%)"
-        art={<div className="ph-art liked-art big"><Heart size={72} fill="#fff" /></div>}
-        meta={<span>{liked.length}곡</span>}
+        color="hsl(262 60% 45%)"
+        art={<div className="ph-art liked-art big"><Heart size={76} fill="#fff" /></div>}
+        meta={<span>{liked.length}곡{liked.length ? `, ${totalTime(liked)}` : ''}</span>}
       />
       <div className="page-body">
         {liked.length ? (
@@ -143,7 +164,9 @@ export function Liked() {
             <Filterable tracks={liked}>{(shown) => <TrackList tracks={shown} context={context} />}</Filterable>
           </>
         ) : (
-          <div className="center-msg"><p>좋아하는 곡에 하트를 눌러 여기에 모아보세요.</p></div>
+          <Empty icon={Heart} title="좋아하는 곡을 모아보세요" text="곡 옆의 하트를 누르면 여기에 저장돼요.">
+            <button className="btn grad" onClick={() => go('search', {})}>곡 찾아보기</button>
+          </Empty>
         )}
       </div>
     </div>
@@ -155,31 +178,34 @@ export function LocalPlaylist({ id }) {
   const { removeFromPlaylist, renamePlaylist, deletePlaylist } = useLibrary.getState();
   const prompt = useUI((s) => s.prompt);
   const go = useNav((s) => s.go);
+  const ref = usePage([id]);
   if (!pl) return <ErrorMsg error="플레이리스트를 찾을 수 없습니다." />;
   const context = { name: pl.name };
   const rename = () => prompt({ title: '플레이리스트 이름 바꾸기', value: pl.name, submitLabel: '저장', onSubmit: (v) => v.trim() && renamePlaylist(pl.id, v.trim()) });
+  const cover = pl.thumb || pl.tracks[0]?.thumb;
   return (
-    <div className="page collection">
+    <div className="page collection" ref={ref}>
       <Header
-        kind="플레이리스트"
+        kind="내 플레이리스트"
         title={pl.name}
+        thumb={cover}
         color={colorFor(pl.id)}
-        art={pl.thumb || pl.tracks[0]?.thumb ? <Thumb src={pl.thumb || pl.tracks[0].thumb} className="ph-art" /> : <div className="ph-art empty-art" onClick={rename}><ListMusic size={64} /></div>}
+        art={cover ? undefined : <div className="ph-art empty-art" onClick={rename}><ListMusic size={64} /></div>}
         meta={<span>{pl.tracks.length}곡{pl.tracks.length ? `, ${totalTime(pl.tracks)}` : ''}</span>}
       />
       <div className="page-body">
         <ActionBar tracks={pl.tracks} context={context}>
-          <button className="icon-btn big" title="이름 바꾸기" onClick={rename}><Pencil size={22} /></button>
-          <button className="icon-btn big" title="삭제" onClick={() => { deletePlaylist(pl.id); go('home'); toast('플레이리스트를 삭제했습니다'); }}><Trash2 size={22} /></button>
+          <button className="icon-btn big" title="이름 바꾸기" onClick={rename}><Pencil size={21} /></button>
+          <button className="icon-btn big" title="삭제" onClick={() => { deletePlaylist(pl.id); go('home'); toast('플레이리스트를 삭제했습니다'); }}><Trash2 size={21} /></button>
         </ActionBar>
         {pl.tracks.length ? (
           <Filterable tracks={pl.tracks}>
-            {(shown, filtered) => (
-              <TrackList tracks={shown} context={context} onRemove={filtered ? undefined : (i) => removeFromPlaylist(pl.id, i)} />
-            )}
+            {(shown, filtered) => <TrackList tracks={shown} context={context} onRemove={filtered ? undefined : (i) => removeFromPlaylist(pl.id, i)} />}
           </Filterable>
         ) : (
-          <div className="center-msg"><p>곡을 우클릭하고 '플레이리스트에 추가'를 눌러 곡을 담아보세요.</p></div>
+          <Empty icon={ListMusic} title="아직 비어 있어요" text="곡을 우클릭하고 '플레이리스트에 추가'를 눌러 담아보세요.">
+            <button className="btn grad" onClick={() => go('search', {})}>곡 찾아보기</button>
+          </Empty>
         )}
       </div>
     </div>

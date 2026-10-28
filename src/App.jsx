@@ -2,14 +2,18 @@ import { useEffect, useRef } from 'react';
 import { useRoute, useNav } from './store/nav.js';
 import { usePlayer } from './store/player.js';
 import { useUI } from './store/ui.js';
-import TopBar from './components/TopBar.jsx';
-import Sidebar from './components/Sidebar.jsx';
-import PlayerBar from './components/PlayerBar.jsx';
-import QueuePanel from './components/QueuePanel.jsx';
+import { initDownloads } from './store/downloads.js';
+import Sidebar from './components/layout/Sidebar.jsx';
+import TopBar from './components/layout/TopBar.jsx';
+import PlayerDock from './components/layout/PlayerDock.jsx';
+import NowPanel from './components/layout/NowPanel.jsx';
+import Stage from './components/layout/Stage.jsx';
 import { ContextMenu, Toast, Dialog } from './components/Overlays.jsx';
 import Home from './views/Home.jsx';
 import Search from './views/Search.jsx';
 import Artist from './views/Artist.jsx';
+import Library from './views/Library.jsx';
+import Downloads from './views/Downloads.jsx';
 import Settings from './views/Settings.jsx';
 import { Album, Playlist, Liked, LocalPlaylist } from './views/Collection.jsx';
 
@@ -22,6 +26,8 @@ function View({ route }) {
     case 'playlist': return <Playlist key={p.id} id={p.id} />;
     case 'liked': return <Liked />;
     case 'local': return <LocalPlaylist key={p.id} id={p.id} />;
+    case 'library': return <Library />;
+    case 'downloads': return <Downloads />;
     case 'settings': return <Settings />;
     default: return <Home />;
   }
@@ -53,22 +59,25 @@ function useShortcuts() {
 
 export default function App() {
   const route = useRoute();
-  const queueOpen = useUI((s) => s.queueOpen);
+  const panelOpen = useUI((s) => s.panelOpen);
+  const stage = useUI((s) => s.stage);
   const mainRef = useRef(null);
   const index = useNav((s) => s.index);
   useShortcuts();
-
+  useEffect(() => initDownloads(), []);
   useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [index]);
 
   return (
-    <div className={`app ${queueOpen ? 'with-queue' : ''}`}>
-      <TopBar />
+    <div className={`app ${panelOpen ? 'with-panel' : ''}`}>
+      <div className="aurora"><i className="a1" /><i className="a2" /><i className="a3" /></div>
       <Sidebar />
-      <main className="main panel" ref={mainRef}>
-        <View route={route} />
+      <TopBar />
+      <main className="main" ref={mainRef}>
+        <View route={route} key={index} />
       </main>
-      {queueOpen && <QueuePanel />}
-      <PlayerBar />
+      {panelOpen && <NowPanel />}
+      <PlayerDock />
+      {stage && <Stage />}
       <ContextMenu />
       <Dialog />
       <Toast />

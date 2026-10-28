@@ -1,21 +1,36 @@
-import { Heart, Clock3, ListPlus, ListEnd, Disc3, User, Plus, Trash2, Play } from 'lucide-react';
+import { useRef } from 'react';
+import { Heart, Clock3, ListPlus, ListEnd, Disc3, User, Plus, Trash2, Radio, ArrowDownToLine, Play, MoreHorizontal } from 'lucide-react';
 import { usePlayer } from '../store/player.js';
 import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { useUI, toast } from '../store/ui.js';
-import { api } from '../api.js';
-import { fmtTime } from '../util.js';
-import { Thumb, ArtistLinks } from './common.jsx';
+import { useDownloads, download, removeDownload } from '../store/downloads.js';
+import { api } from '../lib/api.js';
+import { fmtTime } from '../lib/util.js';
+import { burst, useEnter } from '../lib/motion.js';
+import { Thumb, ArtistLinks, Equalizer } from './common.jsx';
+import DownloadButton from './DownloadButton.jsx';
+
+export async function startRadio(track) {
+  try {
+    const more = await api.related(track.id);
+    usePlayer.getState().playList([track, ...more], 0, { name: `${track.title} 라디오` });
+  } catch {
+    toast('라디오를 시작할 수 없습니다');
+  }
+}
 
 export function trackMenuItems(track, extra = []) {
   const p = usePlayer.getState();
   const lib = useLibrary.getState();
   const nav = useNav.getState();
   const liked = lib.isLiked(track.id);
+  const downloaded = useDownloads.getState().done.has(track.id);
   const artist = track.artists?.find((a) => a.id);
   return [
     { label: '다음에 재생', icon: ListPlus, onClick: () => p.playNext(track) },
     { label: '대기열에 추가', icon: ListEnd, onClick: () => p.addToQueue(track) },
+    { label: '이 곡으로 라디오 시작', icon: Radio, onClick: () => startRadio(track) },
     { divider: true },
     {
       label: '플레이리스트에 추가', icon: Plus,
@@ -25,15 +40,12 @@ export function trackMenuItems(track, extra = []) {
       ],
     },
     { label: liked ? '좋아요 취소' : '좋아요', icon: Heart, onClick: () => lib.toggleLike(track) },
+    downloaded
+      ? { label: '다운로드 삭제', icon: Trash2, onClick: () => removeDownload(track.id) }
+      : { label: '다운로드', icon: ArrowDownToLine, onClick: () => download(track) },
     { divider: true },
     artist && { label: '아티스트로 이동', icon: User, onClick: () => nav.go('artist', { id: artist.id }) },
     track.album?.id && { label: '앨범으로 이동', icon: Disc3, onClick: () => nav.go('album', { id: track.album.id }) },
-    { label: '이 곡으로 라디오 시작', icon: Play, onClick: async () => {
-      try {
-        const more = await api.related(track.id);
-        p.playList([track, ...more], 0, { name: `${track.title} 라디오` });
-      } catch { toast('라디오를 시작할 수 없습니다'); }
-    } },
     ...extra,
   ].filter(Boolean);
 }
@@ -41,10 +53,17 @@ export function trackMenuItems(track, extra = []) {
 export function LikeButton({ track, size = 16, className = '' }) {
   const liked = useLibrary((s) => s.liked.some((t) => t.id === track.id));
   const toggle = useLibrary((s) => s.toggleLike);
+  const ref = useRef(null);
   return (
     <button
+      ref={ref}
       className={`icon-btn like ${liked ? 'on' : ''} ${className}`}
-      onClick={(e) => { e.stopPropagation(); toggle(track); toast(liked ? '좋아요 표시한 곡에서 삭제했습니다' : '좋아요 표시한 곡에 추가했습니다'); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!liked) burst(ref.current);
+        toggle(track);
+        toast(liked ? '좋아요 표시한 곡에서 삭제했습니다' : '좋아요 표시한 곡에 추가했습니다');
+      }}
       aria-label="좋아요"
     >
       <Heart size={size} fill={liked ? 'currentColor' : 'none'} />
@@ -52,12 +71,14 @@ export function LikeButton({ track, size = 16, className = '' }) {
   );
 }
 
-export default function TrackList({ tracks, context, showAlbum = true, showThumb = true, numbered = true, onRemove, compact }) {
+export default function TrackList({ tracks, context, showAlbum = true, showThumb = true, numbered = true, onRemove, compact, animate = true }) {
   const currentId = usePlayer((s) => s.queue[s.index]?.id);
   const playing = usePlayer((s) => s.playing);
   const playList = usePlayer((s) => s.playList);
   const openMenu = useUI((s) => s.openMenu);
   const go = useNav((s) => s.go);
+  const ref = useRef(null);
+  useEnter(ref, [animate ? tracks.length : 0], { step: 18, delay: 20 });
 
   const play = (i) => {
     if (tracks[i].id === currentId) usePlayer.getState().toggle();
@@ -65,7 +86,7 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
   };
 
   return (
-    <div className={`tracklist ${compact ? 'compact' : ''} ${showAlbum ? '' : 'no-album'}`}>
+    <div ref={ref} className={`tracklist ${compact ? 'compact' : ''} ${showAlbum ? '' : 'no-album'}`}>
       {!compact && (
         <div className="tl-head">
           <span className="c-num">#</span>
@@ -80,15 +101,16 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
         return (
           <div
             key={t.id + ':' + i}
+            data-enter={animate && i < 30 ? '' : undefined}
             className={`tl-row ${isCur ? 'current' : ''}`}
             onDoubleClick={() => play(i)}
             onMouseEnter={() => api.prefetch(t.id)}
             onContextMenu={(e) => openMenu(e, trackMenuItems(t, extra))}
           >
             <span className="c-num">
-              {numbered && <span className="num">{isCur && playing ? <span className="eq"><i /><i /><i /></span> : i + 1}</span>}
+              {numbered ? <span className="num">{isCur ? <Equalizer playing={playing} /> : i + 1}</span> : isCur && <span className="num"><Equalizer playing={playing} /></span>}
               <button className="row-play" onClick={() => play(i)} aria-label="재생">
-                {isCur && playing ? '❚❚' : <Play size={14} fill="currentColor" />}
+                {isCur && playing ? <span className="pause-glyph" /> : <Play size={14} fill="currentColor" />}
               </button>
             </span>
             <span className="c-title">
@@ -105,8 +127,9 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
             )}
             <span className="c-dur">
               <LikeButton track={t} className="hover-show" />
+              <DownloadButton track={t} className="hover-show" size={16} />
               <span className="dur">{fmtTime(t.duration)}</span>
-              <button className="icon-btn hover-show more" onClick={(e) => openMenu(e, trackMenuItems(t, extra))} aria-label="더 보기">⋯</button>
+              <button className="icon-btn hover-show" onClick={(e) => openMenu(e, trackMenuItems(t, extra))} aria-label="더 보기"><MoreHorizontal size={18} /></button>
             </span>
           </div>
         );

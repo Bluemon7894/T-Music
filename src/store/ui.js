@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+const savedPanel = (() => { try { return localStorage.getItem('t-music-panel') !== '0'; } catch { return true; } })();
+
 export const useUI = create((set, get) => ({
   menu: null, // { x, y, items: [{ label, onClick, icon, submenu }] }
   openMenu(e, items) {
@@ -20,8 +22,17 @@ export const useUI = create((set, get) => ({
   prompt(opts) { set({ dialog: opts }); },
   closeDialog() { set({ dialog: null }); },
 
-  queueOpen: false,
-  toggleQueue() { set((s) => ({ queueOpen: !s.queueOpen })); },
+  panelOpen: savedPanel, // right "now playing" panel
+  togglePanel() {
+    const panelOpen = !get().panelOpen;
+    set({ panelOpen });
+    try { localStorage.setItem('t-music-panel', panelOpen ? '1' : '0'); } catch { /* ignore */ }
+  },
+  panelTab: 'next', // next | queue
+  setPanelTab(panelTab) { set({ panelTab, panelOpen: true }); },
+
+  stage: false, // fullscreen now-playing
+  setStage(stage) { set({ stage }); },
 }));
 
 export const toast = (text) => useUI.getState().showToast(text);

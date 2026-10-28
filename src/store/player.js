@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { api, streamUrl } from '../api.js';
+import { api, streamUrl } from '../lib/api.js';
+import { attach } from '../lib/audio.js';
 import { useLibrary } from './library.js';
 import { toast } from './ui.js';
 
@@ -9,7 +10,10 @@ const audios = [new Audio(), new Audio()];
 let cur = 0;
 const active = () => audios[cur];
 const spare = () => audios[1 - cur];
-for (const a of audios) a.preload = 'auto';
+for (const a of audios) {
+  a.preload = 'auto';
+  a.crossOrigin = 'anonymous'; // lets the visualizer read samples
+}
 
 const saved = (() => {
   try { return JSON.parse(localStorage.getItem('t-music-player') || '{}'); } catch { return {}; }
@@ -98,12 +102,17 @@ export const usePlayer = create((set, get) => ({
   toggle() {
     const a = active();
     if (get().index < 0) return;
-    if (a.paused) a.play().catch(() => {});
+    if (a.paused) { attach(a); a.play().catch(() => {}); }
     else a.pause();
   },
 
   next(auto = false) {
     const { queue, index, repeat } = get();
+    if (!auto) {
+      // Count a skipped track once it has been listened to for a while.
+      const t = queue[index];
+      if (t && active().currentTime > 30) useLibrary.getState().addListen(t, active().currentTime);
+    }
     if (auto && repeat === 'one') {
       active().currentTime = 0;
       active().play().catch(() => {});
@@ -195,6 +204,7 @@ export const usePlayer = create((set, get) => ({
     a.volume = get().volume;
     a.muted = get().muted;
     set({ time: a.currentTime || 0, duration: track.duration || 0, loading: a.readyState < 3 });
+    for (const el of audios) attach(el);
     a.play().catch(() => {});
     useLibrary.getState().pushRecent(track);
     updateMediaSession(track);
@@ -261,7 +271,12 @@ audios.forEach((a, i) => {
     }
   });
   a.addEventListener('durationchange', () => isActive() && isFinite(a.duration) && usePlayer.setState({ duration: a.duration }));
-  a.addEventListener('ended', () => isActive() && usePlayer.getState().next(true));
+  a.addEventListener('ended', () => {
+    if (!isActive()) return;
+    const t = usePlayer.getState().current();
+    if (t) useLibrary.getState().addListen(t, a.duration || t.duration);
+    usePlayer.getState().next(true);
+  });
   a.addEventListener('error', () => {
     const id = a.dataset.id;
     if (!id) return;

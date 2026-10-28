@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 // Everything the user saves lives on this computer only; no YouTube account involved.
-const slim = (t) => ({ id: t.id, title: t.title, artists: t.artists || [], album: t.album || null, duration: t.duration || 0, thumb: t.thumb || null });
+export const slim = (t) => ({ id: t.id, title: t.title, artists: t.artists || [], album: t.album || null, duration: t.duration || 0, thumb: t.thumb || null });
 const newId = () => Math.random().toString(36).slice(2, 10);
+const DAY = 24 * 60 * 60 * 1000;
 
 export const useLibrary = create(
   persist(
@@ -13,6 +14,7 @@ export const useLibrary = create(
       recent: [],
       savedAlbums: [],
       followed: [],
+      listens: [], // { id, title, artist, sec, at } — powers the listening stats
 
       isLiked: (id) => get().liked.some((t) => t.id === id),
       toggleLike(track) {
@@ -22,6 +24,11 @@ export const useLibrary = create(
 
       pushRecent(track) {
         set({ recent: [slim(track), ...get().recent.filter((t) => t.id !== track.id)].slice(0, 60) });
+      },
+      addListen(track, sec) {
+        const entry = { id: track.id, title: track.title, artist: track.artists?.[0]?.name || '', thumb: track.thumb, sec: Math.round(sec || 0), at: Date.now() };
+        const cutoff = Date.now() - 60 * DAY;
+        set({ listens: [entry, ...get().listens.filter((l) => l.at > cutoff)].slice(0, 2000) });
       },
 
       createPlaylist(name, tracks = [], extra = {}) {
@@ -51,7 +58,7 @@ export const useLibrary = create(
 
       toggleSavedAlbum(album) {
         const list = get().savedAlbums;
-        const item = { id: album.id, title: album.title, artists: album.artists || [], thumb: album.thumb, type: album.type };
+        const item = { id: album.id, title: album.title, artists: album.artists || [], thumb: album.thumb, type: album.type, year: album.year };
         set({ savedAlbums: list.some((a) => a.id === album.id) ? list.filter((a) => a.id !== album.id) : [item, ...list] });
       },
       toggleFollow(artist) {
@@ -63,3 +70,22 @@ export const useLibrary = create(
     { name: 't-music-library' },
   ),
 );
+
+// Last-7-days listening summary for the home dashboard.
+export function weeklyStats(listens) {
+  const since = Date.now() - 7 * DAY;
+  const week = listens.filter((l) => l.at > since);
+  const minutes = Math.round(week.reduce((n, l) => n + l.sec, 0) / 60);
+  const byArtist = {};
+  for (const l of week) if (l.artist) byArtist[l.artist] = (byArtist[l.artist] || 0) + l.sec;
+  const topArtist = Object.entries(byArtist).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+  const byTrack = {};
+  for (const l of week) (byTrack[l.id] ??= { ...l, count: 0 }).count++;
+  const topTracks = Object.values(byTrack).sort((a, b) => b.count - a.count).slice(0, 5);
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (6 - i));
+    const end = start.getTime() + DAY;
+    return { label: '일월화수목금토'[start.getDay()], min: Math.round(week.filter((l) => l.at >= start.getTime() && l.at < end).reduce((n, l) => n + l.sec, 0) / 60) };
+  });
+  return { minutes, plays: week.length, topArtist, topTracks, days };
+}

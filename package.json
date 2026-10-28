@@ -1,7 +1,7 @@
 {
   "name": "t-music",
   "productName": "T-Music",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "광고 없는 개인용 음악 플레이어 (YouTube 기반)",
   "author": "Bluemon7894",
   "main": "electron/main.js",
@@ -18,9 +18,11 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.2",
+    "animejs": "^4.5.0",
     "electron": "^45.1.0",
     "electron-builder": "^26.18.0",
     "lucide-react": "^1.63.0",
+    "pretendard": "^1.3.9",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "vite": "^8.3.5",
@@ -47,9 +49,18 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
+      "createDesktopShortcut": false,
       "createStartMenuShortcut": true,
-      "shortcutName": "T-Music"
+      "shortcutName": "T-Music",
+      "include": "build/tmusic.nsh",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
+      "installerHeader": "build/installerHeader.bmp",
+      "installerLanguages": [
+        "ko_KR"
+      ],
+      "language": "1042",
+      "unicode": true
     }
   }
 }

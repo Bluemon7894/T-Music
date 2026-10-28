@@ -11,6 +11,13 @@ export const api = {
   prefetch: (id) => call('prefetch', id),
   status: () => call('status'),
   diagnose: () => call('diagnose'),
+  downloads: () => call('downloads'),
+  download: (tracks) => call('download', tracks),
+  cancelDownload: (id) => call('cancelDownload', id),
+  retryDownload: (id) => call('retryDownload', id),
+  removeDownload: (ids) => call('removeDownload', ids),
+  openDownloads: () => call('openDownloads'),
+  onDownloads: (cb) => window.api.onDownloads(cb),
 };
 
 export const streamUrl = (id) => `ytm://stream/${id}`;

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { useUI } from '../store/ui.js';
+import { animate, ease } from '../lib/motion.js';
 
 function MenuList({ items, x, y, onClose, sub }) {
   const ref = useRef(null);
@@ -15,6 +16,7 @@ function MenuList({ items, x, y, onClose, sub }) {
     if (left + r.width > window.innerWidth - 8) left = sub ? x - r.width - (sub.width || 0) : window.innerWidth - r.width - 8;
     if (top + r.height > window.innerHeight - 8) top = Math.max(8, window.innerHeight - r.height - 8);
     setPos({ left, top });
+    animate(ref.current, { opacity: [0, 1], scale: [0.94, 1], translateY: [-6, 0], ease: ease.snap });
   }, [x, y, sub]);
 
   return (
@@ -71,8 +73,12 @@ export function ContextMenu() {
 
 export function Toast() {
   const toast = useUI((s) => s.toast);
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    if (ref.current) animate(ref.current, { opacity: [0, 1], translateY: [24, 0], scale: [0.9, 1], ease: ease.bouncy });
+  }, [toast?.id]);
   if (!toast) return null;
-  return <div className="toast" key={toast.id}>{toast.text}</div>;
+  return <div className="toast" ref={ref} key={toast.id}><span className="toast-dot" />{toast.text}</div>;
 }
 
 export function Dialog() {

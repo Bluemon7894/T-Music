@@ -1,13 +1,15 @@
-import { useState } from 'react';
-import { BadgeCheck } from 'lucide-react';
-import { api } from '../api.js';
+import { useRef, useState, useLayoutEffect } from 'react';
+import { BadgeCheck, Radio, Shuffle } from 'lucide-react';
+import { api } from '../lib/api.js';
 import { usePlayer } from '../store/player.js';
 import { useLibrary } from '../store/library.js';
 import { toast } from '../store/ui.js';
-import { useAsync, PlayButton, Loading, ErrorMsg } from '../components/common.jsx';
-import TrackList from '../components/TrackList.jsx';
+import { useAsync, PlayButton, PageSkeleton, ErrorMsg } from '../components/common.jsx';
+import TrackList, { startRadio } from '../components/TrackList.jsx';
+import { DownloadAllButton } from '../components/DownloadButton.jsx';
 import { Shelf } from '../components/Cards.jsx';
-import { colorFor } from '../util.js';
+import { colorFor } from '../lib/util.js';
+import { useEnter, animate } from '../lib/motion.js';
 
 export default function Artist({ id }) {
   const res = useAsync(() => api.artist(id), [id]);
@@ -16,44 +18,64 @@ export default function Artist({ id }) {
   const toggleFollow = useLibrary((s) => s.toggleFollow);
   const playing = usePlayer((s) => s.playing);
   const ctxName = usePlayer((s) => s.context?.name);
-  if (res.loading && !res.data) return <Loading />;
-  if (res.error) return <ErrorMsg error={res.error} />;
+  const ref = useRef(null);
+  const hero = useRef(null);
+  useEnter(ref, [res.data ? 1 : 0]);
+
+  // Slow parallax push-in on the hero image.
+  useLayoutEffect(() => {
+    const img = hero.current?.querySelector('.artist-hero-img');
+    if (img) animate(img, { scale: [1.18, 1.04], opacity: [0, 1], duration: 1400, ease: 'out(3)' });
+  }, [res.data?.id]);
+
+  if (res.loading && !res.data) return <PageSkeleton />;
+  if (res.error) return <ErrorMsg error={res.error} onRetry={res.retry} />;
   const a = res.data;
   const context = { name: a.name };
   const isThis = ctxName === a.name;
 
   return (
-    <div className="page artist">
-      <div className="artist-hero" style={{ '--hdr': colorFor(a.id), backgroundImage: a.thumb ? `url("${a.thumb}")` : undefined }}>
+    <div className="page artist" ref={ref} style={{ '--hdr': colorFor(a.id) }}>
+      <div className="artist-hero" ref={hero}>
+        <div className="artist-hero-img" style={{ backgroundImage: a.thumb ? `url("${a.thumb}")` : undefined }} />
         <div className="artist-hero-shade" />
         <div className="artist-hero-text">
-          <span className="verified"><BadgeCheck size={20} fill="#3d91f4" color="#fff" /> 아티스트</span>
-          <h1 className={a.name.length > 14 ? 'long' : ''}>{a.name}</h1>
-          {a.subscribers && <span className="listeners">구독자 {a.subscribers}명</span>}
+          <span className="verified" data-enter><BadgeCheck size={18} /> 아티스트</span>
+          <h1 className={a.name.length > 14 ? 'long' : ''} data-enter>{a.name}</h1>
+          {a.subscribers && <span className="listeners" data-enter>구독자 {a.subscribers}명</span>}
         </div>
       </div>
       <div className="page-body">
-        <div className="action-bar">
-          <PlayButton size={56} playing={isThis && playing} onClick={() => (isThis ? usePlayer.getState().toggle() : usePlayer.getState().playList(a.songs, 0, context))} />
-          <button className={`pill outline ${following ? 'on' : ''}`} onClick={() => { toggleFollow(a); toast(following ? '팔로우를 취소했습니다' : '팔로우했습니다'); }}>
-            {following ? '팔로잉' : '팔로우하기'}
+        <div className="action-bar" data-enter>
+          <PlayButton size={58} playing={isThis && playing} onClick={() => (isThis ? usePlayer.getState().toggle() : usePlayer.getState().playList(a.songs, 0, context))} />
+          <button className="icon-btn big" title="셔플 재생" onClick={() => { const p = usePlayer.getState(); if (!p.shuffle) p.toggleShuffle(); p.playList(a.songs, Math.floor(Math.random() * a.songs.length), context); }}><Shuffle size={24} /></button>
+          {a.songs[0] && <button className="icon-btn big" title="아티스트 라디오" onClick={() => startRadio(a.songs[0])}><Radio size={24} /></button>}
+          <DownloadAllButton tracks={a.songs} />
+          <button className={`btn outline ${following ? 'on' : ''}`} onClick={() => { toggleFollow(a); toast(following ? '팔로우를 취소했습니다' : '팔로우했습니다'); }}>
+            {following ? '팔로잉' : '팔로우'}
           </button>
         </div>
-        {a.songs.length > 0 && (
-          <section>
-            <h2>인기</h2>
-            <TrackList tracks={more ? a.songs : a.songs.slice(0, 5)} context={context} showAlbum={false} compact />
-            {a.songs.length > 5 && <button className="text-btn" onClick={() => setMore(!more)}>{more ? '간단히 보기' : '자세히 보기'}</button>}
-          </section>
-        )}
+        <div className="artist-grid">
+          {a.songs.length > 0 && (
+            <section className="artist-top" data-enter>
+              <h2>인기 곡</h2>
+              <TrackList tracks={more ? a.songs : a.songs.slice(0, 5)} context={context} showAlbum={false} compact animate={false} />
+              {a.songs.length > 5 && <button className="text-btn" onClick={() => setMore(!more)}>{more ? '간단히 보기' : '더 보기'}</button>}
+            </section>
+          )}
+          {a.description && (
+            <section className="about" data-enter>
+              <h2>소개</h2>
+              <div className="about-card" style={{ backgroundImage: a.thumb ? `url("${a.thumb}")` : undefined }}>
+                <div className="about-shade" />
+                <p>{a.description}</p>
+              </div>
+            </section>
+          )}
+        </div>
         {a.sections.map((s) => <Shelf key={s.title} title={s.title} items={s.items} />)}
-        {a.description && (
-          <section className="about">
-            <h2>정보</h2>
-            <p>{a.description}</p>
-          </section>
-        )}
       </div>
     </div>
   );
 }
+

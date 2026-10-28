@@ -252,12 +252,16 @@ export function related(videoId) {
 }
 
 const HOME_SHELVES = [
-  { title: '지금 인기 있는 K-POP', query: 'K-POP 인기곡 플레이리스트' },
-  { title: '최신 음악', query: '최신 가요 플레이리스트' },
-  { title: '감성 발라드', query: '발라드 플레이리스트' },
+  { title: '지금 뜨는 K-POP', query: 'K-POP 인기곡 플레이리스트' },
+  { title: '새로 나온 음악', query: '최신 가요 플레이리스트' },
+  { title: '마음을 울리는 발라드', query: '발라드 플레이리스트' },
   { title: '힙합 & R&B', query: '국내 힙합 플레이리스트' },
-  { title: '집중할 때', query: '공부할 때 듣는 음악 플레이리스트' },
-  { title: '팝 히트', query: 'pop hits playlist' },
+  { title: '글로벌 팝 히트', query: 'pop hits playlist' },
+  { title: '인디 & 어쿠스틱', query: '인디 어쿠스틱 플레이리스트' },
+  { title: '드라마 OST 명곡', query: '드라마 OST 플레이리스트' },
+  { title: '집중이 필요할 때', query: '공부할 때 듣는 음악 플레이리스트' },
+  { title: 'J-POP 셀렉션', query: 'J-POP 플레이리스트' },
+  { title: '밤에 듣기 좋은', query: '새벽 감성 플레이리스트' },
 ];
 
 export function home() {
