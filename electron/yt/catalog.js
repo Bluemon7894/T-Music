@@ -1,0 +1,276 @@
+// Catalog: search, album/artist/playlist pages, related tracks, home feed.
+// Logged-out YT Music in Korea omits songs, home and radio, so those parts are
+// filled from regular YouTube.
+import { call } from './client.js';
+import * as P from './parse.js';
+
+const memo = new Map();
+async function cached(key, ttlMs, fn) {
+  const hit = memo.get(key);
+  if (hit && hit.until > Date.now()) return hit.value;
+  const value = await fn();
+  memo.set(key, { value, until: Date.now() + ttlMs });
+  if (memo.size > 300) memo.delete(memo.keys().next().value);
+  return value;
+}
+
+const MIN = 60 * 1000;
+const VIDEOS_ONLY = 'EgIQAQ%3D%3D';
+
+function uniqueBy(list, key = (x) => x.id) {
+  const seen = new Set();
+  return list.filter((x) => {
+    const k = key(x);
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+// Sort into score bands, keeping YouTube's relevance order within a band.
+const band = (s) => (s >= 3 ? 2 : s >= 0 ? 1 : 0);
+function rank(tracks) {
+  return tracks
+    .map((t, i) => ({ t, i }))
+    .sort((a, b) => band(b.t.score) - band(a.t.score) || a.i - b.i)
+    .map((x) => x.t);
+}
+
+async function webSongs(query, limit = 20) {
+  const d = await call('/search', { client: 'WEB', query, params: VIDEOS_ONLY });
+  const vids = P.findAll(d, 'videoRenderer').map((v) => P.parseVideo(v, query)).filter(Boolean);
+  return rank(vids.filter((t) => t.score > -3)).slice(0, limit);
+}
+
+// Auto-generated "Artist - Topic" uploads carry this line in their description,
+// so adding it to the query surfaces official studio audio instead of MVs/covers.
+async function officialAudio(query, limit = 20) {
+  const d = await call('/search', { client: 'WEB', query: `${query} "Provided to YouTube"`, params: VIDEOS_ONLY });
+  return P.findAll(d, 'videoRenderer')
+    .map((v) => P.parseVideo(v, query))
+    .filter((t) => t && t.score > -3)
+    .slice(0, limit);
+}
+
+// The highlighted top result YT Music shows above the list.
+function parseCard(d) {
+  const card = P.find(d, 'musicCardShelfRenderer');
+  if (!card) return null;
+  const run = card.title?.runs?.[0];
+  const nav = run?.navigationEndpoint;
+  const browseId = nav?.browseEndpoint?.browseId;
+  const th = P.thumb(P.find(card.thumbnail, 'thumbnails'));
+  if (browseId?.startsWith('UC')) return { kind: 'artist', id: browseId, name: run.text, thumb: th, subtitle: '아티스트' };
+  if (browseId?.startsWith('MPRE')) return { kind: 'album', id: browseId, title: run.text, artists: [], type: '앨범', thumb: th };
+  return null;
+}
+
+export function search(query) {
+  return cached('search:' + query, 10 * MIN, async () => {
+    const [ytm, official, web] = await Promise.allSettled([
+      call('/search', { client: 'YTMUSIC', query }),
+      officialAudio(query, 20),
+      webSongs(query, 30),
+    ]);
+    const ok = (r) => (r.status === 'fulfilled' ? r.value : null);
+    [ytm, official, web].forEach((r, i) => r.status === 'rejected' && console.warn(`[search] part ${i} failed:`, r.reason?.message));
+    const items = ok(ytm)
+      ? P.findAll(ytm.value, 'musicResponsiveListItemRenderer').map((r) => P.parseResponsive(r)).filter(Boolean)
+      : [];
+    const of = (kind) => uniqueBy(items.filter((i) => i.kind === kind));
+    // Logged-out YT Music only returns fan uploads and episodes as "tracks" here, so
+    // official audio goes first and those clips (with a real duration) after it.
+    const ytmSongs = of('track').filter((t) => t.duration > 0);
+    const songs = uniqueBy([...(ok(official) || []), ...ytmSongs, ...(ok(web) || [])]).map(P.strip);
+    const card = ok(ytm) ? parseCard(ytm.value) : null;
+    let artists = of('artist');
+    if (card?.kind === 'artist') artists = uniqueBy([card, ...artists]);
+    const albums = of('album');
+    const playlists = of('playlist');
+
+    const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '');
+    const q = norm(query);
+    let top;
+    if (card) top = card;
+    else if (artists[0] && norm(artists[0].name) === q) top = artists[0];
+    else if (albums[0] && norm(albums[0].title) === q) top = albums[0];
+    else top = songs[0] || artists[0] || albums[0] || null;
+
+    if (!songs.length && !artists.length && !albums.length && !playlists.length && [ytm, official, web].every((r) => r.status === 'rejected')) {
+      throw new Error('검색에 실패했습니다. 인터넷 연결을 확인하세요.');
+    }
+    return { top, songs, artists, albums, playlists };
+  });
+}
+
+export async function suggest(input) {
+  if (!input.trim()) return [];
+  const d = await call('/music/get_search_suggestions', { client: 'YTMUSIC', input });
+  return P.findAll(d, 'searchSuggestionRenderer').map((r) => P.text(r.suggestion)).filter(Boolean).slice(0, 8);
+}
+
+function headerOf(d) {
+  return P.find(d, 'musicResponsiveHeaderRenderer')
+    || P.find(d, 'musicDetailHeaderRenderer')
+    || P.find(d, 'musicEditablePlaylistDetailHeaderRenderer')
+    || P.find(d, 'musicImmersiveHeaderRenderer')
+    || P.find(d, 'musicVisualHeaderRenderer')
+    || {};
+}
+
+function carousels(d) {
+  return P.findAll(d, 'musicCarouselShelfRenderer').map((s) => ({
+    title: P.text(P.find(s.header, 'title')),
+    items: uniqueBy((s.contents || []).map((c) =>
+      c.musicTwoRowItemRenderer ? P.parseTwoRow(c.musicTwoRowItemRenderer)
+        : c.musicResponsiveListItemRenderer ? P.parseResponsive(c.musicResponsiveListItemRenderer)
+          : null).filter(Boolean), (x) => x.kind + x.id),
+  })).filter((s) => s.items.length);
+}
+
+export function album(id) {
+  return cached('album:' + id, 60 * MIN, async () => {
+    const d = await call('/browse', { client: 'YTMUSIC', browseId: id });
+    const h = headerOf(d);
+    const title = P.text(h.title);
+    const strap = h.straplineTextOne?.runs || h.subtitle?.runs || [];
+    const artists = strap
+      .filter((r) => r.navigationEndpoint?.browseEndpoint?.browseId?.startsWith('UC'))
+      .map((r) => ({ id: r.navigationEndpoint.browseEndpoint.browseId, name: r.text }));
+    if (!artists.length && h.straplineTextOne) artists.push({ id: null, name: P.text(h.straplineTextOne) });
+    const subtitle = P.text(h.subtitle);
+    const thumb = P.thumb(P.find(h.thumbnail, 'thumbnails'), 800);
+    const shelf = P.find(d, 'musicShelfRenderer') || d;
+    const ctx = { artists, album: { id, name: title }, thumb };
+    const tracks = uniqueBy(P.findAll(shelf, 'musicResponsiveListItemRenderer').map((r) => P.parseResponsive(r, ctx)).filter((t) => t?.kind === 'track'));
+    // Album tracks only carry their own row thumbnail when it differs; prefer the cover.
+    for (const t of tracks) if (t.thumb?.includes('i.ytimg.com')) t.thumb = thumb;
+    return {
+      kind: 'album',
+      id,
+      title,
+      artists,
+      type: subtitle.split('•')[0]?.trim() || '앨범',
+      year: subtitle.match(/\d{4}/)?.[0] || '',
+      info: P.text(h.secondSubtitle),
+      description: P.text(P.find(h, 'musicDescriptionShelfRenderer')?.description),
+      thumb,
+      tracks,
+      more: carousels(d),
+    };
+  });
+}
+
+export function artist(id) {
+  return cached('artist:' + id, 60 * MIN, async () => {
+    const d = await call('/browse', { client: 'YTMUSIC', browseId: id });
+    const h = headerOf(d);
+    const name = P.text(h.title);
+    const thumb = P.thumb(P.find(h.thumbnail, 'thumbnails'), 1200);
+    const shelf = P.find(d, 'musicShelfRenderer');
+    let songs = shelf
+      ? P.findAll(shelf, 'musicResponsiveListItemRenderer').map((r) => P.parseResponsive(r, { artists: [{ id, name }] })).filter((t) => t?.kind === 'track')
+      : [];
+    if (!songs.length && name) {
+      // YT Music hides the songs shelf when logged out; fall back to YouTube.
+      // The artist's own YouTube channel id can differ from the YT Music id, so
+      // keep the channel that uploaded most of the official audio results.
+      const found = await officialAudio(name, 30).catch(() => []);
+      const counts = {};
+      for (const t of found) if (t.officialArtist || t.topic) counts[t.artists[0].name] = (counts[t.artists[0].name] || 0) + 1;
+      const owner = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+      songs = found
+        .filter((t) => owner && t.artists[0].name === owner)
+        .map((t) => ({ ...P.strip(t), artists: [{ id, name }] }));
+    }
+    return {
+      kind: 'artist',
+      id,
+      name,
+      thumb,
+      description: P.text(h.description),
+      subscribers: P.text(P.find(h.subscriptionButton, 'subscriberCountText')),
+      songs: uniqueBy(songs).slice(0, 10),
+      sections: carousels(d),
+    };
+  });
+}
+
+export function playlist(id) {
+  return cached('playlist:' + id, 30 * MIN, async () => {
+    const browseId = id.startsWith('VL') ? id : 'VL' + id;
+    let result = null;
+    try {
+      const d = await call('/browse', { client: 'YTMUSIC', browseId });
+      const h = headerOf(d);
+      const tracks = uniqueBy(P.findAll(P.find(d, 'musicPlaylistShelfRenderer') || P.find(d, 'musicShelfRenderer') || {}, 'musicResponsiveListItemRenderer')
+        .map((r) => P.parseResponsive(r)).filter((t) => t?.kind === 'track'));
+      if (tracks.length) {
+        result = {
+          title: P.text(h.title),
+          author: P.text(h.straplineTextOne) || P.text(h.subtitle),
+          info: P.text(h.secondSubtitle),
+          description: P.text(P.find(h, 'musicDescriptionShelfRenderer')?.description),
+          thumb: P.thumb(P.find(h.thumbnail, 'thumbnails'), 800),
+          tracks,
+        };
+      }
+    } catch {
+      // fall through to regular YouTube
+    }
+    if (!result) {
+      const d = await call('/browse', { client: 'WEB', browseId });
+      const meta = P.find(d, 'playlistMetadataRenderer') || {};
+      const tracks = uniqueBy([
+        ...P.findAll(d, 'playlistVideoRenderer').map(P.parsePlaylistVideo),
+        ...P.findAll(d, 'lockupViewModel').map((l) => P.parseLockup(l)),
+      ].filter(Boolean)).map(P.strip);
+      result = {
+        title: meta.title || P.text(P.find(d, 'pageHeaderViewModel')?.title) || '재생목록',
+        author: '',
+        info: `${tracks.length}곡`,
+        description: meta.description || '',
+        thumb: tracks[0]?.thumb || null,
+        tracks,
+      };
+    }
+    if (!result.tracks.length) throw new Error('재생목록을 불러올 수 없습니다.');
+    return { kind: 'playlist', id: browseId.slice(2), ...result };
+  });
+}
+
+// "Radio" for a track: YouTube's related videos, filtered to song-like results.
+export function related(videoId) {
+  return cached('related:' + videoId, 30 * MIN, async () => {
+    const d = await call('/next', { client: 'WEB', videoId });
+    const list = [
+      ...P.findAll(d, 'lockupViewModel').map((l) => P.parseLockup(l)),
+      ...P.findAll(d, 'compactVideoRenderer').map((v) => P.parseVideo(v)),
+    ].filter((t) => t && t.id !== videoId && t.score > -3);
+    return uniqueBy(rank(list)).map(P.strip);
+  });
+}
+
+const HOME_SHELVES = [
+  { title: '지금 인기 있는 K-POP', query: 'K-POP 인기곡 플레이리스트' },
+  { title: '최신 음악', query: '최신 가요 플레이리스트' },
+  { title: '감성 발라드', query: '발라드 플레이리스트' },
+  { title: '힙합 & R&B', query: '국내 힙합 플레이리스트' },
+  { title: '집중할 때', query: '공부할 때 듣는 음악 플레이리스트' },
+  { title: '팝 히트', query: 'pop hits playlist' },
+];
+
+export function home() {
+  return cached('home', 60 * MIN, async () => {
+    const shelves = await Promise.all(HOME_SHELVES.map(async (s) => {
+      try {
+        const d = await call('/search', { client: 'YTMUSIC', query: s.query });
+        const items = P.findAll(d, 'musicResponsiveListItemRenderer').map((r) => P.parseResponsive(r)).filter((i) => i && (i.kind === 'playlist' || i.kind === 'album'));
+        return { title: s.title, items: uniqueBy(items, (x) => x.kind + x.id).slice(0, 12) };
+      } catch {
+        return { title: s.title, items: [] };
+      }
+    }));
+    return { shelves: shelves.filter((s) => s.items.length) };
+  });
+}

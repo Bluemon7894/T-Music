@@ -1,0 +1,55 @@
+{
+  "name": "t-music",
+  "productName": "T-Music",
+  "version": "0.1.0",
+  "description": "광고 없는 개인용 음악 플레이어 (YouTube 기반)",
+  "author": "Bluemon7894",
+  "main": "electron/main.js",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "vite build",
+    "start": "vite build && electron .",
+    "dist": "vite build && electron-builder --win nsis --x64"
+  },
+  "dependencies": {
+    "youtubei.js": "^18.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
+    "lucide-react": "^1.63.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vite": "^8.3.5",
+    "zustand": "^5.0.16"
+  },
+  "build": {
+    "appId": "com.bluemon7894.tmusic",
+    "productName": "T-Music",
+    "artifactName": "T-Music-Setup-${version}.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "T-Music"
+    }
+  }
+}
