@@ -119,7 +119,7 @@ export default function Sidebar() {
       <div className="lib-head">
         <div className="seg">
           <button className={tab === 'playlists' ? 'on' : ''} onClick={() => setTab('playlists')}>플레이리스트</button>
-          <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>앨범·아티스트</button>
+          <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>저장됨</button>
         </div>
         <div className="lib-actions">
           <button className="icon-btn circle" title="YouTube 재생목록 가져오기" onClick={importPlaylist}><Link2 size={16} /></button>

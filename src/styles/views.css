@@ -16,7 +16,7 @@
 .hero-label { display: inline-block; padding: 4px 10px; border-radius: 8px; background: rgba(139, 92, 246, 0.35); font-size: 11.5px; font-weight: 800; letter-spacing: 0.04em; color: var(--v-100); }
 .hero-pick h2 { font-size: 21px; margin: 12px 0 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .hero-pick p { color: var(--sub); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hero-actions { display: flex; gap: 10px; margin-top: 16px; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .hero-flow { position: relative; min-height: 340px; overflow: hidden; border-radius: var(--r-lg); }
 
 .quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin-top: 30px; perspective: 1200px; }
@@ -177,8 +177,8 @@
 @keyframes stage-drift { to { transform: scale(1.35) rotate(6deg); } }
 .stage-shade { position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 40%, rgba(124, 58, 237, 0.25), transparent 60%), linear-gradient(180deg, rgba(8, 5, 15, 0.2), rgba(8, 5, 15, 0.85)); }
 .stage-close { position: absolute; top: 14px; left: 18px; z-index: 3; }
-.stage-main { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr); align-items: center; gap: 40px; padding: 60px 70px 20px; min-height: 0; }
-.stage-disc-wrap { position: relative; width: min(46vh, 520px); aspect-ratio: 1; justify-self: center; transform-style: preserve-3d; perspective: 1200px; }
+.stage-main { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: minmax(280px, 1fr) minmax(320px, 1fr); align-items: center; gap: clamp(24px, 4vw, 56px); padding: 64px clamp(32px, 5vw, 80px) 24px; min-height: 0; }
+.stage-disc-wrap { position: relative; width: min(46vh, 34vw, 520px); aspect-ratio: 1; justify-self: center; transform-style: preserve-3d; perspective: 1200px; }
 .stage-ring { position: absolute; inset: -16%; width: 132%; height: 132%; }
 .stage-disc { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, #1a1326 0 30%, #0c0814 31% 100%); box-shadow: 0 50px 100px -30px rgba(0, 0, 0, 0.95), 0 0 0 2px rgba(196, 181, 253, 0.12), inset 0 0 60px rgba(0, 0, 0, 0.8); animation: disc-spin 6s linear infinite; animation-play-state: paused; }
 .stage-disc.spinning { animation-play-state: running; }
@@ -211,8 +211,10 @@
 .stage-next-item span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .stage-next-item b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stage-next-item small { font-size: 11.5px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 1100px) {
-  .stage-main { grid-template-columns: 1fr; padding: 60px 40px 10px; justify-items: center; text-align: center; }
-  .stage-info { align-items: center; }
-  .stage-disc-wrap { width: min(36vh, 380px); }
+@media (max-height: 780px) {
+  .stage-next { display: none; }
+  .stage-main { padding-bottom: 40px; }
+  .stage-info h1 { font-size: clamp(28px, 3.6vw, 48px); -webkit-line-clamp: 2; }
+  .stage-artist { font-size: 17px; }
+  .stage-controls { gap: 20px; }
 }
