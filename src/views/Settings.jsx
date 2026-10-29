@@ -85,6 +85,20 @@ export default function Settings() {
     toast('오디오 출력 장치를 변경했습니다');
   };
 
+  // Global lyrics sync offset (compensates bluetooth latency or personal preference)
+  const [globalSync, setGlobalSync] = useState(() => {
+    try { return localStorage.getItem('t-music-global-sync') || '0'; } catch { return '0'; }
+  });
+  const changeGlobalSync = (val) => {
+    setGlobalSync(val);
+    try {
+      if (val === '0') localStorage.removeItem('t-music-global-sync');
+      else localStorage.setItem('t-music-global-sync', val);
+      window.dispatchEvent(new CustomEvent('lyrics-global-sync-changed'));
+      toast(`가사 전체 싱크를 ${Number(val) > 0 ? '+' : ''}${val}초로 설정했습니다`);
+    } catch {}
+  };
+
   // Auto-start with Windows
   const [autoStart, setAutoStartState] = useState(() => {
     try { return localStorage.getItem('t-music-autostart') === '1'; } catch { return false; }
@@ -200,6 +214,30 @@ export default function Settings() {
               <span className="muted small">곡마다 들쑥날쑥한 볼륨 차이를 실시간으로 완만하게 맞춰줍니다.</span>
             </div>
             <div className={`switch ${normalize ? 'on' : ''}`} />
+          </div>
+
+          <div className="set-item" style={{ cursor: 'default' }}>
+            <div className="set-item-text">
+              <span className="set-item-title">가사 전체 싱크 보정 (블루투스/오디오 지연)</span>
+              <span className="muted small">블루투스 이어폰이나 사운드바의 오디오 출력 딜레이에 맞춰 모든 곡의 가사 타이밍을 한 번에 조절합니다.</span>
+            </div>
+            <select
+              className="set-select"
+              value={globalSync}
+              onChange={(e) => changeGlobalSync(e.target.value)}
+            >
+              <option value="-0.5">-0.5초 (가사 빠르게)</option>
+              <option value="-0.4">-0.4초</option>
+              <option value="-0.3">-0.3초</option>
+              <option value="-0.2">-0.2초</option>
+              <option value="-0.1">-0.1초</option>
+              <option value="0">0.0초 (기본값)</option>
+              <option value="0.1">+0.1초</option>
+              <option value="0.2">+0.2초 (블루투스 권장)</option>
+              <option value="0.3">+0.3초</option>
+              <option value="0.4">+0.4초</option>
+              <option value="0.5">+0.5초 (가사 느리게)</option>
+            </select>
           </div>
 
           {devices.length > 0 && (

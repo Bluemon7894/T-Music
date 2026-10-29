@@ -4,7 +4,7 @@ import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useLibrary } from '../../store/library.js';
 import { api } from '../../lib/api.js';
-import { Thumb, ArtistLinks, Equalizer, useLyricsSync } from '../common.jsx';
+import { Thumb, ArtistLinks, Equalizer, useLyricsSync, SyncControl } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
@@ -78,9 +78,10 @@ function LyricsView({ track }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const { offset, adjust, reset } = useLyricsSync(track?.id);
-  const currentTime = usePlayer((s) => s.time);
   const seek = usePlayer((s) => s.seek);
+  const playing = usePlayer((s) => s.playing);
   const activeLineRef = useRef(null);
+  const [activeIdx, setActiveIdx] = useState(-1);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,9 +94,37 @@ function LyricsView({ track }) {
   }, [track?.id]);
 
   const lines = data?.lines || [];
-  const activeIdx = lines.length > 0
-    ? lines.reduce((best, l, i) => (l.time + offset <= currentTime + 0.1 ? i : best), -1)
-    : -1;
+
+  // Real-time 60fps RAF sync loop
+  useEffect(() => {
+    if (!lines.length) {
+      setActiveIdx(-1);
+      return;
+    }
+
+    let rafId;
+    const checkSync = () => {
+      const t = usePlayer.getState().getPreciseTime();
+      let best = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].time <= t + offset + 0.05) {
+          best = i;
+        } else {
+          break;
+        }
+      }
+      setActiveIdx((prev) => (prev !== best ? best : prev));
+      if (usePlayer.getState().playing) {
+        rafId = requestAnimationFrame(checkSync);
+      }
+    };
+
+    checkSync();
+    if (playing) {
+      rafId = requestAnimationFrame(checkSync);
+    }
+    return () => cancelAnimationFrame(rafId);
+  }, [lines, offset, playing]);
 
   useEffect(() => {
     const activeLine = activeLineRef.current;
@@ -147,6 +176,13 @@ function LyricsView({ track }) {
         <h3>{track.title}</h3>
         <p>{track.artists?.map((a) => a.name).join(', ')}</p>
       </div>
+      {lines.length > 0 && (
+        <SyncControl
+          offset={offset}
+          onAdjust={adjust}
+          onReset={reset}
+        />
+      )}
       {lines.length > 0 ? (
         <div className="lyrics-lines">
           {lines.map((l, i) => {
@@ -164,7 +200,10 @@ function LyricsView({ track }) {
           })}
         </div>
       ) : (
-        <div className="lyrics-plain">{data.plainLyrics}</div>
+        <div className="stage-lyrics-plain-box" style={{ padding: '4px 6px' }}>
+          <div className="stage-lyrics-plain-hint">일반 텍스트 가사 제공 중</div>
+          <div className="lyrics-plain">{data.plainLyrics}</div>
+        </div>
       )}
     </div>
   );

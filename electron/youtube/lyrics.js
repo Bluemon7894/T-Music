@@ -80,7 +80,7 @@ export function parseLrc(lrcText) {
   }
   const offsetSec = offsetMs / 1000;
 
-  const tagRegex = /\[(\d{2}):(\d{2}(?:\.\d{1,3})?)\]/g;
+  const tagRegex = /\[(\d{1,3}):(\d{2}(?:\.\d{1,3})?)\]/g;
   for (const raw of lrcText.split(/\r?\n/)) {
     const trimmed = raw.trim();
     if (!trimmed) continue;
@@ -92,12 +92,13 @@ export function parseLrc(lrcText) {
     while ((match = tagRegex.exec(trimmed)) !== null) {
       const minutes = Number(match[1]);
       const seconds = Number(match[2]);
-      const time = Math.max(0, minutes * 60 + seconds + offsetSec);
+      // Standard LRC offset: positive offset means lyrics should appear earlier (subtract from timestamp)
+      const time = Math.max(0, minutes * 60 + seconds - offsetSec);
       timestamps.push(time);
     }
 
     if (timestamps.length > 0) {
-      const text = trimmed.replace(/\[\d{2}:\d{2}(?:\.\d{1,3})?\]/g, '').trim();
+      const text = trimmed.replace(/\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]/g, '').trim();
       for (const time of timestamps) {
         lines.push({ time, text });
       }

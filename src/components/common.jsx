@@ -137,9 +137,16 @@ export function Empty({ icon: Icon, title, text, children }) {
 }
 
 export function useLyricsSync(trackId) {
-  const [offset, setOffset] = useState(() => {
+  const [trackOffset, setTrackOffset] = useState(() => {
     try {
       const v = localStorage.getItem(`t-music-sync-${trackId}`);
+      return v ? parseFloat(v) || 0 : 0;
+    } catch { return 0; }
+  });
+
+  const [globalOffset, setGlobalOffset] = useState(() => {
+    try {
+      const v = localStorage.getItem('t-music-global-sync');
       return v ? parseFloat(v) || 0 : 0;
     } catch { return 0; }
   });
@@ -147,12 +154,23 @@ export function useLyricsSync(trackId) {
   useEffect(() => {
     try {
       const v = localStorage.getItem(`t-music-sync-${trackId}`);
-      setOffset(v ? parseFloat(v) || 0 : 0);
-    } catch { setOffset(0); }
+      setTrackOffset(v ? parseFloat(v) || 0 : 0);
+    } catch { setTrackOffset(0); }
   }, [trackId]);
 
+  useEffect(() => {
+    const onSyncChange = () => {
+      try {
+        const v = localStorage.getItem('t-music-global-sync');
+        setGlobalOffset(v ? parseFloat(v) || 0 : 0);
+      } catch {}
+    };
+    window.addEventListener('lyrics-global-sync-changed', onSyncChange);
+    return () => window.removeEventListener('lyrics-global-sync-changed', onSyncChange);
+  }, []);
+
   const adjust = (delta) => {
-    setOffset((prev) => {
+    setTrackOffset((prev) => {
       const next = Math.round((prev + delta) * 10) / 10;
       try {
         if (next === 0) localStorage.removeItem(`t-music-sync-${trackId}`);
@@ -163,11 +181,13 @@ export function useLyricsSync(trackId) {
   };
 
   const reset = () => {
-    setOffset(0);
+    setTrackOffset(0);
     try { localStorage.removeItem(`t-music-sync-${trackId}`); } catch {}
   };
 
-  return { offset, adjust, reset };
+  const totalOffset = Math.round((trackOffset + globalOffset) * 10) / 10;
+
+  return { offset: totalOffset, trackOffset, globalOffset, adjust, reset };
 }
 
 export function SyncControl({ offset, onAdjust, onReset }) {
@@ -175,9 +195,11 @@ export function SyncControl({ offset, onAdjust, onReset }) {
     <div className="lyrics-sync-bar">
       <span className="sync-title">싱크</span>
       <button type="button" className="sync-btn" onClick={() => onAdjust(-0.5)} title="0.5초 빠르게">-0.5s</button>
-      <span className={`sync-val ${offset !== 0 ? 'active' : ''}`}>
+      <button type="button" className="sync-btn" onClick={() => onAdjust(-0.1)} title="0.1초 빠르게">-0.1s</button>
+      <span className={`sync-val ${offset !== 0 ? 'active' : ''}`} title="현재 싱크 오프셋 (초)">
         {offset !== 0 ? `${offset > 0 ? '+' : ''}${offset.toFixed(1)}s` : '0.0s'}
       </span>
+      <button type="button" className="sync-btn" onClick={() => onAdjust(0.1)} title="0.1초 느리게">+0.1s</button>
       <button type="button" className="sync-btn" onClick={() => onAdjust(0.5)} title="0.5초 느리게">+0.5s</button>
       {offset !== 0 && (
         <button type="button" className="sync-reset" onClick={onReset} title="싱크 0초로 초기화">초기화</button>

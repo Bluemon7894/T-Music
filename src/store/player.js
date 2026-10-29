@@ -159,6 +159,13 @@ export const usePlayer = create((set, get) => ({
   unshuffled: null,
 
   current: () => get().queue[get().index] || null,
+  getPreciseTime: () => {
+    try {
+      const a = active();
+      if (a && isFinite(a.currentTime)) return a.currentTime;
+    } catch {}
+    return get().time;
+  },
 
   playList(tracks, start = 0, context = null) {
     if (!tracks?.length) return;

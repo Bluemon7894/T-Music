@@ -5,7 +5,7 @@ import { ChevronDown, Shuffle, SkipBack, SkipForward, Repeat, Repeat1, Mic2 } fr
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { api } from '../../lib/api.js';
-import { Thumb, ArtistLinks, PlayButton, useLyricsSync } from '../common.jsx';
+import { Thumb, ArtistLinks, PlayButton, useLyricsSync, SyncControl } from '../common.jsx';
 import { LikeButton } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
@@ -17,10 +17,11 @@ function StageLyrics({ track }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const { offset, adjust, reset } = useLyricsSync(track?.id);
-  const currentTime = usePlayer((s) => s.time);
   const seek = usePlayer((s) => s.seek);
+  const playing = usePlayer((s) => s.playing);
   const activeLineRef = useRef(null);
   const containerRef = useRef(null);
+  const [activeIdx, setActiveIdx] = useState(-1);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,9 +35,37 @@ function StageLyrics({ track }) {
   }, [track?.id]);
 
   const lines = data?.lines || [];
-  const activeIdx = lines.length > 0
-    ? lines.reduce((best, l, i) => (l.time + offset <= currentTime + 0.1 ? i : best), -1)
-    : -1;
+
+  // Real-time 60fps RAF sync loop directly reading hardware-accurate currentTime
+  useEffect(() => {
+    if (!lines.length) {
+      setActiveIdx(-1);
+      return;
+    }
+
+    let rafId;
+    const checkSync = () => {
+      const t = usePlayer.getState().getPreciseTime();
+      let best = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].time <= t + offset + 0.05) {
+          best = i;
+        } else {
+          break;
+        }
+      }
+      setActiveIdx((prev) => (prev !== best ? best : prev));
+      if (usePlayer.getState().playing) {
+        rafId = requestAnimationFrame(checkSync);
+      }
+    };
+
+    checkSync();
+    if (playing) {
+      rafId = requestAnimationFrame(checkSync);
+    }
+    return () => cancelAnimationFrame(rafId);
+  }, [lines, offset, playing]);
 
   // Reset lyrics scroll to top when track changes
   useEffect(() => {
@@ -92,6 +121,15 @@ function StageLyrics({ track }) {
 
   return (
     <div className="stage-lyrics-wrapper">
+      <div className="stage-lyrics-header-row">
+        {lines.length > 0 && (
+          <SyncControl
+            offset={offset}
+            onAdjust={adjust}
+            onReset={reset}
+          />
+        )}
+      </div>
       <div className="stage-lyrics-container" ref={containerRef}>
         {lines.length > 0 ? (
           <div className="stage-lyrics-lines">
@@ -110,7 +148,10 @@ function StageLyrics({ track }) {
             })}
           </div>
         ) : (
-          <div className="stage-lyrics-plain">{data.plainLyrics}</div>
+          <div className="stage-lyrics-plain-box">
+            <div className="stage-lyrics-plain-hint">일반 텍스트 가사 제공 중 (타임스탬프 정보 없음)</div>
+            <div className="stage-lyrics-plain">{data.plainLyrics}</div>
+          </div>
         )}
       </div>
     </div>
