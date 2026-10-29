@@ -12,4 +12,9 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('update-progress', listener);
     return () => ipcRenderer.removeListener('update-progress', listener);
   },
+  onMediaControl: (cb) => {
+    const listener = (_e, action) => cb(action);
+    ipcRenderer.on('media-control', listener);
+    return () => ipcRenderer.removeListener('media-control', listener);
+  },
 });

@@ -24,7 +24,9 @@ export const api = {
   installUpdate: () => call('installUpdate'),
   setGithubToken: (tok) => call('setGithubToken', tok),
   openExternal: (url) => call('openExternal', url),
+  updateTrayTooltip: (text) => call('updateTrayTooltip', text),
   onUpdateProgress: (cb) => window.api?.onUpdateProgress?.(cb) || (() => {}),
+  onMediaControl: (cb) => window.api?.onMediaControl?.(cb) || (() => {}),
 };
 
 export const streamUrl = (id) => `ytm://stream/${id}`;

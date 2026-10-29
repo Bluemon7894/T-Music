@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -13,6 +13,9 @@ import { registerScheme, handleProtocol } from './protocol.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BG = '#0a0712';
+
+let tray = null;
+let isQuitting = false;
 
 registerScheme();
 
@@ -41,6 +44,7 @@ const api = {
   },
   installUpdate: () => updater.installUpdate(),
   setGithubToken: (tok) => updater.setGithubToken(tok),
+  updateTrayTooltip: (text) => { if (tray) tray.setToolTip(text || 'T-Music'); },
   openExternal: (url) => { if (url) shell.openExternal(url); },
 };
 
@@ -71,6 +75,13 @@ function createWindow() {
   });
   win.once('ready-to-show', () => win.show());
 
+  win.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      win.hide();
+    }
+  });
+
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) shell.openExternal(url);
     return { action: 'deny' };
@@ -78,6 +89,70 @@ function createWindow() {
 
   if (process.env.VITE_DEV_URL) win.loadURL(process.env.VITE_DEV_URL);
   else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+
+  return win;
+}
+
+function createTray(win) {
+  if (tray) return;
+  const iconPath = path.join(__dirname, '..', 'build', 'icon.png');
+  const image = fs.existsSync(iconPath)
+    ? nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+    : nativeImage.createEmpty();
+
+  tray = new Tray(image);
+  tray.setToolTip('T-Music');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'T-Music 열기',
+      click: () => {
+        win.show();
+        win.focus();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: '재생 / 일시정지',
+      click: () => win.webContents.send('media-control', 'toggle'),
+    },
+    {
+      label: '다음 곡',
+      click: () => win.webContents.send('media-control', 'next'),
+    },
+    {
+      label: '이전 곡',
+      click: () => win.webContents.send('media-control', 'prev'),
+    },
+    { type: 'separator' },
+    {
+      label: '종료',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  tray.on('click', () => {
+    if (win.isVisible()) {
+      if (win.isFocused()) {
+        win.hide();
+      } else {
+        win.focus();
+      }
+    } else {
+      win.show();
+      win.focus();
+    }
+  });
+
+  tray.on('double-click', () => {
+    win.show();
+    win.focus();
+  });
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -85,9 +160,17 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.setAppUserModelId('com.bluemon7894.tmusic');
 
+  app.on('before-quit', () => {
+    isQuitting = true;
+  });
+
   app.on('second-instance', () => {
     const [win] = BrowserWindow.getAllWindows();
-    if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+    if (win) {
+      if (!win.isVisible()) win.show();
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
   });
 
   app.whenReady().then(async () => {
@@ -99,11 +182,18 @@ if (!app.requestSingleInstanceLock()) {
       app.quit();
       return;
     }
-    createWindow();
+    const win = createWindow();
+    createTray(win);
     // Warm up in the background so the first click plays quickly.
     getClient().catch(() => {});
     ytdlp.ensure().catch(() => {});
   });
 
-  app.on('window-all-closed', () => app.quit());
+  app.on('window-all-closed', () => {
+    if (process.platform === 'darwin' || !isQuitting) {
+      // Keep alive in tray
+    } else {
+      app.quit();
+    }
+  });
 }

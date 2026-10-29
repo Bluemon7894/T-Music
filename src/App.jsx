@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { api } from './lib/api.js';
 import { useRoute, useNav } from './store/nav.js';
 import { usePlayer } from './store/player.js';
 import { useUI } from './store/ui.js';
@@ -65,11 +66,35 @@ export default function App() {
   const stage = useUI((s) => s.stage);
   const mainRef = useRef(null);
   const index = useNav((s) => s.index);
+  const currentTrack = usePlayer((s) => s.queue[s.index]);
+
   useShortcuts();
+
   useEffect(() => {
     initDownloads();
     useUpdater.getState().init();
   }, []);
+
+  // Handle media controls from system tray
+  useEffect(() => {
+    return api.onMediaControl((action) => {
+      const p = usePlayer.getState();
+      if (action === 'toggle') p.toggle();
+      else if (action === 'next') p.next();
+      else if (action === 'prev') p.prev();
+    });
+  }, []);
+
+  // Update tray tooltip with current playing track
+  useEffect(() => {
+    if (currentTrack) {
+      const artist = currentTrack.artists?.map((a) => a.name).join(', ') || currentTrack.artist || '';
+      api.updateTrayTooltip(`T-Music | ${currentTrack.title}${artist ? ` - ${artist}` : ''}`).catch(() => {});
+    } else {
+      api.updateTrayTooltip('T-Music - 음악 플레이어').catch(() => {});
+    }
+  }, [currentTrack?.id, currentTrack?.title]);
+
   useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [index]);
 
   return (
