@@ -169,12 +169,25 @@ export default function Stage() {
   const duration = p.duration || track.duration || 0;
   const upcoming = p.queue.slice(p.index + 1, p.index + 9);
 
-  // Lock all stage containers to never scroll vertically
+  // Lock all stage containers and window to never scroll vertically
   useLayoutEffect(() => {
     if (root.current) root.current.scrollTop = 0;
     if (mainRef.current) mainRef.current.scrollTop = 0;
     if (infoRef.current) infoRef.current.scrollTop = 0;
+    if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
   });
+
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      if (!e.target.closest('.stage-lyrics-container')) {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   const preventNonLyricsWheel = (e) => {
     if (e.target.closest('.stage-lyrics-container')) return;
