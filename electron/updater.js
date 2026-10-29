@@ -221,17 +221,30 @@ export async function installUpdate() {
   const installerPath = downloadedInstallerPath;
   console.log('[updater] Launching installer:', installerPath);
 
-  // Spawn installer detached, ignore stdio so it outlives this process, and quit current app.
-  const child = spawn(installerPath, [], {
-    detached: true,
-    stdio: 'ignore',
-  });
-  child.unref();
+  // Launch installer detached and quit current app.
+  try {
+    if (shell?.openPath) {
+      await shell.openPath(installerPath);
+    } else {
+      const child = spawn(installerPath, [], {
+        detached: true,
+        stdio: 'ignore',
+      });
+      child.unref();
+    }
+  } catch (err) {
+    console.warn('[updater] shell.openPath failed, falling back to spawn:', err);
+    const child = spawn(installerPath, [], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+  }
 
-  // Short delay to ensure process spawned, then quit.
+  // Delay slightly so the installer process is active, then exit cleanly
   setTimeout(() => {
     app.quit();
-  }, 500);
+  }, 800);
 
   return { success: true };
 }

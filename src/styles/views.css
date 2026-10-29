@@ -43,7 +43,7 @@
 .stat-card.link:hover { transform: translateY(-4px); border-color: var(--line-2); }
 .stat-top { display: flex; align-items: center; gap: 7px; color: var(--sub); font-size: 12.5px; font-weight: 700; }
 .stat-top svg { color: var(--v-300); }
-.stat-big { font-size: 38px; font-weight: 900; letter-spacing: -0.04em; margin-top: 8px; }
+.stat-big { font-size: 38px; font-weight: 900; letter-spacing: -0.04em; margin-top: 8px; white-space: nowrap; }
 .stat-big small { font-size: 15px; font-weight: 700; color: var(--sub); margin-left: 3px; }
 .stat-mid { font-size: 22px; font-weight: 800; margin-top: 14px; letter-spacing: -0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat-note { margin-top: auto; padding-top: 8px; color: var(--dim); font-size: 12px; display: flex; align-items: center; gap: 4px; }
@@ -56,7 +56,8 @@
 
 /* ---------- search ---------- */
 .search-loading { padding-top: 10px; }
-.sticky-chips { position: sticky; top: -22px; z-index: 5; margin: -22px -28px 0; padding: 18px 28px 14px; background: linear-gradient(180deg, rgba(14, 9, 26, 0.96) 70%, transparent); }
+.sticky-chips { position: sticky; top: 0; z-index: 10; margin: -22px -28px 14px; padding: 16px 28px 14px; background: rgba(14, 9, 26, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.sticky-chips::-webkit-scrollbar { display: none; }
 .search-top { display: grid; grid-template-columns: minmax(300px, 0.85fr) 1.4fr; gap: 24px; }
 @container main (max-width: 900px) { .search-top { grid-template-columns: 1fr; } }
 .search-top section { margin-top: 18px; }

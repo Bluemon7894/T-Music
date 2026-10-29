@@ -85,6 +85,13 @@ export default function UpdateModal() {
         )}
 
         <div className="update-modal-actions">
+          <button className="btn-ghost" onClick={openReleasePage} title="GitHub 릴리즈 페이지 열기">
+            <ExternalLink size={14} /> 릴리즈 노트
+          </button>
+          <div style={{ flex: 1 }} />
+          <button className="btn-secondary" onClick={closeModal}>
+            나가기
+          </button>
           {downloaded ? (
             <button className="btn-primary" onClick={install}>
               <CheckCircle2 size={16} /> 지금 설치 및 재시작
@@ -95,13 +102,9 @@ export default function UpdateModal() {
             </button>
           ) : (
             <button className="btn-primary" onClick={download}>
-              <Download size={16} /> 지금 업데이트 다운로드
+              <Download size={16} /> 업데이트하기
             </button>
           )}
-
-          <button className="btn-ghost" onClick={openReleasePage}>
-            <ExternalLink size={16} /> GitHub에서 보기
-          </button>
         </div>
       </div>
     </div>

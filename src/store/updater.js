@@ -47,10 +47,10 @@ export const useUpdater = create((set, get) => ({
       }
     });
 
-    // Initial check after short delay
+    // Initial check after short delay on app start
     setTimeout(() => {
       get().check(true);
-    }, 4000);
+    }, 2500);
   },
 
   check: async (silent = false) => {
@@ -73,11 +73,8 @@ export const useUpdater = create((set, get) => ({
       });
 
       if (res.hasUpdate) {
-        if (!silent) {
-          set({ modalOpen: true });
-        } else {
-          toast(`✨ 새 버전(v${res.latestVersion})이 출시되었습니다!`);
-        }
+        // Automatically pop up the modal when an update exists
+        set({ modalOpen: true });
       } else if (!silent) {
         toast(`현재 최신 버전(v${res.currentVersion})을 사용하고 있습니다.`);
       }

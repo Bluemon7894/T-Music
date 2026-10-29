@@ -55,10 +55,20 @@ function StatsRow() {
     <section className="stats">
       <div className="stat-card wide" data-enter>
         <div className="stat-top"><Clock size={16} /> 이번 주 청취</div>
-        <div className="stat-big">{st.minutes}<small>분</small></div>
+        <div className="stat-big">
+          {st.hours > 0 ? (
+            <>
+              {st.hours}<small>시간</small> {st.mins}<small>분</small>
+            </>
+          ) : (
+            <>
+              {st.mins}<small>분</small>
+            </>
+          )}
+        </div>
         <div className="stat-bars">
           {st.days.map((d, i) => (
-            <div key={i} className="stat-bar">
+            <div key={i} className="stat-bar" title={`${d.label}요일: ${d.min >= 60 ? `${Math.floor(d.min / 60)}시간 ${d.min % 60}분` : `${d.min}분`}`}>
               <i style={{ height: `${Math.max(6, (d.min / max) * 100)}%` }} className={i === 6 ? 'today' : ''} />
               <span>{d.label}</span>
             </div>

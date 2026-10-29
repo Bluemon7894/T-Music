@@ -90,6 +90,8 @@ export function weeklyStats(listens) {
   const since = Date.now() - 7 * DAY;
   const week = listens.filter((l) => l.at > since);
   const minutes = Math.round(week.reduce((n, l) => n + l.sec, 0) / 60);
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
   const byArtist = {};
   for (const l of week) if (l.artist) byArtist[l.artist] = (byArtist[l.artist] || 0) + l.sec;
   const topArtist = Object.entries(byArtist).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
@@ -101,5 +103,5 @@ export function weeklyStats(listens) {
     const end = start.getTime() + DAY;
     return { label: '일월화수목금토'[start.getDay()], min: Math.round(week.filter((l) => l.at >= start.getTime() && l.at < end).reduce((n, l) => n + l.sec, 0) / 60) };
   });
-  return { minutes, plays: week.length, topArtist, topTracks, days };
+  return { minutes, hours, mins, plays: week.length, topArtist, topTracks, days };
 }

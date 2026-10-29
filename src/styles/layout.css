@@ -14,8 +14,37 @@
   grid-template-areas: 'side top top' 'side main panel' 'dock dock dock';
 }
 @media (max-width: 1180px) {
-  .app.with-panel { grid-template-columns: var(--side) minmax(0, 1fr); grid-template-areas: 'side top' 'side main' 'dock dock'; }
-  .app.with-panel .now-panel { display: none; }
+  .app.with-panel {
+    grid-template-columns: var(--side) minmax(0, 1fr);
+    grid-template-areas: 'side top' 'side main' 'dock dock';
+  }
+  .app.with-panel .now-panel {
+    display: flex;
+    position: fixed;
+    top: var(--top);
+    right: 12px;
+    bottom: calc(var(--dock) + 12px);
+    width: 360px;
+    max-width: calc(100vw - 24px);
+    z-index: 80;
+    background: rgba(18, 11, 32, 0.95);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-lg);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), 0 0 35px rgba(139, 92, 246, 0.35);
+    animation: panel-slide-in 0.25s var(--out);
+  }
+}
+@keyframes panel-slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* drifting aurora behind everything */

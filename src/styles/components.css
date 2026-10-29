@@ -92,29 +92,30 @@
 .tracklist.compact .tl-row { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; padding: 0 10px; }
 .tracklist.compact .c-album { display: none !important; }
 @container main (max-width: 760px) {
-  .tl-head .c-album, .tl-row .c-album { display: none; }
+  .tl-head .c-album, .tl-row .c-album { display: none !important; }
   .tl-head, .tl-row { grid-template-columns: 36px minmax(0, 1fr) auto; }
 }
 .tl-head { height: 38px; color: var(--dim); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
-.tl-row { height: 60px; border-radius: 14px; color: var(--sub); transition: background 0.15s; }
+.tl-row { height: 60px; border-radius: 14px; color: var(--sub); transition: background 0.15s; overflow: hidden; }
 .tl-row:hover { background: var(--glass-2); }
 .tl-row.current { background: linear-gradient(90deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.04)); }
 .tl-row.current .tl-name { color: var(--v-200); }
-.c-num { grid-column: 1; position: relative; display: flex; justify-content: flex-end; align-items: center; font-variant-numeric: tabular-nums; font-size: 14px; color: var(--dim); }
+.c-num { position: relative; display: flex; justify-content: flex-end; align-items: center; font-variant-numeric: tabular-nums; font-size: 14px; color: var(--dim); }
 .tracklist.compact .c-num { justify-content: center; }
 .row-play { display: none; color: #fff; position: absolute; right: 0; }
 .tracklist.compact .row-play { right: auto; }
 .tl-row:hover .num { visibility: hidden; }
 .tl-row:hover .row-play { display: flex; }
 .pause-glyph { width: 10px; height: 12px; border-left: 3px solid currentColor; border-right: 3px solid currentColor; }
-.c-title { grid-column: 2; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.c-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .tl-thumb { width: 42px; height: 42px; flex: none; border-radius: 9px; }
 .tl-text { display: flex; flex-direction: column; min-width: 0; gap: 3px; flex: 1; }
 .tl-name { color: var(--ink); font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tl-artist { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tl-row:hover .tl-artist, .tl-row:hover .c-album { color: var(--v-100); }
 .c-album { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.c-dur { grid-column: -1; justify-self: end; display: flex; align-items: center; justify-content: flex-end; gap: 12px; font-variant-numeric: tabular-nums; font-size: 13px; flex: none; white-space: nowrap; }
+.c-dur { justify-self: end; display: flex; align-items: center; justify-content: flex-end; gap: 12px; font-variant-numeric: tabular-nums; font-size: 13px; flex: none; white-space: nowrap; }
+.tracklist.compact .c-dur { gap: 6px; }
 .dur { min-width: 38px; text-align: right; }
 .hover-show { visibility: hidden; }
 .tl-row:hover .hover-show, .like.on, .dl.done, .dl.busy, .dl.err { visibility: visible; }
@@ -213,6 +214,8 @@
 .btn-primary { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 18px; border-radius: 12px; background: var(--grad); border: 0; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 18px rgba(124, 58, 237, 0.4); }
 .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(124, 58, 237, 0.6); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 18px; border-radius: 12px; background: var(--glass-2); border: 1px solid var(--line-2); color: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.2s, color 0.2s, transform 0.2s; }
+.btn-secondary:hover { background: var(--glass-3); color: #fff; transform: translateY(-1px); }
 .btn-ghost { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 14px; border-radius: 12px; background: transparent; border: 1px solid var(--line-2); color: var(--sub); font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background 0.2s, color 0.2s; }
 .btn-ghost:hover { background: var(--glass-2); color: #fff; }
 .spin { animation: spin 1s linear infinite; }
