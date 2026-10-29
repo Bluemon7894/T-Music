@@ -30,6 +30,11 @@ export default function LyricsPickerModal({ track, currentData, onSelect, onClos
 
   useEffect(() => {
     fetchCandidates('');
+    if (track) {
+      api.cleanLyricsQuery(track).then((clean) => {
+        if (clean) setQuery(clean);
+      }).catch(() => {});
+    }
   }, [track?.id]);
 
   useEffect(() => {
@@ -80,7 +85,7 @@ export default function LyricsPickerModal({ track, currentData, onSelect, onClos
           <div className="lyrics-picker-title">
             <Mic2 size={20} className="lyrics-picker-icon" />
             <div>
-              <h3>다른 가사 선택</h3>
+              <h3>가사 직접 찾기</h3>
               <p className="lyrics-picker-subtitle">
                 {track?.title} · {track?.artists?.map((a) => a.name).join(', ')}
               </p>

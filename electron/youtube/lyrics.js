@@ -152,6 +152,48 @@ export function parseLrc(lrcText) {
   return lines.sort((a, b) => a.time - b.time);
 }
 
+export function extractEnglishTitles(rawTitle) {
+  if (!rawTitle) return [];
+  const englishCandidates = [];
+  const add = (t) => {
+    if (!t) return;
+    const clean = t.trim().replace(/^['"“‘「『\(\[\{]+|['"”’」』\)\]\}]+$/g, '').trim();
+    if (/^[a-zA-Z0-9\s',.!?&/-]+$/.test(clean) && /[a-zA-Z]{2,}/.test(clean)) {
+      if (!/^(?:official|music\s*video|m\/?v|audio|color\s*coded|lyrics?|live|lyric\s*video|4k|stage\s*mix|special\s*clip|clip|visualizer|remaster|soundtrack|ost|cover|mr|inst|instrumental|hd|feat|prod|by|full\s*ver|full\s*album|mv)$/i.test(clean)) {
+        if (!englishCandidates.includes(clean)) {
+          englishCandidates.push(clean);
+        }
+      }
+    }
+  };
+
+  // 1. Quoted phrases: e.g. 'Ditto', 'Super Shy'
+  const quotes = rawTitle.match(/['"「『“]([^'"」』”]+)['"」』”]/g);
+  if (quotes) quotes.forEach((q) => add(q));
+
+  // 2. Parentheses / brackets: (Event Horizon), (Through the Night), [Queencard]
+  const parens = rawTitle.match(/[\(\[](?:[^\(\)\[\]]*[a-zA-Z]{2,}[^\(\)\[\]]*)[\)\]]/g);
+  if (parens) parens.forEach((p) => add(p));
+
+  // 3. Separator-based segments
+  const spaced = rawTitle
+    .replace(/[\(\[\{]/g, ' ')
+    .replace(/[\)\]\}]/g, ' ')
+    .replace(NOISE_TAG_RE, ' ');
+  const cleaned = cleanTitleNoise(spaced);
+
+  // 4. English phrases of 1 or more English words
+  const engPhrases = cleaned.match(/[a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)*/g);
+  if (engPhrases) {
+    engPhrases.forEach((p) => add(p));
+  }
+
+  // 5. Split by separators: -, :, |, ~, /, _
+  cleaned.split(/\s*[-–—:|~/_]\s*/).forEach((p) => add(p));
+
+  return englishCandidates;
+}
+
 function extractVariants(title, artist, artistsList = []) {
   const primaryTitles = [];
   const secondaryTitles = [];
@@ -290,8 +332,22 @@ function extractVariants(title, artist, artistsList = []) {
     });
   }
 
-  // 7. Expand and deduplicate titles
-  const allTitles = [...primaryTitles, ...secondaryTitles];
+  // 7. English title isolation & prioritization
+  const engTitles = extractEnglishTitles(rawTitle);
+  const validEngTitles = [];
+  for (const et of engTitles) {
+    const norm = normalize(et);
+    const isArtist = [...finalArtists].some((a) => {
+      const na = normalize(a);
+      return na && (na === norm || (norm.length >= 3 && na.includes(norm)) || (na.length >= 3 && norm.includes(na)));
+    });
+    if (!isArtist && isValidTitle(et)) {
+      validEngTitles.push(et);
+    }
+  }
+
+  // 8. Expand and deduplicate titles (English titles prioritized first)
+  const allTitles = [...validEngTitles, ...primaryTitles, ...secondaryTitles];
   const finalTitles = new Set();
   for (const t of allTitles) {
     if (!isValidTitle(t)) continue;
@@ -477,7 +533,7 @@ async function fetchFromNaver(title, artist, artistsList = []) {
 async function fetchFromLrclib(title, artist, duration, artistsList = []) {
   const { titles, artists } = extractVariants(title, artist, artistsList);
   const isKorean = isKoreanTrack(titles, artists);
-  const headers = { 'User-Agent': 'T-Music/0.3.22 (https://github.com/Bluemon7894/T-Music)' };
+  const headers = { 'User-Agent': 'T-Music/0.3.23 (https://github.com/Bluemon7894/T-Music)' };
 
   const getPairs = [];
   for (const t of titles.slice(0, 2)) {
@@ -530,12 +586,25 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
 
   // 2. Search
   const searchQueries = [];
-  const primaryT = titles[0];
   const primaryA = artists[0];
 
-  if (primaryT && primaryA) searchQueries.push(`${primaryT} ${primaryA}`);
-  if (primaryT && !searchQueries.includes(primaryT)) searchQueries.push(primaryT);
-  if (titles[1] && primaryA) searchQueries.push(`${titles[1]} ${primaryA}`);
+  // Prioritize pure English titles first
+  const englishTitles = titles.filter((t) => /^[a-zA-Z0-9\s',.!?&/-]+$/.test(t) && /[a-zA-Z]{2,}/.test(t));
+  for (const et of englishTitles.slice(0, 2)) {
+    if (primaryA) searchQueries.push(`${et} ${primaryA}`);
+    if (!searchQueries.includes(et)) searchQueries.push(et);
+  }
+
+  const primaryT = titles[0];
+  if (primaryT && primaryA && !searchQueries.includes(`${primaryT} ${primaryA}`)) {
+    searchQueries.push(`${primaryT} ${primaryA}`);
+  }
+  if (primaryT && !searchQueries.includes(primaryT)) {
+    searchQueries.push(primaryT);
+  }
+  if (titles[1] && primaryA && !searchQueries.includes(`${titles[1]} ${primaryA}`)) {
+    searchQueries.push(`${titles[1]} ${primaryA}`);
+  }
 
   let candidates = [];
   for (const q of searchQueries.slice(0, 3)) {
@@ -624,7 +693,7 @@ export async function getCandidates(track, customQuery) {
   const title = track.rawTitle || track.title || '';
   const artist = Array.isArray(track.artists) ? track.artists[0]?.name : track.artist || '';
   const duration = track.duration || 0;
-  const headers = { 'User-Agent': 'T-Music/0.3.22 (https://github.com/Bluemon7894/T-Music)' };
+  const headers = { 'User-Agent': 'T-Music/0.3.23 (https://github.com/Bluemon7894/T-Music)' };
 
   const candidates = [];
   const seenTexts = new Set();
@@ -708,13 +777,24 @@ export async function getCandidates(track, customQuery) {
 
   const { titles, artists } = extractVariants(title, artist, track.artists);
 
-  // Search LRCLIB queries
+  // Search LRCLIB queries (prioritize pure English titles first!)
   const queries = [];
-  if (titles[0] && artists[0]) queries.push(`${titles[0]} ${artists[0]}`);
-  if (titles[0] && !queries.includes(titles[0])) queries.push(titles[0]);
-  if (titles[1] && artists[0]) queries.push(`${titles[1]} ${artists[0]}`);
-  const cleanedTitle = cleanTitleNoise(title);
-  if (cleanedTitle && !queries.includes(cleanedTitle)) queries.push(cleanedTitle);
+  const primaryA = artists[0] || artist || '';
+  const englishTitles = titles.filter((t) => /^[a-zA-Z0-9\s',.!?&/-]+$/.test(t) && /[a-zA-Z]{2,}/.test(t));
+  for (const et of englishTitles.slice(0, 2)) {
+    if (primaryA) queries.push(`${et} ${primaryA}`);
+    if (!queries.includes(et)) queries.push(et);
+  }
+
+  if (titles[0] && primaryA && !queries.includes(`${titles[0]} ${primaryA}`)) {
+    queries.push(`${titles[0]} ${primaryA}`);
+  }
+  if (titles[0] && !queries.includes(titles[0])) {
+    queries.push(titles[0]);
+  }
+  if (titles[1] && primaryA && !queries.includes(`${titles[1]} ${primaryA}`)) {
+    queries.push(`${titles[1]} ${primaryA}`);
+  }
 
   for (const q of queries.slice(0, 3)) {
     try {
@@ -871,4 +951,15 @@ export async function getLyrics(track) {
   const empty = { plainLyrics: '', lines: [] };
   cache.set(track.id, empty);
   return empty;
+}
+
+export function getCleanSearchTerm(track) {
+  if (!track) return '';
+  const rawTitle = track.rawTitle || track.title || '';
+  const artist = Array.isArray(track.artists) ? track.artists[0]?.name : track.artist || '';
+  const { titles, artists } = extractVariants(rawTitle, artist, track.artists);
+  const eng = titles.find((t) => /^[a-zA-Z0-9\s',.!?&/-]+$/.test(t) && /[a-zA-Z]{2,}/.test(t));
+  const t = eng || titles[0] || rawTitle;
+  const a = artists[0] || artist || '';
+  return [t, a].filter(Boolean).join(' ');
 }

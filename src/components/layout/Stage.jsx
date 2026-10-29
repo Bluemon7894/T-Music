@@ -11,6 +11,7 @@ import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
 import { Slider } from './PlayerDock.jsx';
 import LyricsPickerModal from './LyricsPickerModal.jsx';
+import PlaybackRateControl from '../common/PlaybackRateControl.jsx';
 import { fmtTime } from '../../lib/util.js';
 import { animate, createTimeline, ease, stagger, useTilt } from '../../lib/motion.js';
 
@@ -134,7 +135,7 @@ function StageLyrics({ track }) {
             className="stage-lyrics-search-btn"
             onClick={() => setPickerOpen(true)}
           >
-            <Search size={14} /> 다른 가사 직접 찾기
+            <Search size={14} /> 가사 직접 찾기
           </button>
         </div>
         {pickerOpen && (
@@ -152,18 +153,20 @@ function StageLyrics({ track }) {
   return (
     <div className="stage-lyrics-wrapper">
       <div className="stage-lyrics-top-bar">
-        {!hasSynced && hasPlain ? (
-          <div className="stage-lyrics-nosync-badge" style={{ marginBottom: 0 }}>
-            <Mic2 size={13} /> 싱크 미지원 (일반 가사)
-          </div>
-        ) : <div />}
-        <button
-          className="stage-lyrics-picker-btn"
-          onClick={() => setPickerOpen(true)}
-          title="다른 가사 선택 또는 검색"
-        >
-          <ListMusic size={13} /> 다른 가사
-        </button>
+        <div className="stage-lyrics-badges-row">
+          {!hasSynced && hasPlain && (
+            <div className="stage-lyrics-nosync-badge">
+              <Mic2 size={13} /> 싱크 미지원 (일반 가사)
+            </div>
+          )}
+          <button
+            className="stage-lyrics-picker-btn"
+            onClick={() => setPickerOpen(true)}
+            title="가사 직접 찾기"
+          >
+            <ListMusic size={13} /> 가사 직접 찾기
+          </button>
+        </div>
       </div>
       <div className="stage-lyrics-container" ref={containerRef}>
         {hasSynced ? (
@@ -366,6 +369,7 @@ export default function Stage() {
             <PlayButton size={72} playing={p.playing} onClick={p.toggle} />
             <button className="icon-btn" onClick={() => p.next()}><SkipForward size={28} fill="currentColor" /></button>
             <button className={`icon-btn toggle ${p.repeat !== 'off' ? 'on' : ''}`} onClick={p.cycleRepeat}>{p.repeat === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}</button>
+            <PlaybackRateControl variant="stage" />
             <div
               className="stage-volume"
               onWheel={(e) => {

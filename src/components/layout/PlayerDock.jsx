@@ -7,6 +7,7 @@ import { fmtTime } from '../../lib/util.js';
 import { Thumb, ArtistLinks, PlayButton } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
+import PlaybackRateControl from '../common/PlaybackRateControl.jsx';
 import logo from '../../assets/logo-mark.png';
 
 export function Slider({ value, max, onChange, onCommit, buffered = 0, className = '' }) {
@@ -129,6 +130,7 @@ export default function PlayerDock() {
       </div>
 
       <div className="dock-right">
+        <PlaybackRateControl variant="dock" />
         <button className={`icon-btn toggle ${lyricsOn ? 'on' : ''}`} onClick={() => (lyricsOn ? useUI.getState().togglePanel() : setPanelTab('lyrics'))} title="가사" disabled={!track}><Mic2 size={18} /></button>
         <button className={`icon-btn toggle ${queueOn ? 'on' : ''}`} onClick={() => (queueOn ? useUI.getState().togglePanel() : setPanelTab('queue'))} title="대기열"><ListMusic size={18} /></button>
         <button className="icon-btn" onClick={() => setStage(true)} title="전체 화면" disabled={!track}><Maximize2 size={16} /></button>

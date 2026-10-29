@@ -10,6 +10,7 @@ export const api = {
   home: () => call('home'),
   lyrics: (track) => call('lyrics', track),
   lyricsCandidates: (track, query) => call('lyricsCandidates', track, query),
+  cleanLyricsQuery: (track) => call('cleanLyricsQuery', track),
   setCustomLyrics: (trackId, lyricsData) => call('setCustomLyrics', trackId, lyricsData),
   prefetch: (id) => call('prefetch', id),
   status: () => call('status'),

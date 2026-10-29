@@ -185,7 +185,7 @@ function LyricsView({ track }) {
             className="lyrics-search-btn"
             onClick={() => setPickerOpen(true)}
           >
-            <Search size={14} /> 다른 가사 직접 찾기
+            <Search size={14} /> 가사 직접 찾기
           </button>
         </div>
         {pickerOpen && (
@@ -206,17 +206,19 @@ function LyricsView({ track }) {
         <div className="lyrics-meta-left">
           <h3>{track.title}</h3>
           <p>{track.artists?.map((a) => a.name).join(', ')}</p>
-          {!hasSynced && hasPlain && (
-            <span className="lyrics-nosync-pill">싱크 미지원</span>
-          )}
+          <div className="lyrics-meta-badges">
+            {!hasSynced && hasPlain && (
+              <span className="lyrics-nosync-pill">싱크 미지원</span>
+            )}
+            <button
+              className="lyrics-picker-pill"
+              onClick={() => setPickerOpen(true)}
+              title="가사 직접 찾기"
+            >
+              <ListMusic size={13} /> 가사 직접 찾기
+            </button>
+          </div>
         </div>
-        <button
-          className="lyrics-picker-pill"
-          onClick={() => setPickerOpen(true)}
-          title="다른 가사 선택"
-        >
-          <ListMusic size={13} /> 다른 가사
-        </button>
       </div>
       {hasSynced ? (
         <div className="lyrics-lines">

@@ -29,6 +29,7 @@ const api = {
   home: () => catalog.home(),
   lyrics: (track) => lyrics.getLyrics(track),
   lyricsCandidates: (track, query) => lyrics.getCandidates(track, query),
+  cleanLyricsQuery: (track) => lyrics.getCleanSearchTerm(track),
   setCustomLyrics: (trackId, lyricsData) => lyrics.setCustom(trackId, lyricsData),
   prefetch: (id) => { if (!downloads.localFile(id)) stream.prefetch(id); return true; },
   status: () => ({ methods: stream.status(), version: app.getVersion() }),

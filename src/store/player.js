@@ -28,6 +28,7 @@ function savePlayerState(extra = {}) {
     const data = {
       volume: s.volume,
       muted: s.muted,
+      playbackRate: s.playbackRate || 1.0,
       repeat: s.repeat,
       autoplay: s.autoplay,
       queue: (s.queue || []).slice(0, 100).map((t) => ({
@@ -160,6 +161,7 @@ export const usePlayer = create((set, get) => ({
   shuffle: false,
   repeat: saved.repeat ?? 'off', // off | all | one
   autoplay: saved.autoplay ?? true,
+  playbackRate: typeof saved.playbackRate === 'number' && saved.playbackRate > 0 ? saved.playbackRate : 1.0,
   unshuffled: null,
 
   current: () => get().queue[get().index] || null,
@@ -370,6 +372,27 @@ export const usePlayer = create((set, get) => ({
     persistPrefs();
   },
 
+  setPlaybackRate(rate) {
+    const clamped = Math.max(0.25, Math.min(2.5, Math.round(rate * 100) / 100));
+    for (const a of audios) {
+      try {
+        a.playbackRate = clamped;
+        a.defaultPlaybackRate = clamped;
+        a.preservesPitch = true;
+      } catch {}
+    }
+    set({ playbackRate: clamped });
+    savePlayerState();
+  },
+
+  cyclePlaybackRate() {
+    const rates = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+    const cur = get().playbackRate || 1.0;
+    const idx = rates.findIndex((r) => Math.abs(r - cur) < 0.05);
+    const next = idx >= 0 && idx < rates.length - 1 ? rates[idx + 1] : rates[0];
+    get().setPlaybackRate(next);
+  },
+
   toggleShuffle() {
     const { shuffle, queue, index, unshuffled } = get();
     const cur = queue[index];
@@ -437,6 +460,10 @@ export const usePlayer = create((set, get) => ({
     const a = active();
     a.volume = get().volume;
     a.muted = get().muted;
+    const rate = get().playbackRate || 1.0;
+    a.playbackRate = rate;
+    a.defaultPlaybackRate = rate;
+    a.preservesPitch = true;
     set({ time: a.currentTime || 0, duration: track.duration || 0, loading: a.readyState < 3 });
     for (const el of audios) attach(el);
     a.play().catch(() => {});
@@ -639,7 +666,7 @@ audios.forEach((a, i) => {
     const b = a.buffered.length ? a.buffered.end(a.buffered.length - 1) : 0;
     usePlayer.setState({ time: a.currentTime, buffered: b });
     if ('mediaSession' in navigator && a.duration) {
-      try { navigator.mediaSession.setPositionState({ duration: a.duration, position: Math.min(a.currentTime, a.duration), playbackRate: 1 }); } catch { /* ignore */ }
+      try { navigator.mediaSession.setPositionState({ duration: a.duration, position: Math.min(a.currentTime, a.duration), playbackRate: a.playbackRate || 1 }); } catch { /* ignore */ }
     }
     // Flush listening progress periodically every 30 seconds of actual playback
     if (listenStartTime != null && performance.now() - listenStartTime >= 30000) {
