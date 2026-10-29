@@ -123,6 +123,7 @@ export default function Stage() {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && setStage(false);
     window.addEventListener('keydown', onKey);
+    api.setTitleBarOverlay({ color: 'rgba(0, 0, 0, 0)', symbolColor: '#c4b5fd' }).catch(() => {});
     return () => window.removeEventListener('keydown', onKey);
   }, [setStage]);
 
@@ -144,6 +145,8 @@ export default function Stage() {
     <div className="stage" ref={root}>
       <div className="stage-bg" style={{ backgroundImage: track.thumb ? `url("${track.thumb}")` : undefined }} />
       <div className="stage-shade" />
+      <div className="stage-top-gradient" />
+      <div className="stage-top-drag" />
       <button className="icon-btn circle glass stage-close" onClick={close} title="닫기 (Esc)"><ChevronDown size={22} /></button>
       <button
         className={`icon-btn circle glass stage-lyrics-toggle ${showLyrics ? 'on' : ''}`}

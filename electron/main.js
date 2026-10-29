@@ -45,6 +45,17 @@ const api = {
   installUpdate: () => updater.installUpdate(),
   setGithubToken: (tok) => updater.setGithubToken(tok),
   updateTrayTooltip: (text) => { if (tray) tray.setToolTip(text || 'T-Music'); },
+  setTitleBarOverlay: (opts) => {
+    const [win] = BrowserWindow.getAllWindows();
+    if (win && typeof win.setTitleBarOverlay === 'function') {
+      try {
+        win.setTitleBarOverlay(opts);
+      } catch (e) {
+        console.warn('setTitleBarOverlay failed:', e);
+      }
+    }
+    return true;
+  },
   openExternal: (url) => { if (url) shell.openExternal(url); },
 };
 
@@ -65,7 +76,7 @@ function createWindow() {
     title: 'T-Music',
     icon: fs.existsSync(icon) ? icon : undefined,
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: BG, symbolColor: '#c4b5fd', height: 52 },
+    titleBarOverlay: { color: 'rgba(0, 0, 0, 0)', symbolColor: '#c4b5fd', height: 52 },
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),

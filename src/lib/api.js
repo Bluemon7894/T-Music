@@ -24,6 +24,7 @@ export const api = {
   installUpdate: () => call('installUpdate'),
   setGithubToken: (tok) => call('setGithubToken', tok),
   openExternal: (url) => call('openExternal', url),
+  setTitleBarOverlay: (opts) => call('setTitleBarOverlay', opts),
   updateTrayTooltip: (text) => call('updateTrayTooltip', text),
   onUpdateProgress: (cb) => window.api?.onUpdateProgress?.(cb) || (() => {}),
   onMediaControl: (cb) => window.api?.onMediaControl?.(cb) || (() => {}),

@@ -195,8 +195,33 @@
 .stage-bg { position: absolute; inset: -80px; background-size: cover; background-position: center; filter: blur(80px) saturate(1.6) brightness(0.55); transform: scale(1.2); animation: stage-drift 30s ease-in-out infinite alternate; }
 @keyframes stage-drift { to { transform: scale(1.35) rotate(6deg); } }
 .stage-shade { position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 40%, rgba(124, 58, 237, 0.25), transparent 60%), linear-gradient(180deg, rgba(8, 5, 15, 0.2), rgba(8, 5, 15, 0.85)); }
-.stage-close { position: absolute; top: 14px; left: 18px; z-index: 3; }
-.stage-lyrics-toggle { position: absolute; top: 14px; right: 18px; z-index: 3; }
+
+/* Smooth gradient blend for top-right window controls overlay (- □ X) */
+.stage-top-gradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 140px;
+  background:
+    radial-gradient(ellipse 460px 140px at 100% 0%, rgba(8, 5, 15, 0.95) 0%, rgba(8, 5, 15, 0.72) 32%, rgba(8, 5, 15, 0.35) 62%, rgba(8, 5, 15, 0.08) 82%, transparent 100%),
+    linear-gradient(180deg, rgba(8, 5, 15, 0.75) 0%, rgba(8, 5, 15, 0.3) 50px, rgba(8, 5, 15, 0.08) 90px, transparent 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.stage-top-drag {
+  position: absolute;
+  top: 0;
+  left: 70px;
+  right: 210px;
+  height: 52px;
+  -webkit-app-region: drag;
+  z-index: 2;
+}
+
+.stage-close { position: absolute; top: 14px; left: 18px; z-index: 3; -webkit-app-region: no-drag; }
+.stage-lyrics-toggle { position: absolute; top: 14px; right: 154px; z-index: 3; -webkit-app-region: no-drag; }
 .stage-lyrics-toggle.on { color: var(--v-300); background: rgba(139, 92, 246, 0.25); border-color: var(--v-400); box-shadow: 0 0 16px rgba(167, 139, 250, 0.4); }
 
 .stage-main { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: minmax(280px, 1fr) minmax(320px, 1fr); align-items: center; gap: clamp(24px, 4vw, 56px); padding: 64px clamp(32px, 5vw, 80px) 24px; min-height: 0; }
