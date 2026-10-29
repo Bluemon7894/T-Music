@@ -37,6 +37,7 @@ function savePlayerState(extra = {}) {
         album: t.album || null,
         duration: t.duration || 0,
         thumb: t.thumb || '',
+        isAutoplay: Boolean(t.isAutoplay),
       })),
       index: s.index,
       context: s.context,
@@ -54,7 +55,10 @@ function savePlayerState(extra = {}) {
 const persistPrefs = () => savePlayerState();
 
 const initialQueue = Array.isArray(saved.queue)
-  ? saved.queue.filter((t) => t && typeof t.id === 'string')
+  ? saved.queue
+      .filter((t) => t && typeof t.id === 'string')
+      .map((t) => ({ ...t, isAutoplay: Boolean(t.isAutoplay) }))
+      .filter((t, i) => saved.autoplay !== false || i <= (saved.index ?? -1) || !t.isAutoplay)
   : [];
 const initialIndex = (typeof saved.index === 'number' && saved.index >= 0 && saved.index < initialQueue.length)
   ? saved.index
@@ -267,11 +271,26 @@ export const usePlayer = create((set, get) => ({
       return;
     }
     commitListen();
-    if (index + 1 < queue.length) {
+
+    // Check if next track is an auto-recommended track while autoplay is turned off
+    const nextTrack = queue[index + 1];
+    if (nextTrack) {
+      if (!autoplay && nextTrack.isAutoplay) {
+        // Autoplay is OFF: do not play auto-recommended tracks!
+        active().pause();
+        active().currentTime = 0;
+        set({ playing: false, loading: false, time: 0 });
+        savePlayerState({ time: 0, wasPlaying: false });
+        if (!auto) {
+          toast('자동 재생이 꺼져 있어 재생을 마쳤습니다.');
+        }
+        return;
+      }
       set({ index: index + 1 });
       get()._load();
       return;
     }
+
     if (repeat === 'all' && queue.length) {
       set({ index: 0 });
       get()._load();
@@ -293,7 +312,7 @@ export const usePlayer = create((set, get) => ({
 
     // End of queue reached with autoplay ON: fetch related recommendations
     set({ loading: true });
-    await get()._ensureNextTracks();
+    await get()._ensureNextTracks(true);
     const updated = get();
     if (updated.index + 1 < updated.queue.length) {
       set({ index: updated.index + 1 });
@@ -363,6 +382,8 @@ export const usePlayer = create((set, get) => ({
     persistPrefs();
     savePlayerState();
 
+    toast(next ? '추천곡 자동 재생을 켰습니다' : '추천곡 자동 재생을 껐습니다');
+
     if (!next) {
       // Switched OFF: prune any unplayed auto-added recommendation tracks from queue
       const { queue, index } = get();
@@ -373,9 +394,11 @@ export const usePlayer = create((set, get) => ({
         savePlayerState();
       }
     } else {
-      // Switched ON: if near the end of the queue, proactively fetch recommendations
-      if (get().index >= get().queue.length - 2) {
-        get()._ensureNextTracks();
+      // Switched ON: proactively fetch recommendations if queue has no upcoming auto tracks
+      const { queue, index } = get();
+      const hasUpcomingAutoplay = queue.slice(index + 1).some((t) => t.isAutoplay);
+      if (!hasUpcomingAutoplay && queue.length > 0) {
+        get()._ensureNextTracks(true);
       }
     }
   },
@@ -439,7 +462,7 @@ export const usePlayer = create((set, get) => ({
     if (after) api.prefetch(after.id);
   },
 
-  async _ensureNextTracks() {
+  async _ensureNextTracks(force = false) {
     if (!get().autoplay) return false;
     if (extendingPromise) return extendingPromise;
     extendingPromise = (async () => {
@@ -464,6 +487,10 @@ export const usePlayer = create((set, get) => ({
           }
         }
 
+        if (force) {
+          usedRadioSeeds.clear();
+        }
+
         // Pick seeds that haven't been fetched yet
         let seed = candidates.find((c) => !usedRadioSeeds.has(c.id));
         if (!seed) {
@@ -482,6 +509,7 @@ export const usePlayer = create((set, get) => ({
             if (more.length > 0 && get().autoplay) {
               set({ queue: [...get().queue, ...more] });
               get()._preloadNext();
+              savePlayerState();
               return true;
             }
           } catch (err) {
@@ -502,6 +530,7 @@ export const usePlayer = create((set, get) => ({
             if (more.length > 0 && get().autoplay) {
               set({ queue: [...get().queue, ...more] });
               get()._preloadNext();
+              savePlayerState();
               return true;
             }
           } catch { /* ignore */ }
@@ -518,6 +547,7 @@ export const usePlayer = create((set, get) => ({
           if (more.length > 0 && get().autoplay) {
             set({ queue: [...get().queue, ...more] });
             get()._preloadNext();
+            savePlayerState();
             return true;
           }
         } catch { /* ignore */ }
@@ -533,6 +563,7 @@ export const usePlayer = create((set, get) => ({
           if (more.length > 0 && get().autoplay) {
             set({ queue: [...get().queue, ...more] });
             get()._preloadNext();
+            savePlayerState();
             return true;
           }
         } catch { /* ignore */ }

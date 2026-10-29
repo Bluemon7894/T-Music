@@ -208,6 +208,8 @@ export default function NowPanel() {
   const togglePanel = useUI((s) => s.togglePanel);
   const cur = queue[index];
   const upcoming = queue.map((t, i) => ({ t, i })).slice(index + 1);
+  const manualUpcoming = upcoming.filter(({ t }) => !t.isAutoplay);
+  const autoUpcoming = upcoming.filter(({ t }) => t.isAutoplay);
 
   return (
     <aside className="now-panel">
@@ -226,25 +228,70 @@ export default function NowPanel() {
         {cur && panelTab === 'next' && (
           <>
             <NowCard track={cur} />
-            <div className="np-section">
-              <span>다음 곡</span>
-              {context?.name && <small>{context.name}</small>}
-            </div>
-            {upcoming.slice(0, 6).map(({ t, i }) => (
-              <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
-            ))}
+            {manualUpcoming.length > 0 && (
+              <>
+                <div className="np-section">
+                  <span>다음 곡</span>
+                  {context?.name && <small>{context.name}</small>}
+                </div>
+                {manualUpcoming.slice(0, 6).map(({ t, i }) => (
+                  <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
+                ))}
+              </>
+            )}
+            {autoUpcoming.length > 0 && (
+              <>
+                <div className="np-section auto-section">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Sparkles size={13} style={{ color: 'var(--accent)' }} /> 추천곡 자동 재생
+                  </span>
+                  <small>{autoUpcoming.length}곡</small>
+                </div>
+                {autoUpcoming.slice(0, manualUpcoming.length > 0 ? Math.max(2, 6 - manualUpcoming.length) : 6).map(({ t, i }) => (
+                  <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
+                ))}
+              </>
+            )}
             {upcoming.length > 6 && <button className="text-btn block" onClick={() => setPanelTab('queue')}>대기열 전체 보기 ({upcoming.length}곡)</button>}
-            {!upcoming.length && <p className="np-hint">{autoplay ? '이 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 마지막 곡입니다.'}</p>}
+            {!upcoming.length && <p className="np-hint">{autoplay ? '이 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 마지막 곡입니다. (자동 재생 꺼짐)'}</p>}
+            {manualUpcoming.length > 0 && !autoUpcoming.length && (
+              <p className="np-hint" style={{ fontSize: '11.5px', marginTop: 8 }}>
+                {autoplay ? '대기열의 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 곡이 끝나면 재생이 정지됩니다.'}
+              </p>
+            )}
           </>
         )}
         {cur && panelTab === 'queue' && (
           <>
             <div className="np-section"><span>지금 재생 중</span></div>
             <QueueRow track={cur} current index={1} menu={trackMenuItems(cur)} />
-            <div className="np-section"><span>다음 곡</span><small>{upcoming.length}곡</small></div>
-            {upcoming.map(({ t, i }) => (
-              <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: '대기열에서 삭제', icon: X, onClick: () => removeAt(i) }])} />
-            ))}
+            {manualUpcoming.length > 0 && (
+              <>
+                <div className="np-section"><span>다음 곡</span><small>{manualUpcoming.length}곡</small></div>
+                {manualUpcoming.map(({ t, i }) => (
+                  <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: '대기열에서 삭제', icon: X, onClick: () => removeAt(i) }])} />
+                ))}
+              </>
+            )}
+            {autoUpcoming.length > 0 && (
+              <>
+                <div className="np-section auto-section">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Sparkles size={13} style={{ color: 'var(--accent)' }} /> 추천곡 자동 재생
+                  </span>
+                  <small>{autoUpcoming.length}곡</small>
+                </div>
+                {autoUpcoming.map(({ t, i }) => (
+                  <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: '대기열에서 삭제', icon: X, onClick: () => removeAt(i) }])} />
+                ))}
+              </>
+            )}
+            {!upcoming.length && <p className="np-hint">{autoplay ? '이 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 마지막 곡입니다. (자동 재생 꺼짐)'}</p>}
+            {manualUpcoming.length > 0 && !autoUpcoming.length && (
+              <p className="np-hint" style={{ fontSize: '11.5px', marginTop: 8 }}>
+                {autoplay ? '대기열의 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 곡이 끝나면 재생이 정지됩니다.'}
+              </p>
+            )}
           </>
         )}
       </div>
