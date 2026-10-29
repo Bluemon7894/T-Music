@@ -4,7 +4,7 @@ import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useLibrary } from '../../store/library.js';
 import { api } from '../../lib/api.js';
-import { Thumb, ArtistLinks, Equalizer } from '../common.jsx';
+import { Thumb, ArtistLinks, Equalizer, useLyricsSync, SyncControl } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
@@ -77,6 +77,7 @@ function Idle() {
 function LyricsView({ track }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { offset, adjust, reset } = useLyricsSync(track?.id);
   const currentTime = usePlayer((s) => s.time);
   const seek = usePlayer((s) => s.seek);
   const activeLineRef = useRef(null);
@@ -93,7 +94,7 @@ function LyricsView({ track }) {
 
   const lines = data?.lines || [];
   const activeIdx = lines.length > 0
-    ? lines.reduce((best, l, i) => (l.time <= currentTime + 0.3 ? i : best), -1)
+    ? lines.reduce((best, l, i) => (l.time + offset <= currentTime + 0.1 ? i : best), -1)
     : -1;
 
   useEffect(() => {
@@ -131,6 +132,7 @@ function LyricsView({ track }) {
         <h3>{track.title}</h3>
         <p>{track.artists?.map((a) => a.name).join(', ')}</p>
       </div>
+      {lines.length > 0 && <SyncControl offset={offset} onAdjust={adjust} onReset={reset} />}
       {lines.length > 0 ? (
         <div className="lyrics-lines">
           {lines.map((l, i) => {
@@ -140,7 +142,7 @@ function LyricsView({ track }) {
                 key={l.time + '-' + i}
                 ref={isActive ? activeLineRef : null}
                 className={`lyrics-line ${isActive ? 'active' : ''}`}
-                onClick={() => seek(l.time)}
+                onClick={() => seek(Math.max(0, l.time + offset))}
               >
                 {l.text || '...'}
               </div>

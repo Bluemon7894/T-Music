@@ -5,7 +5,7 @@ import { ChevronDown, Shuffle, SkipBack, SkipForward, Repeat, Repeat1, Mic2 } fr
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { api } from '../../lib/api.js';
-import { Thumb, ArtistLinks, PlayButton } from '../common.jsx';
+import { Thumb, ArtistLinks, PlayButton, useLyricsSync, SyncControl } from '../common.jsx';
 import { LikeButton } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
@@ -16,6 +16,7 @@ import { animate, createTimeline, ease, stagger, useTilt } from '../../lib/motio
 function StageLyrics({ track }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { offset, adjust, reset } = useLyricsSync(track?.id);
   const currentTime = usePlayer((s) => s.time);
   const seek = usePlayer((s) => s.seek);
   const activeLineRef = useRef(null);
@@ -34,7 +35,7 @@ function StageLyrics({ track }) {
 
   const lines = data?.lines || [];
   const activeIdx = lines.length > 0
-    ? lines.reduce((best, l, i) => (l.time <= currentTime + 0.3 ? i : best), -1)
+    ? lines.reduce((best, l, i) => (l.time + offset <= currentTime + 0.1 ? i : best), -1)
     : -1;
 
   useEffect(() => {
@@ -67,26 +68,29 @@ function StageLyrics({ track }) {
   }
 
   return (
-    <div className="stage-lyrics-container" ref={containerRef}>
-      {lines.length > 0 ? (
-        <div className="stage-lyrics-lines">
-          {lines.map((l, i) => {
-            const isActive = i === activeIdx;
-            return (
-              <div
-                key={l.time + '-' + i}
-                ref={isActive ? activeLineRef : null}
-                className={`stage-lyrics-line ${isActive ? 'active' : ''}`}
-                onClick={() => seek(l.time)}
-              >
-                {l.text || '...'}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="stage-lyrics-plain">{data.plainLyrics}</div>
-      )}
+    <div className="stage-lyrics-wrapper">
+      {lines.length > 0 && <SyncControl offset={offset} onAdjust={adjust} onReset={reset} />}
+      <div className="stage-lyrics-container" ref={containerRef}>
+        {lines.length > 0 ? (
+          <div className="stage-lyrics-lines">
+            {lines.map((l, i) => {
+              const isActive = i === activeIdx;
+              return (
+                <div
+                  key={l.time + '-' + i}
+                  ref={isActive ? activeLineRef : null}
+                  className={`stage-lyrics-line ${isActive ? 'active' : ''}`}
+                  onClick={() => seek(Math.max(0, l.time + offset))}
+                >
+                  {l.text || '...'}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="stage-lyrics-plain">{data.plainLyrics}</div>
+        )}
+      </div>
     </div>
   );
 }
