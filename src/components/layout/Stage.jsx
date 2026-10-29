@@ -22,13 +22,11 @@ function StageLyrics({ track }) {
   const activeLineRef = useRef(null);
   const containerRef = useRef(null);
   const [activeIdx, setActiveIdx] = useState(-1);
-  const [showPlain, setShowPlain] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setData(null);
-    setShowPlain(false);
     if (!track?.id) { setLoading(false); return; }
     api.lyrics(track)
       .then((res) => { if (!cancelled) { setData(res); setLoading(false); } })
@@ -111,27 +109,14 @@ function StageLyrics({ track }) {
     );
   }
 
-  if (lines.length === 0) {
+  const hasSynced = lines.length > 0;
+  const hasPlain = !!data?.plainLyrics;
+
+  if (!hasSynced && !hasPlain) {
     return (
       <div className="stage-lyrics-empty">
         <Mic2 size={36} opacity={0.35} />
-        <p>싱크 데이터를 찾을 수 없습니다</p>
-        {data?.plainLyrics && (
-          <div className="stage-lyrics-plain-fallback">
-            <button
-              className="stage-lyrics-plain-btn"
-              onClick={() => setShowPlain((v) => !v)}
-            >
-              {showPlain ? '일반 가사 접기' : '일반 가사 보기'}
-            </button>
-            {showPlain && (
-              <div className="stage-lyrics-plain-box" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
-                <div className="stage-lyrics-plain">{data.plainLyrics}</div>
-                {data.footer && <div className="stage-lyrics-footer">{data.footer}</div>}
-              </div>
-            )}
-          </div>
-        )}
+        <p>가사를 찾을 수 없습니다</p>
       </div>
     );
   }
@@ -139,21 +124,31 @@ function StageLyrics({ track }) {
   return (
     <div className="stage-lyrics-wrapper">
       <div className="stage-lyrics-container" ref={containerRef}>
-        <div className="stage-lyrics-lines">
-          {lines.map((l, i) => {
-            const isActive = i === activeIdx;
-            return (
-              <div
-                key={l.time + '-' + i}
-                ref={isActive ? activeLineRef : null}
-                className={`stage-lyrics-line ${isActive ? 'active' : ''}`}
-                onClick={() => seek(Math.max(0, l.time + autoOffset))}
-              >
-                {l.text || '...'}
-              </div>
-            );
-          })}
-        </div>
+        {hasSynced ? (
+          <div className="stage-lyrics-lines">
+            {lines.map((l, i) => {
+              const isActive = i === activeIdx;
+              return (
+                <div
+                  key={l.time + '-' + i}
+                  ref={isActive ? activeLineRef : null}
+                  className={`stage-lyrics-line ${isActive ? 'active' : ''}`}
+                  onClick={() => seek(Math.max(0, l.time + autoOffset))}
+                >
+                  {l.text || '...'}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="stage-lyrics-plain-box">
+            <div className="stage-lyrics-nosync-badge">
+              <Mic2 size={13} /> 싱크 미지원 (일반 가사)
+            </div>
+            <div className="stage-lyrics-plain">{data.plainLyrics}</div>
+            {data.footer && <div className="stage-lyrics-footer">{data.footer}</div>}
+          </div>
+        )}
       </div>
     </div>
   );
