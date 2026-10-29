@@ -560,35 +560,6 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
-.turntable-indicator {
-  position: absolute;
-  left: 20px;
-  bottom: 18px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--v-300);
-  letter-spacing: 0.08em;
-  pointer-events: none;
-}
-.turntable-indicator-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #7c7699;
-  transition: background 0.3s, box-shadow 0.3s;
-}
-.turntable-indicator-dot.on {
-  background: #d946ef;
-  box-shadow: 0 0 10px #d946ef, 0 0 20px #a855f7;
-  animation: indicator-pulse 2s ease-in-out infinite;
-}
-@keyframes indicator-pulse {
-  50% { opacity: 0.6; transform: scale(0.9); }
-}
-
 .stage-info { display: flex; flex-direction: column; gap: 10px; max-width: 560px; min-height: 0; height: 100%; max-height: 100%; justify-content: center; overflow: hidden !important; box-sizing: border-box; }
 .stage-info.with-lyrics { max-width: 680px; height: 100%; max-height: 100%; min-height: 0; gap: 6px; justify-content: flex-start; overflow: hidden !important; }
 .stage-info.with-lyrics .stage-header { flex: 0 0 auto; display: flex; flex-direction: column; gap: 3px; min-width: 0; }

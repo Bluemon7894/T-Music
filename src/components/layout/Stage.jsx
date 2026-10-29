@@ -274,10 +274,6 @@ export default function Stage() {
               <div className="vinyl-hole" />
             </div>
             <div className={`tonearm ${p.playing ? 'on' : 'resting'}`}><i /></div>
-            <div className="turntable-indicator">
-              <span className={`turntable-indicator-dot ${p.playing ? 'on' : ''}`} />
-              <span>33 RPM</span>
-            </div>
           </div>
         </div>
 

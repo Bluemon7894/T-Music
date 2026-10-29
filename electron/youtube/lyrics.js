@@ -30,8 +30,6 @@ const KOREAN_ARTIST_MAP = {
 
 const NOISE_TAG_RE = /[\(\[【][^\)\]】]*(?:official|music\s*video|m\/?v|audio|color\s*coded|lyrics?|가사|자막|live|라이브|lyric\s*video|딩고|dingo|4k|stage\s*mix|교차편집|노래방|반주|special\s*clip|clip|visualizer|tj\.\d+|ky\.\d+|side\s*[a-z0-9]+|mr제거|cover|커버|remaster|soundtrack|ost|원곡[^\)\]】]*)[^\)\]】]*[\)\]】]/gi;
 
-const GENERIC_TITLES = new Set(['hello', 'home', 'stay', 'rain', 'love', 'intro', 'outro', 'run', 'fly', 'one', 'you', 'me']);
-
 function cleanTitleNoise(str) {
   let s = String(str || '');
   s = s.replace(/^[\[【][^\]】]+[\]】]\s*/g, '');
@@ -108,7 +106,6 @@ export function parseLrc(lrcText) {
     while ((match = tagRegex.exec(trimmed)) !== null) {
       const minutes = Number(match[1]);
       const seconds = Number(match[2]);
-      // Standard LRC offset: positive offset means lyrics should appear earlier (subtract from timestamp)
       const time = Math.max(0, minutes * 60 + seconds - offsetSec);
       timestamps.push(time);
     }
@@ -285,162 +282,93 @@ function extractVariants(title, artist, artistsList = []) {
   };
 }
 
-function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, rawTitle, isCoverOrIndie }) {
+function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, rawTitle }) {
   if (!item || item.instrumental) return { score: -1000, artistMatchFound: false };
   if (!item.plainLyrics && !item.syncedLyrics) return { score: -1000, artistMatchFound: false };
 
-  let score = 0;
   const candTrack = item.trackName || '';
   const candArtist = item.artistName || '';
-  const normCandTrack = normalize(candTrack);
-  const normCandArtist = normalize(candArtist);
 
-  // Extract candidate title variants (handles bilingual titles like "Through the Night (밤편지)")
-  const candTitles = [candTrack];
-  const candMatch = candTrack.match(/^([^\(\[]+)\s*[\(\[]([^\)\]]+)[\)\]]/);
-  if (candMatch) {
-    candTitles.push(candMatch[1].trim());
-    candTitles.push(candMatch[2].trim());
-  }
-
-  // Extract candidate artist variants
-  const candArtists = [candArtist];
-  const artMatch = candArtist.match(/^([^\(\[]+)\s*[\(\[]([^\)\]]+)[\)\]]/);
-  if (artMatch) {
-    candArtists.push(artMatch[1].trim());
-    candArtists.push(artMatch[2].trim());
-  }
-
-  // 1. Artist matching
-  let artistExact = false;
-  let artistMatchFound = false;
-
-  for (const a of targetArtists) {
-    const normTarget = normalize(a);
-    if (!normTarget || normTarget.length < 2) continue;
-    for (const ca of candArtists) {
-      const normCand = normalize(ca);
-      if (normCand === normTarget) {
-        artistExact = true;
-        artistMatchFound = true;
-        break;
-      }
-      if (normCand.includes(normTarget) || normTarget.includes(normCand)) {
-        artistMatchFound = true;
-      }
-    }
-    if (artistExact) break;
-  }
-
-  // Check for inverted track/artist upload (e.g. trackName: "NewJeans", artistName: "OMG")
-  let invertedMatch = false;
-  if (!artistMatchFound) {
-    for (const a of targetArtists) {
-      const normTargetA = normalize(a);
-      if (normTargetA) {
-        for (const ct of candTitles) {
-          const normCT = normalize(ct);
-          if (normCT === normTargetA || normCT.includes(normTargetA)) {
-            for (const t of targetTitles) {
-              const normTargetT = normalize(t);
-              if (normTargetT) {
-                for (const ca of candArtists) {
-                  const normCA = normalize(ca);
-                  if (normCA === normTargetT || normCA.includes(normTargetT)) {
-                    invertedMatch = true;
-                    artistMatchFound = true;
-                    break;
-                  }
-                }
-              }
-              if (invertedMatch) break;
-            }
-          }
-          if (invertedMatch) break;
-        }
-      }
-      if (invertedMatch) break;
-    }
-  }
-
-  // 2. Title matching
-  let titleExact = false;
-  let titleMatchFound = false;
-
-  for (const t of targetTitles) {
-    const normTarget = normalize(t);
-    if (!normTarget) continue;
-    for (const ct of candTitles) {
-      const normCand = normalize(ct);
-      if (normCand === normTarget) {
-        titleExact = true;
-        titleMatchFound = true;
-        break;
-      }
-      if (normCand.includes(normTarget) || normTarget.includes(normCand)) {
-        titleMatchFound = true;
-      }
-    }
-    if (titleExact) break;
-  }
-
-  // Duration match calculation - HEAVILY reward exact audio length match to avoid MV/live offset drift
-  let durationClose = false;
-  let durDiff = 999;
-  if (targetDuration > 0 && item.duration > 0) {
-    durDiff = Math.abs(item.duration - targetDuration);
-    if (durDiff <= 1.0) {
-      score += 75; // Pinpoint match
-      durationClose = true;
-    } else if (durDiff <= 2.5) {
-      score += 55;
-      durationClose = true;
-    } else if (durDiff <= 5.0) {
-      score += 30;
-      durationClose = true;
-    } else if (durDiff <= 10.0) {
-      score += 10;
-    } else if (durDiff <= 20.0) {
-      score -= 10;
-    } else {
-      score -= 40;
-    }
-  }
-
-  // Apply Artist & Title scores
-  if (artistExact) score += 60;
-  else if (artistMatchFound) score += 40;
-  else {
-    // If it's a cover or indie upload, OR non-generic title:
-    const isGeneric = GENERIC_TITLES.has(normCandTrack) || normCandTrack.length <= 2;
-    if (titleExact && !isGeneric) {
-      score += 35;
-      artistMatchFound = true; // allow acceptance for covers / indie uploads
-    } else if (titleMatchFound && !isGeneric) {
-      score += 20;
-      artistMatchFound = true;
-    } else {
-      score -= 80; // Disqualify unrelated songs
-    }
-  }
-
-  if (titleExact || invertedMatch) score += 60;
-  else if (titleMatchFound) score += 35;
-  else score -= 90;
-
-  // Version keyword mismatch penalties
+  // 1. Version keyword mismatch:
+  // Disqualify immediately if candidate has remix, live, acoustic, cover, instrumental, speed up, etc. when original does not
   const keywords = ['remix', 'acoustic', 'live', 'instrumental', 'inst', 'orchestra', 'speed up', 'slowed', 'cover'];
   for (const kw of keywords) {
     const targetHas = hasVersionKeyword(rawTitle, kw);
     const candHas = hasVersionKeyword(candTrack, kw);
-    if (targetHas !== candHas) score -= 35;
+    if (!targetHas && candHas) {
+      return { score: -1000, artistMatchFound: false };
+    }
   }
 
-  // Synced lyrics bonus
+  // 2. Strict audio duration match:
+  // Standard Spotify/YouTube Music sync matching requires <= 3.0 seconds tolerance
+  if (targetDuration > 0 && item.duration > 0) {
+    const durDiff = Math.abs(item.duration - targetDuration);
+    if (durDiff > 3.0) {
+      return { score: -1000, artistMatchFound: false };
+    }
+  }
+
+  // 3. Artist & Title matching
+  const normCandTrack = normalize(candTrack);
+  const normCandArtist = normalize(candArtist);
+
+  let artistExact = false;
+  let artistMatchFound = false;
+  for (const tArtist of targetArtists) {
+    const normTarget = normalize(tArtist);
+    if (!normTarget || normTarget.length < 2) continue;
+    if (normCandArtist === normTarget) {
+      artistExact = true;
+      artistMatchFound = true;
+      break;
+    }
+    if (normCandArtist.includes(normTarget) || normTarget.includes(normCandArtist)) {
+      artistMatchFound = true;
+    }
+  }
+
+  let titleExact = false;
+  let titleMatchFound = false;
+  for (const tTitle of targetTitles) {
+    const normTarget = normalize(tTitle);
+    if (!normTarget) continue;
+    if (normCandTrack === normTarget) {
+      titleExact = true;
+      titleMatchFound = true;
+      break;
+    }
+    if (normCandTrack.includes(normTarget) || normTarget.includes(normCandTrack)) {
+      titleMatchFound = true;
+    }
+  }
+
+  // Must match both artist and title
+  if (!artistMatchFound || (!titleExact && !titleMatchFound)) {
+    return { score: -1000, artistMatchFound: false };
+  }
+
+  // 4. Validate synced lyrics if present
+  if (item.syncedLyrics && !isValidSyncedLyrics(item.syncedLyrics)) {
+    return { score: -1000, artistMatchFound: false };
+  }
+
+  let score = 50;
+  if (artistExact) score += 60;
+  else if (artistMatchFound) score += 30;
+
+  if (titleExact) score += 60;
+  else if (titleMatchFound) score += 30;
+
+  if (targetDuration > 0 && item.duration > 0) {
+    const durDiff = Math.abs(item.duration - targetDuration);
+    if (durDiff <= 1.0) score += 50;
+    else if (durDiff <= 2.0) score += 30;
+    else if (durDiff <= 3.0) score += 15;
+  }
+
   if (item.syncedLyrics && isValidSyncedLyrics(item.syncedLyrics)) {
-    score += 55;
-  } else if (item.syncedLyrics && !isValidSyncedLyrics(item.syncedLyrics)) {
-    score -= 120; // Penalize fake/troll synced lyrics like probe
+    score += 50;
   }
 
   return { score, artistMatchFound };
@@ -466,8 +394,8 @@ async function fetchFromYouTubeMusic(videoId) {
 }
 
 async function fetchFromLrclib(title, artist, duration, artistsList = []) {
-  const { titles, artists, isCoverOrIndie } = extractVariants(title, artist, artistsList);
-  const headers = { 'User-Agent': 'T-Music/0.3.12 (https://github.com/Bluemon7894/T-Music)' };
+  const { titles, artists } = extractVariants(title, artist, artistsList);
+  const headers = { 'User-Agent': 'T-Music/0.3.17 (https://github.com/Bluemon7894/T-Music)' };
 
   const getPairs = [];
   if (titles[0] && artists[0]) getPairs.push([titles[0], artists[0]]);
@@ -486,21 +414,24 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
         if (r.ok) {
           const d = await r.json();
           if (d.syncedLyrics && isValidSyncedLyrics(d.syncedLyrics)) {
-            const lines = parseLrc(d.syncedLyrics);
-            return {
-              plainLyrics: d.plainLyrics || '',
-              syncedLyrics: d.syncedLyrics,
-              lines,
-              lyricsDuration: d.duration || duration,
-              autoOffset: 0,
-            };
+            const durDiff = (duration > 0 && d.duration > 0) ? Math.abs(d.duration - duration) : 0;
+            if (!duration || durDiff <= 3.0) {
+              const lines = parseLrc(d.syncedLyrics);
+              return {
+                plainLyrics: d.plainLyrics || '',
+                syncedLyrics: d.syncedLyrics,
+                lines,
+                lyricsDuration: d.duration || duration,
+                autoOffset: (duration > 0 && d.duration > 0) ? (duration - d.duration) : 0,
+              };
+            }
           }
         }
       } catch {}
     }
   }
 
-  // 1b. Direct GET without strict duration (fallback for small differences)
+  // 1b. Direct GET without strict duration (only accept if duration is within 3.0s)
   for (const [t, a] of getPairs) {
     try {
       const u = new URL('https://lrclib.net/api/get');
@@ -514,30 +445,29 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
           targetArtists: artists,
           targetDuration: duration,
           rawTitle: title,
-          isCoverOrIndie,
         });
 
-        if (score >= 35 && artistMatchFound) {
+        if (score >= 80 && artistMatchFound) {
           const durDiff = (duration > 0 && d.duration > 0) ? Math.abs(d.duration - duration) : 0;
-          const canSync = !duration || durDiff <= 25.0;
-
-          if (d.syncedLyrics && canSync && isValidSyncedLyrics(d.syncedLyrics)) {
-            const lines = parseLrc(d.syncedLyrics);
-            const durDelta = (duration > 0 && d.duration > 0) ? (duration - d.duration) : 0;
-            return {
-              plainLyrics: d.plainLyrics || '',
-              syncedLyrics: d.syncedLyrics,
-              lines,
-              lyricsDuration: d.duration || duration,
-              autoOffset: durDelta,
-            };
+          if (!duration || durDiff <= 3.0) {
+            if (d.syncedLyrics && isValidSyncedLyrics(d.syncedLyrics)) {
+              const lines = parseLrc(d.syncedLyrics);
+              const durDelta = (duration > 0 && d.duration > 0) ? (duration - d.duration) : 0;
+              return {
+                plainLyrics: d.plainLyrics || '',
+                syncedLyrics: d.syncedLyrics,
+                lines,
+                lyricsDuration: d.duration || duration,
+                autoOffset: durDelta,
+              };
+            }
           }
         }
       }
     } catch {}
   }
 
-  // 2. Single or dual gentle targeted searches (DO NOT burst parallel queries to prevent Cloudflare 503 ServerOverloaded)
+  // 2. Targeted search
   const searchQueries = [];
   const primaryT = titles[0];
   const primaryA = artists[0];
@@ -558,7 +488,7 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
         const list = await res.json();
         if (Array.isArray(list) && list.length > 0) {
           candidates.push(...list);
-          break; // Stop once we find candidate results
+          break;
         }
       }
     } catch {}
@@ -575,113 +505,36 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
   }
 
   if (unique.length > 0) {
-    // Score each candidate
-    const validCandidates = unique.filter((c) => isValidSyncedLyrics(c.syncedLyrics) || isValidLyrics(c.plainLyrics));
+    const validCandidates = unique.filter((c) => isValidSyncedLyrics(c.syncedLyrics));
     const scored = (validCandidates.length > 0 ? validCandidates : unique).map((c) => {
       const { score, artistMatchFound } = scoreCandidate(c, {
         targetTitles: titles,
         targetArtists: artists,
         targetDuration: duration,
         rawTitle: title,
-        isCoverOrIndie,
       });
       return { ...c, matchScore: score, artistMatchFound };
     }).sort((a, b) => b.matchScore - a.matchScore);
 
     const best = scored[0];
-    if (best && best.matchScore >= 35 && best.artistMatchFound) {
+    if (best && best.matchScore >= 80 && best.artistMatchFound) {
       const durDiff = (duration > 0 && best.duration > 0) ? Math.abs(best.duration - duration) : 0;
-      const canSync = !duration || durDiff <= 25.0;
-
-      if (best.syncedLyrics && canSync && isValidSyncedLyrics(best.syncedLyrics)) {
-        const lines = parseLrc(best.syncedLyrics);
-        const durDelta = (duration > 0 && best.duration > 0) ? (duration - best.duration) : 0;
-        return {
-          plainLyrics: best.plainLyrics || '',
-          syncedLyrics: best.syncedLyrics,
-          lines,
-          lyricsDuration: best.duration || duration,
-          autoOffset: durDelta,
-        };
-      }
-
-      if (best.plainLyrics && isValidLyrics(best.plainLyrics)) {
-        return {
-          plainLyrics: best.plainLyrics,
-          syncedLyrics: null,
-          lines: [],
-          lyricsDuration: best.duration || 0,
-          autoOffset: 0,
-        };
+      if (!duration || durDiff <= 3.0) {
+        if (best.syncedLyrics && isValidSyncedLyrics(best.syncedLyrics)) {
+          const lines = parseLrc(best.syncedLyrics);
+          const durDelta = (duration > 0 && best.duration > 0) ? (duration - best.duration) : 0;
+          return {
+            plainLyrics: best.plainLyrics || '',
+            syncedLyrics: best.syncedLyrics,
+            lines,
+            lyricsDuration: best.duration || duration,
+            autoOffset: durDelta,
+          };
+        }
       }
     }
   }
 
-  return null;
-}
-
-export async function fetchFromNetEase(title, artist, duration, artistsList = []) {
-  try {
-    const { titles, artists } = extractVariants(title, artist, artistsList);
-    const searchQueries = [];
-
-    const t0 = titles[0] || title;
-    const a0 = artists[0] || artist || '';
-
-    if (a0 && t0) searchQueries.push(`${a0} ${t0}`);
-    if (t0) searchQueries.push(t0);
-
-    for (const q of searchQueries) {
-      const url = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(q)}&type=1&offset=0&limit=5`;
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Referer': 'https://music.163.com',
-        },
-        signal: AbortSignal.timeout(3500),
-      });
-      if (!res.ok) continue;
-
-      const data = await res.json();
-      const songs = data.result?.songs || [];
-      if (!songs || songs.length === 0) continue;
-
-      for (const song of songs) {
-        // Duration tolerance: within 25s if duration available
-        const songDur = song.dt ? song.dt / 1000 : 0;
-        if (duration > 0 && songDur > 0 && Math.abs(duration - songDur) > 25.0) {
-          continue;
-        }
-
-        const lrcUrl = `https://music.163.com/api/song/lyric?os=pc&id=${song.id}&lv=-1&kv=-1&tv=-1`;
-        const lrcRes = await fetch(lrcUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'https://music.163.com',
-          },
-          signal: AbortSignal.timeout(3000),
-        });
-        if (!lrcRes.ok) continue;
-
-        const lrcData = await lrcRes.json();
-        const rawLrc = lrcData.lrc?.lyric;
-
-        if (rawLrc && isValidSyncedLyrics(rawLrc)) {
-          const lines = parseLrc(rawLrc);
-          if (lines.length >= 4) {
-            const durDelta = (duration > 0 && songDur > 0) ? (duration - songDur) : 0;
-            return {
-              plainLyrics: rawLrc.replace(/\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]/g, '').trim(),
-              syncedLyrics: rawLrc,
-              lines,
-              lyricsDuration: songDur || duration,
-              autoOffset: durDelta,
-            };
-          }
-        }
-      }
-    }
-  } catch {}
   return null;
 }
 
@@ -693,7 +546,7 @@ export async function getLyrics(track) {
   const title = track.rawTitle || track.title || '';
   const duration = track.duration || 0;
 
-  // 1. 순회 1순위: LRCLIB (검증된 정품 타임스탬프 LRC 데이터베이스)
+  // 1. LRCLIB 엄격 매칭 (스포티파이/유튜브 뮤직 방식의 정확한 메타데이터 & 오디오 길이 ±3초 이내 검증)
   const lrc = await fetchFromLrclib(title, artist, duration, track.artists);
   if (lrc && lrc.lines && lrc.lines.length >= 4) {
     cache.set(track.id, lrc);
@@ -701,15 +554,7 @@ export async function getLyrics(track) {
     return lrc;
   }
 
-  // 2. 순회 2순위: NetEase Cloud Music (공식 대형 라이브러리 LRC 타임스탬프 서비스)
-  const netease = await fetchFromNetEase(title, artist, duration, track.artists);
-  if (netease && netease.lines && netease.lines.length >= 4) {
-    cache.set(track.id, netease);
-    if (cache.size > 300) cache.delete(cache.keys().next().value);
-    return netease;
-  }
-
-  // 3. 순회 3순위: YouTube Music 공식 가사 (공식 라이선스 계약 가사)
+  // 2. YouTube Music 공식 가사 (재생 중인 비디오 트랙의 100% 공식 라이선스 가사)
   const ytm = await fetchFromYouTubeMusic(track.id);
   if (ytm && ytm.plainLyrics && isValidLyrics(ytm.plainLyrics)) {
     cache.set(track.id, ytm);
@@ -717,8 +562,8 @@ export async function getLyrics(track) {
     return ytm;
   }
 
-  // 4. 공식 사이트들에 가사가 전혀 없는 경우:
-  // 검증되지 않은 외부 사이트나 웹 검색 스니펫을 긁어오지 않고 깨끗하게 없음으로 표시
+  // 3. 확실하게 검증된 공식 가사가 없는 경우:
+  // 엉뚱한 리믹스, 다른 곡, 잘못된 가사를 일절 불러오지 않고 없음으로 처리
   const empty = { plainLyrics: '', lines: [] };
   cache.set(track.id, empty);
   return empty;
