@@ -756,3 +756,12 @@
     width: min(32vh, 240px);
   }
 }
+
+@media (max-width: 768px) {
+  .stage-main.with-lyrics .stage-disc-wrap {
+    display: none;
+  }
+  .stage-lyrics-toggle {
+    right: 20px !important;
+  }
+}

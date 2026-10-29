@@ -29,6 +29,7 @@ import { toast } from '../store/ui.js';
 import { fmtBytes } from '../lib/util.js';
 import { useEnter } from '../lib/motion.js';
 import { isNormalizeEnabled, setNormalize, getAudioSinkId, setAudioSinkId } from '../lib/audio.js';
+import { isElectron, isAndroid, isMobileScreen } from '../lib/device.js';
 import logo from '../assets/logo-mark.png';
 
 const METHOD_LABEL = {
@@ -184,60 +185,66 @@ export default function Settings() {
             <div className={`switch ${normalize ? 'on' : ''}`} />
           </div>
 
-          <div className="set-item" style={{ cursor: 'default' }}>
-            <div className="set-item-text">
-              <span className="set-item-title">오디오 출력 장치</span>
-              <span className="muted small">소리를 출력할 스피커 또는 헤드셋을 선택합니다.</span>
+          {isElectron && devices.length > 0 && (
+            <div className="set-item" style={{ cursor: 'default' }}>
+              <div className="set-item-text">
+                <span className="set-item-title">오디오 출력 장치</span>
+                <span className="muted small">소리를 출력할 스피커 또는 헤드셋을 선택합니다.</span>
+              </div>
+              <select
+                className="set-select"
+                value={selectedDevice}
+                onChange={(e) => changeDevice(e.target.value)}
+              >
+                <option value="">시스템 기본값</option>
+                {devices.map((d, i) => (
+                  <option key={d.deviceId || i} value={d.deviceId}>
+                    {d.label || `출력 장치 ${i + 1}`}
+                  </option>
+                ))}
+              </select>
             </div>
-            <select
-              className="set-select"
-              value={selectedDevice}
-              onChange={(e) => changeDevice(e.target.value)}
-            >
-              <option value="">시스템 기본값</option>
-              {devices.map((d, i) => (
-                <option key={d.deviceId || i} value={d.deviceId}>
-                  {d.label || `출력 장치 ${i + 1}`}
-                </option>
-              ))}
-            </select>
-          </div>
+          )}
         </section>
 
-        <section className="set-card" data-enter>
-          <h2><Monitor size={18} /> 시스템 및 연동</h2>
-          <p className="muted">윈도우 시작 및 디스코드 상태 표시 설정을 관리해요.</p>
+        {isElectron && (
+          <section className="set-card" data-enter>
+            <h2><Monitor size={18} /> 시스템 및 연동</h2>
+            <p className="muted">윈도우 시작 및 디스코드 상태 표시 설정을 관리해요.</p>
 
-          <div className="set-item" onClick={toggleAutoStart}>
-            <div className="set-item-text">
-              <span className="set-item-title">윈도우 시작 시 자동 실행</span>
-              <span className="muted small">PC를 켤 때 T-Music을 백그라운드 트레이로 자동 실행합니다.</span>
+            <div className="set-item" onClick={toggleAutoStart}>
+              <div className="set-item-text">
+                <span className="set-item-title">윈도우 시작 시 자동 실행</span>
+                <span className="muted small">PC를 켤 때 T-Music을 백그라운드 트레이로 자동 실행합니다.</span>
+              </div>
+              <div className={`switch ${autoStart ? 'on' : ''}`} />
             </div>
-            <div className={`switch ${autoStart ? 'on' : ''}`} />
-          </div>
 
-          <div className="set-item" onClick={toggleDiscordRPC}>
-            <div className="set-item-text">
-              <span className="set-item-title">디스코드 활동 상태 (Rich Presence)</span>
-              <span className="muted small">현재 듣고 있는 곡과 재생 시간을 디스코드 프로필에 실시간으로 표시합니다.</span>
+            <div className="set-item" onClick={toggleDiscordRPC}>
+              <div className="set-item-text">
+                <span className="set-item-title">디스코드 활동 상태 (Rich Presence)</span>
+                <span className="muted small">현재 듣고 있는 곡과 재생 시간을 디스코드 프로필에 실시간으로 표시합니다.</span>
+              </div>
+              <div className={`switch ${discordRPC ? 'on' : ''}`} />
             </div>
-            <div className={`switch ${discordRPC ? 'on' : ''}`} />
-          </div>
-        </section>
+          </section>
+        )}
 
-        <section className="set-card" data-enter>
-          <h2><Download size={18} /> 다운로드 저장소</h2>
-          <p className="muted">{dl.items.length}곡 저장됨 · {fmtBytes(dl.totalSize)}</p>
-          <p className="muted small path">{dl.dir}</p>
-          <div className="row-btns">
-            <button className="btn" onClick={openDownloads}><FolderOpen size={15} /> 폴더 열기</button>
-            <button className="btn" onClick={changeDownloadsDir}><FolderEdit size={15} /> 폴더 변경</button>
-          </div>
-        </section>
+        {isElectron && (
+          <section className="set-card" data-enter>
+            <h2><Download size={18} /> 다운로드 저장소</h2>
+            <p className="muted">{dl.items.length}곡 저장됨 · {fmtBytes(dl.totalSize)}</p>
+            <p className="muted small path">{dl.dir}</p>
+            <div className="row-btns">
+              <button className="btn" onClick={openDownloads}><FolderOpen size={15} /> 폴더 열기</button>
+              <button className="btn" onClick={changeDownloadsDir}><FolderEdit size={15} /> 폴더 변경</button>
+            </div>
+          </section>
+        )}
 
         <section className="set-card" data-enter>
           <h2><Library size={18} /> 보관함</h2>
-          <p className="muted">좋아요와 플레이리스트는 이 PC에만 저장돼요. 유튜브 계정과는 연결되지 않습니다.</p>
+          <p className="muted">좋아요와 플레이리스트는 이 기기에만 안전하게 저장돼요. 유튜브 계정과는 연결되지 않습니다.</p>
           <div className="set-stats">
             <div><b>{lib.liked.length}</b><span>좋아요</span></div>
             <div><b>{lib.playlists.length}</b><span>플레이리스트</span></div>
@@ -247,52 +254,69 @@ export default function Settings() {
           <div className="row-btns">
             <button className="btn" onClick={exportLib}><Download size={15} /> 백업</button>
             <button className="btn" onClick={importLib}><Upload size={15} /> 복원</button>
+            {!isElectron && (
+              <button
+                className="btn"
+                onClick={() => {
+                  try {
+                    sessionStorage.clear();
+                    toast('모바일 임시 캐시를 비웠습니다');
+                  } catch {}
+                }}
+              >
+                <RefreshCw size={15} /> 캐시 비우기
+              </button>
+            )}
           </div>
         </section>
 
-        <section className="set-card" data-enter>
-          <h2><Gauge size={18} /> 재생 엔진</h2>
-          <p className="muted">곡마다 아래 방법을 순서대로 시도해요. 최근에 실패한 방법은 몇 시간 동안 뒤로 밀렸다가 다시 시도됩니다.</p>
-          <div className="method-list">
-            {status.data?.methods.map((m, i) => (
-              <div key={m.name} className="method">
-                <span className="method-order">{i + 1}</span>
-                <span className="method-name">{METHOD_LABEL[m.name] || m.name}</span>
-                <span className="muted small">성공 {m.ok} · 실패 {m.fail}</span>
-              </div>
-            ))}
-          </div>
-          <button className="btn grad" onClick={runDiag} disabled={running}><Activity size={15} /> {running ? '진단 중… (최대 1분)' : '재생 진단 실행'}</button>
-          {diag && (
+        {isElectron && (
+          <section className="set-card" data-enter>
+            <h2><Gauge size={18} /> 재생 엔진</h2>
+            <p className="muted">곡마다 아래 방법을 순서대로 시도해요. 최근에 실패한 방법은 몇 시간 동안 뒤로 밀렸다가 다시 시도됩니다.</p>
             <div className="method-list">
-              {diag.map((d) => (
-                <div key={d.name} className="method">
-                  {d.ok ? <CheckCircle2 size={17} className="ok" /> : <XCircle size={17} className="bad" />}
-                  <span className="method-name">{METHOD_LABEL[d.name] || d.name}</span>
-                  <span className="muted small">{d.ok ? `${d.ms}ms` : d.error}</span>
+              {status.data?.methods.map((m, i) => (
+                <div key={m.name} className="method">
+                  <span className="method-order">{i + 1}</span>
+                  <span className="method-name">{METHOD_LABEL[m.name] || m.name}</span>
+                  <span className="muted small">성공 {m.ok} · 실패 {m.fail}</span>
                 </div>
               ))}
             </div>
-          )}
-        </section>
+            <button className="btn grad" onClick={runDiag} disabled={running}><Activity size={15} /> {running ? '진단 중… (최대 1분)' : '재생 진단 실행'}</button>
+            {diag && (
+              <div className="method-list">
+                {diag.map((d) => (
+                  <div key={d.name} className="method">
+                    {d.ok ? <CheckCircle2 size={17} className="ok" /> : <XCircle size={17} className="bad" />}
+                    <span className="method-name">{METHOD_LABEL[d.name] || d.name}</span>
+                    <span className="muted small">{d.ok ? `${d.ms}ms` : d.error}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
-        <section className="set-card" data-enter>
-          <h2><Keyboard size={18} /> 단축키</h2>
-          <div className="shortcuts">
-            <span><kbd>Space</kbd> 재생 / 일시정지</span>
-            <span><kbd>Ctrl</kbd> <kbd>→</kbd> 다음 곡</span>
-            <span><kbd>Ctrl</kbd> <kbd>←</kbd> 이전 곡</span>
-            <span><kbd>Ctrl</kbd> <kbd>↑</kbd> <kbd>↓</kbd> 볼륨</span>
-            <span><kbd>Ctrl</kbd> <kbd>K</kbd> 검색</span>
-            <span><kbd>Alt</kbd> <kbd>←</kbd> <kbd>→</kbd> 뒤로 / 앞으로</span>
-            <span><kbd>Esc</kbd> 전체 화면 닫기</span>
-          </div>
-        </section>
+        {isElectron && (
+          <section className="set-card" data-enter>
+            <h2><Keyboard size={18} /> 단축키</h2>
+            <div className="shortcuts">
+              <span><kbd>Space</kbd> 재생 / 일시정지</span>
+              <span><kbd>Ctrl</kbd> <kbd>→</kbd> 다음 곡</span>
+              <span><kbd>Ctrl</kbd> <kbd>←</kbd> 이전 곡</span>
+              <span><kbd>Ctrl</kbd> <kbd>↑</kbd> <kbd>↓</kbd> 볼륨</span>
+              <span><kbd>Ctrl</kbd> <kbd>K</kbd> 검색</span>
+              <span><kbd>Alt</kbd> <kbd>←</kbd> <kbd>→</kbd> 뒤로 / 앞으로</span>
+              <span><kbd>Esc</kbd> 전체 화면 닫기</span>
+            </div>
+          </section>
+        )}
 
         <section className="set-card about-app" data-enter>
           <img src={logo} alt="" />
           <div className="about-app-info">
-            <h2><Info size={18} /> T-Music {status.data?.version ? `v${status.data.version}` : ''}</h2>
+            <h2><Info size={18} /> T-Music {status.data?.version ? `v${status.data.version}` : 'v0.3.9'} {isElectron ? '· PC' : '· Android'}</h2>
             <p className="muted">광고 없는 나만의 음악 플레이어. 개인 학습·사용 목적으로 만들었어요.</p>
             <div className="update-check-row">
               <button className="btn" onClick={() => checkUpdate(false)} disabled={checkingUpdate}>
