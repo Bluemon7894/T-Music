@@ -14,6 +14,17 @@ export default function LyricsPickerModal({ track, currentData, onSelect, onClos
   const [applyingId, setApplyingId] = useState(null);
   const inputRef = useRef(null);
   const modalRef = useRef(null);
+  const backdropRef = useRef(null);
+
+  useEffect(() => {
+    const el = backdropRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      e.stopPropagation();
+    };
+    el.addEventListener('wheel', onWheel, { passive: true });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   const fetchCandidates = async (searchQuery) => {
     if (!track?.id) return;
@@ -79,7 +90,12 @@ export default function LyricsPickerModal({ track, currentData, onSelect, onClos
   };
 
   return (
-    <div className="lyrics-picker-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      ref={backdropRef}
+      className="lyrics-picker-backdrop"
+      onWheel={(e) => e.stopPropagation()}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="lyrics-picker-modal" ref={modalRef} role="dialog" aria-modal="true">
         <div className="lyrics-picker-header">
           <div className="lyrics-picker-title">

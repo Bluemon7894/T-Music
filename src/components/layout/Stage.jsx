@@ -269,8 +269,8 @@ export default function Stage() {
     const el = root.current;
     if (!el) return;
     const onWheel = (e) => {
-      if (e.target.closest('.stage-lyrics-container')) {
-        return; // Allow lyrics scrolling
+      if (e.target.closest('.stage-lyrics-container, .lyrics-picker-modal, .lyrics-picker-backdrop, .lyrics-picker-body')) {
+        return; // Allow lyrics and lyrics picker modal scrolling
       }
       e.preventDefault();
       const delta = e.deltaY < 0 ? 0.04 : -0.04;
@@ -283,7 +283,7 @@ export default function Stage() {
   }, []);
 
   const preventNonLyricsWheel = (e) => {
-    if (e.target.closest('.stage-lyrics-container')) return;
+    if (e.target.closest('.stage-lyrics-container, .lyrics-picker-modal, .lyrics-picker-backdrop, .lyrics-picker-body')) return;
     e.preventDefault();
   };
 
