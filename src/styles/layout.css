@@ -190,7 +190,7 @@
 .dock-empty { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 13px; padding-left: 8px; }
 .dock-empty-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--v-500); box-shadow: 0 0 12px var(--v-400); animation: pulse-dot 1.8s ease-in-out infinite; }
 @keyframes pulse-dot { 50% { transform: scale(1.6); opacity: 0.5; } }
-.dock-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.dock-center { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 5px; }
 .dock-controls { display: flex; align-items: center; gap: 22px; }
 .dock-play { background: #fff !important; color: var(--v-900) !important; box-shadow: 0 6px 20px -4px rgba(196, 181, 253, 0.8) !important; }
 .dock-play.loading { animation: breathe 1s ease-in-out infinite; }
