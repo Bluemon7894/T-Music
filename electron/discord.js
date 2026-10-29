@@ -3,7 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
 
-const DEFAULT_CLIENT_ID = '1344211029410156554';
+// Verified working YouTube Music Discord RPC Client ID
+const DEFAULT_CLIENT_ID = '1177081335727267940';
 const configFile = () => path.join(app.getPath('userData'), 'discord-rpc-config.json');
 
 let client = null;
@@ -12,6 +13,7 @@ let customClientId = null;
 let currentActivity = null;
 let connectPromise = null;
 let reconnectTimer = null;
+let lastError = null;
 
 function loadConfig() {
   try {
@@ -20,7 +22,6 @@ function loadConfig() {
     if (typeof data.enabled === 'boolean') enabled = data.enabled;
     if (data.clientId) customClientId = data.clientId;
   } catch {
-    // Default: enabled = true
     enabled = true;
   }
 }
@@ -39,6 +40,18 @@ export function isEnabled() {
 export function getClientId() {
   loadConfig();
   return customClientId || DEFAULT_CLIENT_ID;
+}
+
+export function getStatus() {
+  loadConfig();
+  return {
+    enabled,
+    connected: Boolean(client && client.user),
+    user: client?.user ? { username: client.user.username, id: client.user.id } : null,
+    clientId: getClientId(),
+    isCustom: Boolean(customClientId),
+    error: lastError,
+  };
 }
 
 export async function setEnabled(val) {
@@ -75,6 +88,7 @@ async function connect() {
 
       rpc.on('ready', () => {
         client = rpc;
+        lastError = null;
         if (currentActivity) {
           applyActivity(currentActivity);
         }
@@ -85,14 +99,20 @@ async function connect() {
         scheduleReconnect();
       });
 
-      await rpc.login().catch(() => {
+      rpc.transport.on('close', (e) => {
+        if (e && e.message) lastError = e.message;
+      });
+
+      await rpc.login().catch((err) => {
         client = null;
+        lastError = err?.message || 'Discord 연결 실패';
         scheduleReconnect();
       });
 
       return client;
-    } catch {
+    } catch (err) {
       client = null;
+      lastError = err?.message || 'Discord 클라이언트 오류';
       scheduleReconnect();
       return null;
     } finally {
@@ -108,7 +128,7 @@ function scheduleReconnect() {
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     connect().catch(() => {});
-  }, 15000); // Retry every 15s if Discord wasn't running
+  }, 10000);
 }
 
 async function disconnect() {
@@ -128,18 +148,21 @@ function applyActivity(data) {
   if (!client || !client.user) return;
   if (!enabled) return;
 
-  const { title, artist, thumb, playing, time = 0, duration = 0 } = data;
+  const { id, title, artist, thumb, playing, time = 0, duration = 0 } = data;
 
   const activity = {
     details: (title || '음악 듣는 중').slice(0, 128),
     state: (artist || 'T-Music').slice(0, 128),
-    largeImageKey: thumb && /^https?:\/\//.test(thumb) ? thumb : 'logo',
-    largeImageText: (title || 'T-Music').slice(0, 128),
-    smallImageKey: playing ? 'play' : 'pause',
-    smallImageText: playing ? '재생 중' : '일시정지',
     instance: false,
   };
 
+  // Large thumbnail image
+  if (thumb && /^https?:\/\//.test(thumb)) {
+    activity.largeImageKey = thumb;
+    activity.largeImageText = (title || 'T-Music').slice(0, 128);
+  }
+
+  // Playback timer
   if (playing && typeof time === 'number' && isFinite(time) && time >= 0) {
     const now = Date.now();
     activity.startTimestamp = Math.floor(now - time * 1000);
@@ -148,13 +171,30 @@ function applyActivity(data) {
     }
   }
 
-  client.user.setActivity(activity).catch(() => {});
+  // Clickable button
+  if (id && /^[\w-]{11}$/.test(id)) {
+    activity.buttons = [
+      { label: 'YouTube에서 듣기', url: `https://www.youtube.com/watch?v=${id}` },
+    ];
+  }
+
+  try {
+    client.user.setActivity(activity).catch((err) => {
+      // If setting with buttons/images failed, retry with simple text
+      if (activity.buttons || activity.largeImageKey) {
+        delete activity.buttons;
+        delete activity.largeImageKey;
+        delete activity.largeImageText;
+        client.user.setActivity(activity).catch(() => {});
+      }
+    });
+  } catch {}
 }
 
 export function setActivity(data) {
   currentActivity = data;
   if (!enabled) return;
-  if (!client) {
+  if (!client || !client.user) {
     connect().then(() => {
       if (currentActivity === data) applyActivity(data);
     }).catch(() => {});
@@ -166,7 +206,9 @@ export function setActivity(data) {
 export function clearActivity() {
   currentActivity = null;
   if (client && client.user) {
-    client.user.clearActivity().catch(() => {});
+    try {
+      client.user.clearActivity().catch(() => {});
+    } catch {}
   }
 }
 

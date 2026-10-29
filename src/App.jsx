@@ -104,6 +104,7 @@ export default function App() {
     if (currentTrack) {
       const artist = currentTrack.artists?.map((a) => a.name).join(', ') || currentTrack.artist || 'T-Music';
       api.updateDiscordActivity({
+        id: currentTrack.id,
         title: currentTrack.title,
         artist,
         thumb: currentTrack.thumb,
