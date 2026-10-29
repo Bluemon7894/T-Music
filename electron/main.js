@@ -6,6 +6,7 @@ import * as catalog from './youtube/catalog.js';
 import * as stream from './youtube/stream.js';
 import * as ytdlp from './youtube/ytdlp.js';
 import * as lyrics from './youtube/lyrics.js';
+import * as updater from './updater.js';
 import { getClient } from './youtube/client.js';
 import * as downloads from './downloads.js';
 import { registerScheme, handleProtocol } from './protocol.js';
@@ -33,6 +34,14 @@ const api = {
   retryDownload: (id) => downloads.retry(id),
   removeDownload: (ids) => downloads.remove(ids),
   openDownloads: () => downloads.openFolder(),
+  checkUpdate: () => updater.checkUpdate(),
+  downloadUpdate: () => {
+    const [win] = BrowserWindow.getAllWindows();
+    return updater.downloadUpdate(win?.webContents);
+  },
+  installUpdate: () => updater.installUpdate(),
+  setGithubToken: (tok) => updater.setGithubToken(tok),
+  openExternal: (url) => { if (url) shell.openExternal(url); },
 };
 
 ipcMain.handle('api', async (_e, method, ...args) => {

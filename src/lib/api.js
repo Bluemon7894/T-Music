@@ -18,7 +18,13 @@ export const api = {
   retryDownload: (id) => call('retryDownload', id),
   removeDownload: (ids) => call('removeDownload', ids),
   openDownloads: () => call('openDownloads'),
-  onDownloads: (cb) => window.api.onDownloads(cb),
+  onDownloads: (cb) => window.api?.onDownloads?.(cb) || (() => {}),
+  checkUpdate: () => call('checkUpdate'),
+  downloadUpdate: () => call('downloadUpdate'),
+  installUpdate: () => call('installUpdate'),
+  setGithubToken: (tok) => call('setGithubToken', tok),
+  openExternal: (url) => call('openExternal', url),
+  onUpdateProgress: (cb) => window.api?.onUpdateProgress?.(cb) || (() => {}),
 };
 
 export const streamUrl = (id) => `ytm://stream/${id}`;

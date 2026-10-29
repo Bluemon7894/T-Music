@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
-import { Activity, CheckCircle2, XCircle, Link2, Download, Upload, FolderOpen, Gauge, Library, Keyboard, Info } from 'lucide-react';
+import { Activity, CheckCircle2, XCircle, Link2, Download, Upload, FolderOpen, Gauge, Library, Keyboard, Info, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useAsync } from '../components/common.jsx';
 import { importPlaylist } from '../components/layout/Sidebar.jsx';
 import { useLibrary } from '../store/library.js';
 import { useDownloads, openDownloads } from '../store/downloads.js';
+import { useUpdater } from '../store/updater.js';
 import { toast } from '../store/ui.js';
 import { fmtBytes } from '../lib/util.js';
 import { useEnter } from '../lib/motion.js';
@@ -23,6 +24,11 @@ export default function Settings() {
   const [running, setRunning] = useState(false);
   const lib = useLibrary();
   const dl = useDownloads();
+  const checkingUpdate = useUpdater((s) => s.checking);
+  const hasUpdate = useUpdater((s) => s.hasUpdate);
+  const latestVersion = useUpdater((s) => s.latestVersion);
+  const checkUpdate = useUpdater((s) => s.check);
+  const openModal = useUpdater((s) => s.openModal);
   const ref = useRef(null);
   useEnter(ref, [], { step: 50 });
 
@@ -127,6 +133,16 @@ export default function Settings() {
           <div>
             <h2><Info size={18} /> T-Music {status.data?.version ? `v${status.data.version}` : ''}</h2>
             <p className="muted">광고 없는 나만의 음악 플레이어. 개인 학습·사용 목적으로 만들었어요.</p>
+            <div className="update-check-row" style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button className="btn" onClick={() => checkUpdate(false)} disabled={checkingUpdate}>
+                <RefreshCw size={14} className={checkingUpdate ? 'spin' : ''} /> {checkingUpdate ? '확인 중…' : '업데이트 확인'}
+              </button>
+              {hasUpdate && (
+                <button className="btn grad" onClick={openModal}>
+                  <Sparkles size={14} /> v{latestVersion} 업데이트 가능
+                </button>
+              )}
+            </div>
           </div>
         </section>
       </div>

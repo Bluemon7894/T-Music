@@ -96,7 +96,7 @@ function Results({ q }) {
           {songs.length > 5 && (
             <section data-enter>
               <h2>노래 더 보기</h2>
-              <TrackList tracks={songs.slice(5, 15)} context={ctx} compact animate={false} />
+              <TrackList tracks={songs.slice(5, 15)} context={ctx} showAlbum={false} compact animate={false} />
             </section>
           )}
         </>

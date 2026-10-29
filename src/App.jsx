@@ -3,11 +3,13 @@ import { useRoute, useNav } from './store/nav.js';
 import { usePlayer } from './store/player.js';
 import { useUI } from './store/ui.js';
 import { initDownloads } from './store/downloads.js';
+import { useUpdater } from './store/updater.js';
 import Sidebar from './components/layout/Sidebar.jsx';
 import TopBar from './components/layout/TopBar.jsx';
 import PlayerDock from './components/layout/PlayerDock.jsx';
 import NowPanel from './components/layout/NowPanel.jsx';
 import Stage from './components/layout/Stage.jsx';
+import UpdateModal from './components/UpdateModal.jsx';
 import { ContextMenu, Toast, Dialog } from './components/Overlays.jsx';
 import Home from './views/Home.jsx';
 import Search from './views/Search.jsx';
@@ -64,7 +66,10 @@ export default function App() {
   const mainRef = useRef(null);
   const index = useNav((s) => s.index);
   useShortcuts();
-  useEffect(() => initDownloads(), []);
+  useEffect(() => {
+    initDownloads();
+    useUpdater.getState().init();
+  }, []);
   useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [index]);
 
   return (
@@ -81,6 +86,7 @@ export default function App() {
       <ContextMenu />
       <Dialog />
       <Toast />
+      <UpdateModal />
     </div>
   );
 }

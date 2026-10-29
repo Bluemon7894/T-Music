@@ -7,4 +7,9 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('downloads', listener);
     return () => ipcRenderer.removeListener('downloads', listener);
   },
+  onUpdateProgress: (cb) => {
+    const listener = (_e, data) => cb(data);
+    ipcRenderer.on('update-progress', listener);
+    return () => ipcRenderer.removeListener('update-progress', listener);
+  },
 });

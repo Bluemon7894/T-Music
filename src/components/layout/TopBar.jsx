@@ -1,10 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search, X, Settings, PanelRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X, Settings, PanelRight, Sparkles } from 'lucide-react';
 import { useNav, useRoute } from '../../store/nav.js';
 import { useUI } from '../../store/ui.js';
 import { useDownloads } from '../../store/downloads.js';
+import { useUpdater } from '../../store/updater.js';
 import { api } from '../../lib/api.js';
 import { ProgressRing } from '../DownloadButton.jsx';
+
+function UpdatePill() {
+  const hasUpdate = useUpdater((s) => s.hasUpdate);
+  const latestVersion = useUpdater((s) => s.latestVersion);
+  const openModal = useUpdater((s) => s.openModal);
+
+  if (!hasUpdate) return null;
+
+  return (
+    <button className="update-pill" onClick={openModal} title="새로운 업데이트가 있습니다">
+      <Sparkles size={14} />
+      <span>v{latestVersion} 업데이트</span>
+    </button>
+  );
+}
 
 function DownloadPill() {
   const allJobs = useDownloads((s) => s.jobs);
@@ -108,6 +124,7 @@ export default function TopBar() {
         )}
       </div>
       <div className="tb-right">
+        <UpdatePill />
         <DownloadPill />
         <button className={`icon-btn circle glass ${panelOpen ? 'on' : ''}`} onClick={togglePanel} title="지금 재생 중 패널"><PanelRight size={17} /></button>
         <button className={`icon-btn circle glass ${route.name === 'settings' ? 'on' : ''}`} onClick={() => go('settings')} title="설정"><Settings size={17} /></button>

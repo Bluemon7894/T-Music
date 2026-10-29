@@ -88,18 +88,20 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
   const ref = useRef(null);
   useEnter(ref, [animate ? tracks.length : 0], { step: 18, delay: 20 });
 
+  const hasAlbum = showAlbum && !compact;
+
   const play = (i) => {
     if (tracks[i].id === currentId) usePlayer.getState().toggle();
     else playList(tracks, i, context);
   };
 
   return (
-    <div ref={ref} className={`tracklist ${compact ? 'compact' : ''} ${showAlbum ? '' : 'no-album'}`}>
+    <div ref={ref} className={`tracklist ${compact ? 'compact' : ''} ${hasAlbum ? '' : 'no-album'}`}>
       {!compact && (
         <div className="tl-head">
           <span className="c-num">#</span>
           <span>제목</span>
-          {showAlbum && <span className="c-album">앨범</span>}
+          {hasAlbum && <span className="c-album">앨범</span>}
           <span className="c-dur"><Clock3 size={15} /></span>
         </div>
       )}
@@ -128,7 +130,7 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
                 <ArtistLinks artists={t.artists} className="tl-artist" />
               </span>
             </span>
-            {showAlbum && (
+            {hasAlbum && (
               <span className="c-album">
                 {t.album?.id ? <a onClick={() => go('album', { id: t.album.id })}>{t.album.name}</a> : t.album?.name || ''}
               </span>
