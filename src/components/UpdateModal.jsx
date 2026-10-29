@@ -1,5 +1,8 @@
+import { useMemo } from 'react';
 import { Sparkles, Download, ExternalLink, X, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { marked } from 'marked';
 import { useUpdater } from '../store/updater.js';
+import { api } from '../lib/api.js';
 import { fmtBytes } from '../lib/util.js';
 
 export default function UpdateModal() {
@@ -18,6 +21,15 @@ export default function UpdateModal() {
   const download = useUpdater((s) => s.download);
   const install = useUpdater((s) => s.install);
   const openReleasePage = useUpdater((s) => s.openReleasePage);
+
+  const renderedNotes = useMemo(() => {
+    if (!releaseNotes) return '';
+    try {
+      return marked.parse(releaseNotes, { gfm: true, breaks: true });
+    } catch {
+      return releaseNotes;
+    }
+  }, [releaseNotes]);
 
   if (!modalOpen) return null;
 
@@ -49,9 +61,17 @@ export default function UpdateModal() {
         {releaseNotes && (
           <div className="update-modal-notes-wrapper">
             <div className="update-modal-notes-title">업데이트 내용</div>
-            <div className="update-modal-notes">
-              <pre>{releaseNotes}</pre>
-            </div>
+            <div
+              className="update-modal-notes markdown-body"
+              dangerouslySetInnerHTML={{ __html: renderedNotes }}
+              onClick={(e) => {
+                const target = e.target.closest('a');
+                if (target && target.href) {
+                  e.preventDefault();
+                  api.openExternal(target.href);
+                }
+              }}
+            />
           </div>
         )}
 

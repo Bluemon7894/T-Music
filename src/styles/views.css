@@ -186,6 +186,51 @@
 .set-stats b { font-size: 22px; font-weight: 900; }
 .set-stats span { font-size: 11.5px; color: var(--dim); white-space: nowrap; }
 .path { word-break: break-all; user-select: text; }
+.set-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  user-select: none;
+  width: 100%;
+}
+.set-item:first-of-type {
+  border-top: none;
+  padding-top: 2px;
+}
+.set-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  padding-right: 12px;
+}
+.set-item-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+}
+.set-select {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--glass-2);
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  max-width: 220px;
+  text-overflow: ellipsis;
+  flex: none;
+}
+.set-select option {
+  background: #181126;
+  color: #fff;
+}
 .shortcuts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; color: var(--sub); font-size: 13px; width: 100%; }
 @container main (max-width: 480px) { .shortcuts { grid-template-columns: 1fr; } }
 .about-app {

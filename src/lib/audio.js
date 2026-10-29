@@ -1,19 +1,72 @@
-// Web Audio graph for the visualizers. Each <audio> element is routed through
-// one shared analyser; the stream protocol sends CORS headers so the samples
-// aren't blanked out.
+// Web Audio graph for the visualizers and dynamic volume normalization.
+// Each <audio> element is routed through one shared analyser and compressor.
+
 let ctx = null;
 let analyser = null;
+let compressor = null;
 const sources = new WeakMap();
+
+let normalizeEnabled = (() => {
+  try {
+    return localStorage.getItem('t-music-normalize') === '1';
+  } catch {
+    return false;
+  }
+})();
+
+let currentSinkId = (() => {
+  try {
+    return localStorage.getItem('t-music-sink-id') || '';
+  } catch {
+    return '';
+  }
+})();
+
+function setupGraph() {
+  if (ctx) return;
+  try {
+    ctx = new AudioContext();
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.8;
+
+    compressor = ctx.createDynamicsCompressor();
+    // Broadcasting standard multiband-style dynamic loudness leveling:
+    compressor.threshold.setValueAtTime(-22, ctx.currentTime);
+    compressor.knee.setValueAtTime(30, ctx.currentTime);
+    compressor.ratio.setValueAtTime(12, ctx.currentTime);
+    compressor.attack.setValueAtTime(0.003, ctx.currentTime);
+    compressor.release.setValueAtTime(0.25, ctx.currentTime);
+
+    reconnectDestination();
+
+    if (currentSinkId && typeof ctx.setSinkId === 'function') {
+      ctx.setSinkId(currentSinkId).catch(() => {});
+    }
+  } catch {
+    // AudioContext creation failure fallback
+  }
+}
+
+function reconnectDestination() {
+  if (!ctx || !analyser || !compressor) return;
+  try {
+    analyser.disconnect();
+    compressor.disconnect();
+
+    if (normalizeEnabled) {
+      analyser.connect(compressor);
+      compressor.connect(ctx.destination);
+    } else {
+      analyser.connect(ctx.destination);
+    }
+  } catch {}
+}
 
 export function attach(el) {
   try {
-    if (!ctx) {
-      ctx = new AudioContext();
-      analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.8;
-      analyser.connect(ctx.destination);
-    }
+    setupGraph();
+    if (!ctx) return;
     if (!sources.has(el)) {
       const src = ctx.createMediaElementSource(el);
       src.connect(analyser);
@@ -27,4 +80,37 @@ export function attach(el) {
 
 export function getAnalyser() {
   return analyser;
+}
+
+export function setNormalize(enabled) {
+  normalizeEnabled = Boolean(enabled);
+  try {
+    localStorage.setItem('t-music-normalize', normalizeEnabled ? '1' : '0');
+  } catch {}
+  reconnectDestination();
+  return normalizeEnabled;
+}
+
+export function isNormalizeEnabled() {
+  return normalizeEnabled;
+}
+
+export async function setAudioSinkId(deviceId) {
+  currentSinkId = deviceId || '';
+  try {
+    localStorage.setItem('t-music-sink-id', currentSinkId);
+  } catch {}
+
+  if (ctx && typeof ctx.setSinkId === 'function') {
+    try {
+      await ctx.setSinkId(currentSinkId);
+    } catch (e) {
+      console.warn('ctx.setSinkId failed:', e);
+    }
+  }
+  return currentSinkId;
+}
+
+export function getAudioSinkId() {
+  return currentSinkId;
 }

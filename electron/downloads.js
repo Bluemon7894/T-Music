@@ -1,6 +1,6 @@
 // Offline downloads: audio files saved under the app's data folder, with an index
 // so the stream protocol can serve them without touching the network.
-import { app, net, shell, BrowserWindow } from 'electron';
+import { app, net, shell, BrowserWindow, dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { Readable, Transform } from 'stream';
@@ -8,7 +8,18 @@ import { pipeline } from 'stream/promises';
 import * as stream from './youtube/stream.js';
 
 const MAX_PARALLEL = 2;
-const dir = () => path.join(app.getPath('userData'), 'downloads');
+const configFile = () => path.join(app.getPath('userData'), 'downloads-config.json');
+
+function getCustomDir() {
+  try {
+    const raw = fs.readFileSync(configFile(), 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed.dir && fs.existsSync(parsed.dir)) return parsed.dir;
+  } catch {}
+  return null;
+}
+
+const dir = () => getCustomDir() || path.join(app.getPath('userData'), 'downloads');
 const indexFile = () => path.join(dir(), 'index.json');
 
 let index = null; // id -> { track, file, size, mime, date }
@@ -195,4 +206,25 @@ export function remove(ids) {
 export function openFolder() {
   load();
   return shell.openPath(dir());
+}
+
+export async function chooseFolder() {
+  const [win] = BrowserWindow.getAllWindows();
+  const res = await dialog.showOpenDialog(win, {
+    title: '다운로드 저장 폴더 선택',
+    defaultPath: dir(),
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (!res.canceled && res.filePaths?.[0]) {
+    const selected = res.filePaths[0];
+    fs.mkdirSync(selected, { recursive: true });
+    try {
+      fs.writeFileSync(configFile(), JSON.stringify({ dir: selected }), 'utf8');
+    } catch {}
+    index = null; // force reload from new dir
+    load();
+    emit();
+    return dir();
+  }
+  return dir();
 }

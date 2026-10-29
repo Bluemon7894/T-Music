@@ -85,6 +85,10 @@ export default function App() {
     });
   }, []);
 
+  const playing = usePlayer((s) => s.playing);
+  const currentTime = usePlayer((s) => s.time);
+  const duration = usePlayer((s) => s.duration);
+
   // Update tray tooltip with current playing track
   useEffect(() => {
     if (currentTrack) {
@@ -94,6 +98,23 @@ export default function App() {
       api.updateTrayTooltip('T-Music - 음악 플레이어').catch(() => {});
     }
   }, [currentTrack?.id, currentTrack?.title]);
+
+  // Sync Discord Rich Presence
+  useEffect(() => {
+    if (currentTrack) {
+      const artist = currentTrack.artists?.map((a) => a.name).join(', ') || currentTrack.artist || 'T-Music';
+      api.updateDiscordActivity({
+        title: currentTrack.title,
+        artist,
+        thumb: currentTrack.thumb,
+        playing,
+        time: currentTime,
+        duration: currentTrack.duration || duration || 0,
+      }).catch(() => {});
+    } else {
+      api.clearDiscordActivity().catch(() => {});
+    }
+  }, [currentTrack?.id, currentTrack?.title, playing]);
 
   useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [index]);
 

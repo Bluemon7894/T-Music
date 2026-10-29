@@ -1,14 +1,34 @@
-import { useRef, useState } from 'react';
-import { Activity, CheckCircle2, XCircle, Download, Upload, FolderOpen, Gauge, Library, Keyboard, Info, RefreshCw, Sparkles, Radio } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Activity,
+  CheckCircle2,
+  XCircle,
+  Download,
+  Upload,
+  FolderOpen,
+  FolderEdit,
+  Gauge,
+  Library,
+  Keyboard,
+  Info,
+  RefreshCw,
+  Sparkles,
+  Radio,
+  Volume2,
+  Monitor,
+  MessageSquare,
+  Speaker,
+} from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useAsync } from '../components/common.jsx';
 import { useLibrary } from '../store/library.js';
-import { usePlayer } from '../store/player.js';
+import { usePlayer, applyOutputDevice } from '../store/player.js';
 import { useDownloads, openDownloads } from '../store/downloads.js';
 import { useUpdater } from '../store/updater.js';
 import { toast } from '../store/ui.js';
 import { fmtBytes } from '../lib/util.js';
 import { useEnter } from '../lib/motion.js';
+import { isNormalizeEnabled, setNormalize, getAudioSinkId, setAudioSinkId } from '../lib/audio.js';
 import logo from '../assets/logo-mark.png';
 
 const METHOD_LABEL = {
@@ -30,6 +50,83 @@ export default function Settings() {
   const latestVersion = useUpdater((s) => s.latestVersion);
   const checkUpdate = useUpdater((s) => s.check);
   const openModal = useUpdater((s) => s.openModal);
+
+  // Audio Normalization state
+  const [normalize, setNormalizeState] = useState(isNormalizeEnabled);
+  const toggleNormalize = () => {
+    const next = !normalize;
+    setNormalize(next);
+    setNormalizeState(next);
+    toast(next ? '음량 자동 균일화를 켰습니다' : '음량 자동 균일화를 껐습니다');
+  };
+
+  // Audio Output Devices
+  const [devices, setDevices] = useState([]);
+  const [selectedDevice, setSelectedDevice] = useState(getAudioSinkId);
+
+  useEffect(() => {
+    const updateDevices = async () => {
+      try {
+        if (!navigator.mediaDevices?.enumerateDevices) return;
+        const list = await navigator.mediaDevices.enumerateDevices();
+        const outputs = list.filter((d) => d.kind === 'audiooutput');
+        setDevices(outputs);
+      } catch {}
+    };
+    updateDevices();
+    navigator.mediaDevices?.addEventListener('devicechange', updateDevices);
+    return () => navigator.mediaDevices?.removeEventListener('devicechange', updateDevices);
+  }, []);
+
+  const changeDevice = async (deviceId) => {
+    setSelectedDevice(deviceId);
+    await setAudioSinkId(deviceId);
+    await applyOutputDevice(deviceId);
+    toast('오디오 출력 장치를 변경했습니다');
+  };
+
+  // Auto-start with Windows
+  const [autoStart, setAutoStartState] = useState(false);
+  useEffect(() => {
+    api.getAutoStart().then((v) => setAutoStartState(Boolean(v))).catch(() => {});
+  }, []);
+  const toggleAutoStart = async () => {
+    const next = !autoStart;
+    try {
+      const res = await api.setAutoStart(next);
+      setAutoStartState(Boolean(res));
+      toast(res ? '윈도우 시작 시 자동 실행을 켰습니다' : '윈도우 시작 시 자동 실행을 껐습니다');
+    } catch {
+      toast('설정을 변경할 수 없습니다');
+    }
+  };
+
+  // Discord Rich Presence
+  const [discordRPC, setDiscordRPCState] = useState(true);
+  useEffect(() => {
+    api.getDiscordRPC().then((v) => setDiscordRPCState(Boolean(v))).catch(() => {});
+  }, []);
+  const toggleDiscordRPC = async () => {
+    const next = !discordRPC;
+    try {
+      const res = await api.setDiscordRPC(next);
+      setDiscordRPCState(Boolean(res));
+      toast(res ? '디스코드 활동 상태 연동을 켰습니다' : '디스코드 활동 상태 연동을 껐습니다');
+    } catch {
+      toast('설정을 변경할 수 없습니다');
+    }
+  };
+
+  // Choose download folder
+  const changeDownloadsDir = async () => {
+    try {
+      const newDir = await api.chooseDownloadsDir();
+      if (newDir) toast('다운로드 폴더를 변경했습니다');
+    } catch {
+      toast('폴더를 변경할 수 없습니다');
+    }
+  };
+
   const ref = useRef(null);
   useEnter(ref, [], { step: 50 });
 
@@ -68,6 +165,92 @@ export default function Settings() {
 
       <div className="settings-grid">
         <section className="set-card" data-enter>
+          <h2><Radio size={18} /> 재생 및 음질 설정</h2>
+          <p className="muted">오디오 재생 방식과 볼륨, 출력 장치를 설정해요.</p>
+
+          <div className="set-item" onClick={toggleAutoplay}>
+            <div className="set-item-text">
+              <span className="set-item-title">추천곡 자동 재생</span>
+              <span className="muted small">대기열의 마지막 곡이 끝나면 비슷한 추천곡을 자동으로 이어서 재생합니다.</span>
+            </div>
+            <div className={`switch ${autoplay ? 'on' : ''}`} />
+          </div>
+
+          <div className="set-item" onClick={toggleNormalize}>
+            <div className="set-item-text">
+              <span className="set-item-title">음량 자동 균일화 (Normalizer)</span>
+              <span className="muted small">곡마다 들쑥날쑥한 볼륨 차이를 실시간으로 완만하게 맞춰줍니다.</span>
+            </div>
+            <div className={`switch ${normalize ? 'on' : ''}`} />
+          </div>
+
+          <div className="set-item" style={{ cursor: 'default' }}>
+            <div className="set-item-text">
+              <span className="set-item-title">오디오 출력 장치</span>
+              <span className="muted small">소리를 출력할 스피커 또는 헤드셋을 선택합니다.</span>
+            </div>
+            <select
+              className="set-select"
+              value={selectedDevice}
+              onChange={(e) => changeDevice(e.target.value)}
+            >
+              <option value="">시스템 기본값</option>
+              {devices.map((d, i) => (
+                <option key={d.deviceId || i} value={d.deviceId}>
+                  {d.label || `출력 장치 ${i + 1}`}
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
+
+        <section className="set-card" data-enter>
+          <h2><Monitor size={18} /> 시스템 및 연동</h2>
+          <p className="muted">윈도우 시작 및 디스코드 상태 표시 설정을 관리해요.</p>
+
+          <div className="set-item" onClick={toggleAutoStart}>
+            <div className="set-item-text">
+              <span className="set-item-title">윈도우 시작 시 자동 실행</span>
+              <span className="muted small">PC를 켤 때 T-Music을 백그라운드 트레이로 자동 실행합니다.</span>
+            </div>
+            <div className={`switch ${autoStart ? 'on' : ''}`} />
+          </div>
+
+          <div className="set-item" onClick={toggleDiscordRPC}>
+            <div className="set-item-text">
+              <span className="set-item-title">디스코드 활동 상태 (Rich Presence)</span>
+              <span className="muted small">현재 듣고 있는 곡과 재생 시간을 디스코드 프로필에 실시간으로 표시합니다.</span>
+            </div>
+            <div className={`switch ${discordRPC ? 'on' : ''}`} />
+          </div>
+        </section>
+
+        <section className="set-card" data-enter>
+          <h2><Download size={18} /> 다운로드 저장소</h2>
+          <p className="muted">{dl.items.length}곡 저장됨 · {fmtBytes(dl.totalSize)}</p>
+          <p className="muted small path">{dl.dir}</p>
+          <div className="row-btns">
+            <button className="btn" onClick={openDownloads}><FolderOpen size={15} /> 폴더 열기</button>
+            <button className="btn" onClick={changeDownloadsDir}><FolderEdit size={15} /> 폴더 변경</button>
+          </div>
+        </section>
+
+        <section className="set-card" data-enter>
+          <h2><Library size={18} /> 보관함</h2>
+          <p className="muted">좋아요와 플레이리스트는 이 PC에만 저장돼요. 유튜브 계정과는 연결되지 않습니다.</p>
+          <div className="set-stats">
+            <div><b>{lib.liked.length}</b><span>좋아요</span></div>
+            <div><b>{lib.playlists.length}</b><span>플레이리스트</span></div>
+            <div><b>{lib.savedAlbums.length}</b><span>앨범</span></div>
+            <div><b>{lib.followed.length}</b><span>아티스트</span></div>
+          </div>
+          <div className="row-btns">
+            <button className="btn" onClick={exportLib}><Download size={15} /> 백업</button>
+            <button className="btn" onClick={importLib}><Upload size={15} /> 복원</button>
+          </div>
+        </section>
+
+        <section className="set-card" data-enter>
           <h2><Gauge size={18} /> 재생 엔진</h2>
           <p className="muted">곡마다 아래 방법을 순서대로 시도해요. 최근에 실패한 방법은 몇 시간 동안 뒤로 밀렸다가 다시 시도됩니다.</p>
           <div className="method-list">
@@ -91,50 +274,6 @@ export default function Settings() {
               ))}
             </div>
           )}
-        </section>
-
-        <section className="set-card" data-enter>
-          <h2><Radio size={18} /> 재생 설정</h2>
-          <p className="muted">대기열의 등록된 음악이 끝났을 때의 재생 방식을 설정해요.</p>
-          <div
-            onClick={toggleAutoplay}
-            style={{
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '14px 0',
-              borderTop: '1px solid var(--line)',
-            }}
-          >
-            <div>
-              <div style={{ color: '#fff', fontWeight: 600, fontSize: '14px' }}>추천곡 자동 재생</div>
-              <div className="muted small">대기열의 마지막 곡이 끝나면 비슷한 추천곡을 자동으로 이어서 재생합니다.</div>
-            </div>
-            <div className={`switch ${autoplay ? 'on' : ''}`} style={{ flex: 'none', marginLeft: '16px' }} />
-          </div>
-        </section>
-
-        <section className="set-card" data-enter>
-          <h2><Library size={18} /> 보관함</h2>
-          <p className="muted">좋아요와 플레이리스트는 이 PC에만 저장돼요. 유튜브 계정과는 연결되지 않습니다.</p>
-          <div className="set-stats">
-            <div><b>{lib.liked.length}</b><span>좋아요</span></div>
-            <div><b>{lib.playlists.length}</b><span>플레이리스트</span></div>
-            <div><b>{lib.savedAlbums.length}</b><span>앨범</span></div>
-            <div><b>{lib.followed.length}</b><span>아티스트</span></div>
-          </div>
-          <div className="row-btns">
-            <button className="btn" onClick={exportLib}><Download size={15} /> 백업</button>
-            <button className="btn" onClick={importLib}><Upload size={15} /> 복원</button>
-          </div>
-        </section>
-
-        <section className="set-card" data-enter>
-          <h2><Download size={18} /> 다운로드</h2>
-          <p className="muted">{dl.items.length}곡 · {fmtBytes(dl.totalSize)}</p>
-          <p className="muted small path">{dl.dir}</p>
-          <button className="btn" onClick={openDownloads}><FolderOpen size={15} /> 폴더 열기</button>
         </section>
 
         <section className="set-card" data-enter>

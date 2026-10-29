@@ -69,6 +69,19 @@ export const useLibrary = create(
       removeFromPlaylist(id, index) {
         set({ playlists: get().playlists.map((p) => (p.id === id ? { ...p, tracks: p.tracks.filter((_, i) => i !== index) } : p)) });
       },
+      reorderPlaylist(id, fromIndex, toIndex) {
+        if (fromIndex === toIndex) return;
+        set({
+          playlists: get().playlists.map((p) => {
+            if (p.id !== id) return p;
+            const nextTracks = [...p.tracks];
+            if (fromIndex < 0 || toIndex < 0 || fromIndex >= nextTracks.length || toIndex >= nextTracks.length) return p;
+            const [moved] = nextTracks.splice(fromIndex, 1);
+            nextTracks.splice(toIndex, 0, moved);
+            return { ...p, tracks: nextTracks };
+          }),
+        });
+      },
 
       toggleSavedAlbum(album) {
         const list = get().savedAlbums;

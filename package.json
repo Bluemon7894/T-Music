@@ -1,7 +1,7 @@
 {
   "name": "t-music",
   "productName": "T-Music",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "광고 없는 개인용 음악 플레이어 (YouTube 기반)",
   "author": "Bluemon7894",
   "main": "electron/main.js",
@@ -14,6 +14,8 @@
     "dist": "vite build && electron-builder --win nsis --x64"
   },
   "dependencies": {
+    "@xhayper/discord-rpc": "^1.5.1",
+    "marked": "^18.1.2",
     "youtubei.js": "^18.3.0"
   },
   "devDependencies": {

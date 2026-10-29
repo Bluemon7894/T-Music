@@ -123,6 +123,25 @@ window.addEventListener('beforeunload', () => {
   });
 });
 
+export async function applyOutputDevice(deviceId) {
+  for (const a of audios) {
+    if (typeof a.setSinkId === 'function') {
+      try {
+        await a.setSinkId(deviceId || '');
+      } catch (e) {
+        console.warn('a.setSinkId failed:', e);
+      }
+    }
+  }
+}
+
+const savedSinkId = (() => {
+  try { return localStorage.getItem('t-music-sink-id') || ''; } catch { return ''; }
+})();
+if (savedSinkId) {
+  applyOutputDevice(savedSinkId).catch(() => {});
+}
+
 export const usePlayer = create((set, get) => ({
   queue: initialQueue,
   index: initialIndex,
@@ -185,6 +204,27 @@ export const usePlayer = create((set, get) => ({
     const { queue, index } = get();
     if (i === index) return;
     set({ queue: queue.filter((_, j) => j !== i), index: i < index ? index - 1 : index });
+    savePlayerState();
+    get()._preloadNext();
+  },
+
+  reorderQueue(fromIndex, toIndex) {
+    const { queue, index } = get();
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= queue.length || toIndex >= queue.length) return;
+    const q = queue.slice();
+    const [moved] = q.splice(fromIndex, 1);
+    q.splice(toIndex, 0, moved);
+
+    let nextIndex = index;
+    if (index === fromIndex) {
+      nextIndex = toIndex;
+    } else if (fromIndex < index && toIndex >= index) {
+      nextIndex = index - 1;
+    } else if (fromIndex > index && toIndex <= index) {
+      nextIndex = index + 1;
+    }
+
+    set({ queue: q, index: nextIndex });
     savePlayerState();
     get()._preloadNext();
   },

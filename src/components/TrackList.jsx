@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { Heart, Clock3, ListPlus, ListEnd, Disc3, User, Plus, Trash2, Radio, ArrowDownToLine, Play, MoreHorizontal } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Heart, Clock3, ListPlus, ListEnd, Disc3, User, Plus, Trash2, Radio, ArrowDownToLine, Play, MoreHorizontal, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, GripVertical } from 'lucide-react';
 import { usePlayer } from '../store/player.js';
 import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
@@ -79,13 +79,14 @@ export function LikeButton({ track, size = 16, className = '' }) {
   );
 }
 
-export default function TrackList({ tracks, context, showAlbum = true, showThumb = true, numbered = true, onRemove, compact, animate = true }) {
+export default function TrackList({ tracks, context, showAlbum = true, showThumb = true, numbered = true, onRemove, onReorder, compact, animate = true }) {
   const currentId = usePlayer((s) => s.queue[s.index]?.id);
   const playing = usePlayer((s) => s.playing);
   const playList = usePlayer((s) => s.playList);
   const openMenu = useUI((s) => s.openMenu);
   const go = useNav((s) => s.go);
   const ref = useRef(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
   useEnter(ref, [animate ? tracks.length : 0], { step: 18, delay: 20 });
 
   const hasAlbum = showAlbum && !compact;
@@ -99,7 +100,7 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
     <div ref={ref} className={`tracklist ${compact ? 'compact' : ''} ${hasAlbum ? '' : 'no-album'}`}>
       {!compact && (
         <div className="tl-head">
-          <span className="c-num">#</span>
+          <span className="c-num">{onReorder ? <GripVertical size={14} title="드래그하여 순서 변경" /> : '#'}</span>
           <span>제목</span>
           {hasAlbum && <span className="c-album">앨범</span>}
           <span className="c-dur"><Clock3 size={15} /></span>
@@ -107,17 +108,55 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
       )}
       {tracks.map((t, i) => {
         const isCur = t.id === currentId;
-        const extra = onRemove ? [{ divider: true }, { label: '이 플레이리스트에서 삭제', icon: Trash2, onClick: () => onRemove(i) }] : [];
+        const reorderMenu = onReorder
+          ? [
+              { divider: true },
+              i > 0 && { label: '위로 이동', icon: ChevronUp, onClick: () => onReorder(i, i - 1) },
+              i < tracks.length - 1 && { label: '아래로 이동', icon: ChevronDown, onClick: () => onReorder(i, i + 1) },
+              i > 0 && { label: '맨 위로 이동', icon: ChevronsUp, onClick: () => onReorder(i, 0) },
+              i < tracks.length - 1 && { label: '맨 아래로 이동', icon: ChevronsDown, onClick: () => onReorder(i, tracks.length - 1) },
+            ].filter(Boolean)
+          : [];
+        const extra = [
+          ...(onRemove ? [{ divider: true }, { label: '이 플레이리스트에서 삭제', icon: Trash2, onClick: () => onRemove(i) }] : []),
+          ...reorderMenu,
+        ];
         return (
           <div
             key={t.id + ':' + i}
             data-enter={animate && i < 30 ? '' : undefined}
-            className={`tl-row ${isCur ? 'current' : ''}`}
+            className={`tl-row ${isCur ? 'current' : ''} ${onReorder ? 'reorderable' : ''} ${dragOverIdx === i ? 'drag-over' : ''}`}
+            draggable={!!onReorder}
+            onDragStart={(e) => {
+              if (onReorder) {
+                e.dataTransfer.setData('text/plain', String(i));
+                e.dataTransfer.effectAllowed = 'move';
+              }
+            }}
+            onDragOver={(e) => {
+              if (onReorder) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragOverIdx !== i) setDragOverIdx(i);
+              }
+            }}
+            onDragLeave={() => {
+              if (dragOverIdx === i) setDragOverIdx(null);
+            }}
+            onDrop={(e) => {
+              if (onReorder) {
+                e.preventDefault();
+                setDragOverIdx(null);
+                const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                if (!isNaN(from) && from !== i) onReorder(from, i);
+              }
+            }}
             onDoubleClick={() => play(i)}
             onMouseEnter={() => api.prefetch(t.id)}
             onContextMenu={(e) => openMenu(e, trackMenuItems(t, extra))}
           >
             <span className="c-num">
+              {onReorder && <GripVertical size={13} className="drag-handle" title="끌어서 순서 변경" />}
               {numbered ? <span className="num">{isCur ? <Equalizer playing={playing} /> : i + 1}</span> : isCur && <span className="num"><Equalizer playing={playing} /></span>}
               <button className="row-play" onClick={() => play(i)} aria-label="재생">
                 {isCur && playing ? <span className="pause-glyph" /> : <Play size={14} fill="currentColor" />}

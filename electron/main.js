@@ -8,6 +8,7 @@ import * as lyrics from './youtube/lyrics.js';
 import * as updater from './updater.js';
 import { getClient } from './youtube/client.js';
 import * as downloads from './downloads.js';
+import * as discord from './discord.js';
 import { registerScheme, handleProtocol } from './protocol.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -71,6 +72,20 @@ const api = {
     }
     return true;
   },
+  chooseDownloadsDir: () => downloads.chooseFolder(),
+  getDiscordRPC: () => discord.isEnabled(),
+  setDiscordRPC: (val) => discord.setEnabled(val),
+  updateDiscordActivity: (data) => { discord.setActivity(data); return true; },
+  clearDiscordActivity: () => { discord.clearActivity(); return true; },
+  getAutoStart: () => app.getLoginItemSettings().openAtLogin,
+  setAutoStart: (val) => {
+    app.setLoginItemSettings({
+      openAtLogin: Boolean(val),
+      path: process.execPath,
+      args: ['--hidden'],
+    });
+    return app.getLoginItemSettings().openAtLogin;
+  },
   openExternal: (url) => { if (url) shell.openExternal(url); },
 };
 
@@ -121,7 +136,8 @@ function createWindow() {
       sandbox: true,
     },
   });
-  win.once('ready-to-show', () => win.show());
+  const isHidden = process.argv.includes('--hidden');
+  if (!isHidden) win.once('ready-to-show', () => win.show());
 
   win.on('close', (e) => {
     if (!isQuitting) {

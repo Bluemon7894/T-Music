@@ -175,7 +175,7 @@ export function Liked() {
 
 export function LocalPlaylist({ id }) {
   const pl = useLibrary((s) => s.playlists.find((p) => p.id === id));
-  const { removeFromPlaylist, renamePlaylist, deletePlaylist } = useLibrary.getState();
+  const { removeFromPlaylist, renamePlaylist, deletePlaylist, reorderPlaylist } = useLibrary.getState();
   const prompt = useUI((s) => s.prompt);
   const go = useNav((s) => s.go);
   const ref = usePage([id]);
@@ -200,7 +200,14 @@ export function LocalPlaylist({ id }) {
         </ActionBar>
         {pl.tracks.length ? (
           <Filterable tracks={pl.tracks}>
-            {(shown, filtered) => <TrackList tracks={shown} context={context} onRemove={filtered ? undefined : (i) => removeFromPlaylist(pl.id, i)} />}
+            {(shown, filtered) => (
+              <TrackList
+                tracks={shown}
+                context={context}
+                onRemove={filtered ? undefined : (i) => removeFromPlaylist(pl.id, i)}
+                onReorder={filtered ? undefined : (from, to) => reorderPlaylist(pl.id, from, to)}
+              />
+            )}
           </Filterable>
         ) : (
           <Empty icon={ListMusic} title="아직 비어 있어요" text="곡을 우클릭하고 '플레이리스트에 추가'를 눌러 담아보세요.">
