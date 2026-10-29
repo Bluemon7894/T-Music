@@ -114,3 +114,50 @@ export async function setAudioSinkId(deviceId) {
 export function getAudioSinkId() {
   return currentSinkId;
 }
+
+// Automatic audio onset and silence detector for zero-configuration lyrics sync
+let onsetTrackId = null;
+let currentOnsetSec = 0;
+let onsetCheckTimer = null;
+
+export function getAudioOnset(trackId) {
+  return onsetTrackId === trackId ? currentOnsetSec : 0;
+}
+
+export function startAudioOnsetDetection(audioEl, trackId) {
+  if (!trackId) return;
+  onsetTrackId = trackId;
+  currentOnsetSec = 0;
+  clearInterval(onsetCheckTimer);
+
+  if (!analyser || !audioEl) return;
+  if (audioEl.currentTime > 2.0) return;
+
+  const buffer = new Uint8Array(analyser.frequencyBinCount);
+  let checks = 0;
+
+  onsetCheckTimer = setInterval(() => {
+    checks++;
+    if (checks > 150 || audioEl.paused || audioEl.currentTime > 7.0) {
+      clearInterval(onsetCheckTimer);
+      return;
+    }
+
+    analyser.getByteFrequencyData(buffer);
+    let sum = 0;
+    for (let i = 2; i < 90; i++) {
+      sum += buffer[i];
+    }
+    const avg = sum / 88;
+
+    if (avg >= 16) {
+      if (currentOnsetSec === 0 && audioEl.currentTime >= 0.45) {
+        currentOnsetSec = Math.round(audioEl.currentTime * 10) / 10;
+        window.dispatchEvent(new CustomEvent('audio-onset-detected', {
+          detail: { trackId, onset: currentOnsetSec }
+        }));
+      }
+      clearInterval(onsetCheckTimer);
+    }
+  }, 40);
+}

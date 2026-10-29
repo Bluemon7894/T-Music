@@ -4,7 +4,7 @@ import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useLibrary } from '../../store/library.js';
 import { api } from '../../lib/api.js';
-import { Thumb, ArtistLinks, Equalizer, useLyricsSync, SyncControl } from '../common.jsx';
+import { Thumb, ArtistLinks, Equalizer, useAutoLyricsSync } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
@@ -77,7 +77,7 @@ function Idle() {
 function LyricsView({ track }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { offset, adjust, reset } = useLyricsSync(track?.id);
+  const autoOffset = useAutoLyricsSync(track, data);
   const seek = usePlayer((s) => s.seek);
   const playing = usePlayer((s) => s.playing);
   const activeLineRef = useRef(null);
@@ -95,7 +95,7 @@ function LyricsView({ track }) {
 
   const lines = data?.lines || [];
 
-  // Real-time 60fps RAF sync loop
+  // Real-time 60fps RAF sync loop with automatic offset compensation
   useEffect(() => {
     if (!lines.length) {
       setActiveIdx(-1);
@@ -107,7 +107,7 @@ function LyricsView({ track }) {
       const t = usePlayer.getState().getPreciseTime();
       let best = -1;
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].time <= t + offset + 0.05) {
+        if (lines[i].time + autoOffset <= t + 0.05) {
           best = i;
         } else {
           break;
@@ -124,7 +124,7 @@ function LyricsView({ track }) {
       rafId = requestAnimationFrame(checkSync);
     }
     return () => cancelAnimationFrame(rafId);
-  }, [lines, offset, playing]);
+  }, [lines, autoOffset, playing]);
 
   useEffect(() => {
     const activeLine = activeLineRef.current;
@@ -176,13 +176,6 @@ function LyricsView({ track }) {
         <h3>{track.title}</h3>
         <p>{track.artists?.map((a) => a.name).join(', ')}</p>
       </div>
-      {lines.length > 0 && (
-        <SyncControl
-          offset={offset}
-          onAdjust={adjust}
-          onReset={reset}
-        />
-      )}
       {lines.length > 0 ? (
         <div className="lyrics-lines">
           {lines.map((l, i) => {
@@ -192,7 +185,7 @@ function LyricsView({ track }) {
                 key={l.time + '-' + i}
                 ref={isActive ? activeLineRef : null}
                 className={`lyrics-line ${isActive ? 'active' : ''}`}
-                onClick={() => seek(l.time)}
+                onClick={() => seek(Math.max(0, l.time + autoOffset))}
               >
                 {l.text || '...'}
               </div>
@@ -201,7 +194,6 @@ function LyricsView({ track }) {
         </div>
       ) : (
         <div className="stage-lyrics-plain-box" style={{ padding: '4px 6px' }}>
-          <div className="stage-lyrics-plain-hint">일반 텍스트 가사 제공 중</div>
           <div className="lyrics-plain">{data.plainLyrics}</div>
         </div>
       )}

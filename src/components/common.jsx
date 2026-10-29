@@ -3,6 +3,7 @@ import { Music, Play, Pause, RotateCw } from 'lucide-react';
 import { useNav } from '../store/nav.js';
 import { errorText } from '../lib/api.js';
 import { pop } from '../lib/motion.js';
+import { getAudioOnset } from '../lib/audio.js';
 
 export function useAsync(fn, deps) {
   const [state, setState] = useState({ loading: true, data: null, error: null });
@@ -136,74 +137,49 @@ export function Empty({ icon: Icon, title, text, children }) {
   );
 }
 
-export function useLyricsSync(trackId) {
-  const [trackOffset, setTrackOffset] = useState(() => {
-    try {
-      const v = localStorage.getItem(`t-music-sync-${trackId}`);
-      return v ? parseFloat(v) || 0 : 0;
-    } catch { return 0; }
-  });
-
-  const [globalOffset, setGlobalOffset] = useState(() => {
-    try {
-      const v = localStorage.getItem('t-music-global-sync');
-      return v ? parseFloat(v) || 0 : 0;
-    } catch { return 0; }
-  });
+// Zero-configuration automatic lyrics sync engine
+// Automatically aligns YouTube audio with LRC timestamps using audio onset and calibrated duration
+export function useAutoLyricsSync(track, data) {
+  const [autoOffset, setAutoOffset] = useState(0);
 
   useEffect(() => {
-    try {
-      const v = localStorage.getItem(`t-music-sync-${trackId}`);
-      setTrackOffset(v ? parseFloat(v) || 0 : 0);
-    } catch { setTrackOffset(0); }
-  }, [trackId]);
+    if (!track?.id || !data) {
+      setAutoOffset(0);
+      return;
+    }
 
-  useEffect(() => {
-    const onSyncChange = () => {
-      try {
-        const v = localStorage.getItem('t-music-global-sync');
-        setGlobalOffset(v ? parseFloat(v) || 0 : 0);
-      } catch {}
+    const computeOffset = () => {
+      // 1. Audio hardware onset detected during playback (e.g. 2.1s intro card before audio starts)
+      const onset = getAudioOnset(track.id);
+      if (onset >= 0.4 && onset <= 12.0) {
+        return onset;
+      }
+
+      // 2. Calibrated duration difference between YouTube video and studio LRC
+      const trackDur = track.duration || 0;
+      const lyricsDur = data.lyricsDuration || 0;
+      if (trackDur > 0 && lyricsDur > 0) {
+        const diff = trackDur - lyricsDur;
+        if (diff >= 0.8 && diff <= 10.0) {
+          return Math.round(diff * 10) / 10;
+        } else if (diff <= -0.8 && diff >= -8.0) {
+          return Math.round(diff * 10) / 10;
+        }
+      }
+
+      return data.autoOffset || 0;
     };
-    window.addEventListener('lyrics-global-sync-changed', onSyncChange);
-    return () => window.removeEventListener('lyrics-global-sync-changed', onSyncChange);
-  }, []);
 
-  const adjust = (delta) => {
-    setTrackOffset((prev) => {
-      const next = Math.round((prev + delta) * 10) / 10;
-      try {
-        if (next === 0) localStorage.removeItem(`t-music-sync-${trackId}`);
-        else localStorage.setItem(`t-music-sync-${trackId}`, String(next));
-      } catch {}
-      return next;
-    });
-  };
+    setAutoOffset(computeOffset());
 
-  const reset = () => {
-    setTrackOffset(0);
-    try { localStorage.removeItem(`t-music-sync-${trackId}`); } catch {}
-  };
+    const onOnset = (e) => {
+      if (e.detail?.trackId === track.id && typeof e.detail?.onset === 'number') {
+        setAutoOffset(e.detail.onset);
+      }
+    };
+    window.addEventListener('audio-onset-detected', onOnset);
+    return () => window.removeEventListener('audio-onset-detected', onOnset);
+  }, [track?.id, track?.duration, data]);
 
-  const totalOffset = Math.round((trackOffset + globalOffset) * 10) / 10;
-
-  return { offset: totalOffset, trackOffset, globalOffset, adjust, reset };
-}
-
-export function SyncControl({ offset, onAdjust, onReset }) {
-  return (
-    <div className="lyrics-sync-bar">
-      <span className="sync-title">싱크</span>
-      <button type="button" className="sync-btn" onClick={() => onAdjust(-0.5)} title="0.5초 빠르게">-0.5s</button>
-      <button type="button" className="sync-btn" onClick={() => onAdjust(-0.1)} title="0.1초 빠르게">-0.1s</button>
-      <span className={`sync-val ${offset !== 0 ? 'active' : ''}`} title="현재 싱크 오프셋 (초)">
-        {offset !== 0 ? `${offset > 0 ? '+' : ''}${offset.toFixed(1)}s` : '0.0s'}
-      </span>
-      <button type="button" className="sync-btn" onClick={() => onAdjust(0.1)} title="0.1초 느리게">+0.1s</button>
-      <button type="button" className="sync-btn" onClick={() => onAdjust(0.5)} title="0.5초 느리게">+0.5s</button>
-      {offset !== 0 && (
-        <button type="button" className="sync-reset" onClick={onReset} title="싱크 0초로 초기화">초기화</button>
-      )}
-    </div>
-  );
+  return autoOffset;
 }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { api, streamUrl } from '../lib/api.js';
-import { attach } from '../lib/audio.js';
+import { attach, startAudioOnsetDetection } from '../lib/audio.js';
 import { useLibrary } from './library.js';
 import { toast } from './ui.js';
 
@@ -562,7 +562,9 @@ audios.forEach((a, i) => {
       consecutiveErrors = 0;
       clearTimeout(errorSkipTimer);
       usePlayer.setState({ playing: true, loading: false });
-      startListening(usePlayer.getState().current());
+      const curTrack = usePlayer.getState().current();
+      startListening(curTrack);
+      startAudioOnsetDetection(a, curTrack?.id);
       savePlayerState({ wasPlaying: true, time: a.currentTime });
     }
   });
@@ -704,12 +706,10 @@ if (initialTrack) {
       const safeT = Math.max(0, Math.min(initialTime, dur > 0 ? dur - 0.5 : initialTime));
       a.currentTime = safeT;
       usePlayer.setState({ time: safeT, duration: dur });
-      if (saved.wasPlaying) {
-        attach(a);
-        a.play().catch(() => {
-          usePlayer.setState({ playing: false });
-        });
-      }
+      // Always restore session in a paused state when reopening the app
+      attach(a);
+      usePlayer.setState({ playing: false, time: safeT, duration: dur });
+      savePlayerState({ wasPlaying: false, time: safeT });
     } catch (e) {
       console.warn('Failed to restore position:', e);
     }

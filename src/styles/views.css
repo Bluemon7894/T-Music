@@ -624,100 +624,11 @@
   flex-direction: column;
   overflow: hidden;
 }
-.stage-lyrics-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex: 0 0 auto;
-  margin: 0 0 2px 0;
-  z-index: 5;
-}
 .stage-lyrics-plain-box {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 8px 4px;
-}
-.stage-lyrics-plain-hint {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--v-300);
-  background: rgba(139, 92, 246, 0.15);
-  border: 1px solid rgba(196, 181, 253, 0.25);
-  border-radius: 8px;
-  padding: 4px 10px;
-  display: inline-block;
-  align-self: flex-start;
-}
-
-.lyrics-sync-bar {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(196, 181, 253, 0.18);
-  font-size: 12px;
-  color: var(--sub);
-  user-select: none;
-  backdrop-filter: blur(12px);
-  margin: 4px 6px 8px;
-  align-self: flex-start;
-  transition: opacity 0.2s, background 0.2s;
-  z-index: 10;
-}
-.lyrics-sync-bar:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(196, 181, 253, 0.35);
-}
-.lyrics-sync-bar .sync-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--v-300);
-  margin-right: 2px;
-}
-.lyrics-sync-bar .sync-btn {
-  background: rgba(139, 92, 246, 0.18);
-  color: var(--v-200);
-  border: 1px solid rgba(196, 181, 253, 0.25);
-  border-radius: 10px;
-  padding: 2px 7px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, transform 0.1s;
-}
-.lyrics-sync-bar .sync-btn:hover {
-  background: rgba(139, 92, 246, 0.45);
-  color: #fff;
-  transform: scale(1.05);
-}
-.lyrics-sync-bar .sync-val {
-  font-weight: 800;
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-  color: var(--v-100);
-  min-width: 36px;
-  text-align: center;
-}
-.lyrics-sync-bar .sync-val.active {
-  color: #e879f9;
-  text-shadow: 0 0 10px rgba(232, 121, 249, 0.5);
-}
-.lyrics-sync-bar .sync-reset {
-  background: none;
-  border: none;
-  color: var(--dim);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 2px 4px;
-  text-decoration: underline;
-  transition: color 0.15s;
-}
-.lyrics-sync-bar .sync-reset:hover {
-  color: #f87171;
 }
 
 .stage-lyrics-container {

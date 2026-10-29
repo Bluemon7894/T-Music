@@ -368,26 +368,26 @@ function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, raw
     if (titleExact) break;
   }
 
-  // Duration match calculation
+  // Duration match calculation - HEAVILY reward exact audio length match to avoid MV/live offset drift
   let durationClose = false;
   let durDiff = 999;
   if (targetDuration > 0 && item.duration > 0) {
     durDiff = Math.abs(item.duration - targetDuration);
-    if (durDiff <= 2.0) {
-      score += 45;
+    if (durDiff <= 1.0) {
+      score += 75; // Pinpoint match
+      durationClose = true;
+    } else if (durDiff <= 2.5) {
+      score += 55;
       durationClose = true;
     } else if (durDiff <= 5.0) {
       score += 30;
       durationClose = true;
     } else if (durDiff <= 10.0) {
-      score += 15;
-      durationClose = true;
+      score += 10;
     } else if (durDiff <= 20.0) {
-      score += 5;
-    } else if (durDiff <= 45.0) {
       score -= 10;
     } else {
-      score -= 25;
+      score -= 40;
     }
   }
 
@@ -449,15 +449,42 @@ async function fetchFromYouTubeMusic(videoId) {
 
 async function fetchFromLrclib(title, artist, duration, artistsList = []) {
   const { titles, artists, isCoverOrIndie } = extractVariants(title, artist, artistsList);
-  const headers = { 'User-Agent': 'T-Music/0.3.10 (https://github.com/Bluemon7894/T-Music)' };
+  const headers = { 'User-Agent': 'T-Music/0.3.12 (https://github.com/Bluemon7894/T-Music)' };
 
-  // 1. Direct GET try with variations (track_name + artist_name)
-  // First try clean primary title & artist without strict duration (to avoid 404 when track duration slightly differs)
   const getPairs = [];
   if (titles[0] && artists[0]) getPairs.push([titles[0], artists[0]]);
   if (titles[0] && artists[1]) getPairs.push([titles[0], artists[1]]);
   if (titles[1] && artists[0]) getPairs.push([titles[1], artists[0]]);
 
+  // 1a. Try direct GET with EXACT track duration first (finds the exact studio/video audio sync)
+  if (duration > 0) {
+    for (const [t, a] of getPairs) {
+      try {
+        const u = new URL('https://lrclib.net/api/get');
+        u.searchParams.set('track_name', t);
+        u.searchParams.set('artist_name', a);
+        u.searchParams.set('duration', Math.round(duration));
+        const r = await fetch(u.href, { headers, signal: AbortSignal.timeout(2200) });
+        if (r.ok) {
+          const d = await r.json();
+          if (d.syncedLyrics) {
+            const lines = parseLrc(d.syncedLyrics);
+            if (lines.length >= 3) {
+              return {
+                plainLyrics: d.plainLyrics || '',
+                syncedLyrics: d.syncedLyrics,
+                lines,
+                lyricsDuration: d.duration || duration,
+                autoOffset: 0,
+              };
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // 1b. Direct GET without strict duration (fallback for small differences)
   for (const [t, a] of getPairs) {
     try {
       const u = new URL('https://lrclib.net/api/get');
@@ -481,10 +508,13 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
           if (d.syncedLyrics && canSync) {
             const lines = parseLrc(d.syncedLyrics);
             if (lines.length >= 3) {
+              const durDelta = (duration > 0 && d.duration > 0) ? (duration - d.duration) : 0;
               return {
                 plainLyrics: d.plainLyrics || '',
                 syncedLyrics: d.syncedLyrics || null,
                 lines,
+                lyricsDuration: d.duration || duration,
+                autoOffset: durDelta,
               };
             }
           }
@@ -496,6 +526,8 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
               plainLyrics: plain,
               syncedLyrics: null,
               lines: [],
+              lyricsDuration: d.duration || 0,
+              autoOffset: 0,
             };
           }
         }
@@ -561,10 +593,13 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
       if (best.syncedLyrics && canSync) {
         const lines = parseLrc(best.syncedLyrics);
         if (lines.length >= 3) {
+          const durDelta = (duration > 0 && best.duration > 0) ? (duration - best.duration) : 0;
           return {
             plainLyrics: best.plainLyrics || '',
             syncedLyrics: best.syncedLyrics,
             lines,
+            lyricsDuration: best.duration || duration,
+            autoOffset: durDelta,
           };
         }
       }
@@ -575,6 +610,8 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
           plainLyrics: plain,
           syncedLyrics: null,
           lines: [],
+          lyricsDuration: best.duration || 0,
+          autoOffset: 0,
         };
       }
     }
