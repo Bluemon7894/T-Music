@@ -38,17 +38,6 @@ function serveFile({ file, mime }, range) {
   });
 }
 
-// Some clients' URLs (iOS) reject ranges larger than 1 MB outright.
-const CHUNK = 1024 * 1024;
-
-function capRange(range) {
-  const m = range && /bytes=(\d+)-(\d*)/.exec(range);
-  if (!m) return range;
-  const start = Number(m[1]);
-  const end = m[2] ? Math.min(Number(m[2]), start + CHUNK - 1) : start + CHUNK - 1;
-  return `bytes=${start}-${end}`;
-}
-
 async function handleStream(req) {
   const id = new URL(req.url).pathname.slice(1);
   if (!/^[\w-]{11}$/.test(id)) return new Response('bad id', { status: 400 });
@@ -57,10 +46,10 @@ async function handleStream(req) {
   const local = downloads.localFile(id);
   if (local) return serveFile(local, range);
 
-  // googlevideo throttles long requests to about playback speed; asking for at
-  // most CHUNK bytes keeps each response fast, and the media element simply
-  // requests the next range when it needs more.
-  const upstreamRange = capRange(range);
+  // Pass the browser's Range request directly to upstream (e.g. bytes=0- or bytes=X-)
+  // so the audio element receives a continuous stream and can seek to any position
+  // without premature stream termination or 416 errors.
+  const upstreamRange = range || 'bytes=0-';
 
   const exclude = [];
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -82,6 +71,12 @@ async function handleStream(req) {
         }
         if (!h.has('accept-ranges')) h.set('accept-ranges', 'bytes');
         return new Response(res.body, { status: res.status, headers: h });
+      }
+      if (res.status === 416) {
+        const h = new Headers(CORS);
+        const cr = res.headers.get('content-range');
+        if (cr) h.set('content-range', cr);
+        return new Response(null, { status: 416, headers: h });
       }
       res.body?.cancel();
     } catch {

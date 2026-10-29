@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Shuffle, SkipBack, SkipForward, Repeat, Repeat1, ListMusic, Volume2, Volume1, VolumeX, Maximize2 } from 'lucide-react';
+import { Shuffle, SkipBack, SkipForward, Repeat, Repeat1, ListMusic, Volume2, Volume1, VolumeX, Maximize2, Mic2 } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useNav } from '../../store/nav.js';
@@ -66,6 +66,7 @@ export default function PlayerDock() {
   const VolIcon = p.muted || p.volume === 0 ? VolumeX : p.volume < 0.5 ? Volume1 : Volume2;
   const duration = p.duration || track?.duration || 0;
   const queueOn = panelOpen && panelTab === 'queue';
+  const lyricsOn = panelOpen && panelTab === 'lyrics';
 
   return (
     <footer className={`dock ${track ? '' : 'idle'}`}>
@@ -107,6 +108,7 @@ export default function PlayerDock() {
       </div>
 
       <div className="dock-right">
+        <button className={`icon-btn toggle ${lyricsOn ? 'on' : ''}`} onClick={() => (lyricsOn ? useUI.getState().togglePanel() : setPanelTab('lyrics'))} title="가사" disabled={!track}><Mic2 size={18} /></button>
         <button className={`icon-btn toggle ${queueOn ? 'on' : ''}`} onClick={() => (queueOn ? useUI.getState().togglePanel() : setPanelTab('queue'))} title="대기열"><ListMusic size={18} /></button>
         <button className="icon-btn" onClick={() => setStage(true)} title="전체 화면" disabled={!track}><Maximize2 size={16} /></button>
         <button className="icon-btn" onClick={p.toggleMute} title="음소거"><VolIcon size={18} /></button>

@@ -158,7 +158,7 @@ export default function Home() {
 
       <StatsRow />
 
-      {lib.recent.length > 0 && <Shelf title="최근 재생한 곡" items={lib.recent.slice(0, 20).map((t) => ({ ...t, kind: 'track' }))} />}
+      {lib.recent.length > 0 && <Shelf title="최근 재생한 곡" items={lib.recent.slice(0, 20).map((t) => ({ ...t, kind: 'track', isRecent: true }))} />}
       {forYou.data?.length > 0 && <Shelf title="취향 저격 추천" subtitle={`'${lib.recent[0].title}'를 좋아한다면`} items={forYou.data.map((t) => ({ ...t, kind: 'track' }))} />}
       {lib.followed.length > 0 && <Shelf title="팔로우한 아티스트" items={lib.followed.map((a) => ({ ...a, kind: 'artist' }))} />}
 

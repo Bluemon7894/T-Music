@@ -25,10 +25,24 @@ export const useLibrary = create(
       pushRecent(track) {
         set({ recent: [slim(track), ...get().recent.filter((t) => t.id !== track.id)].slice(0, 60) });
       },
+      removeRecent(id) {
+        set({ recent: get().recent.filter((t) => t.id !== id) });
+      },
       addListen(track, sec) {
-        const entry = { id: track.id, title: track.title, artist: track.artists?.[0]?.name || '', thumb: track.thumb, sec: Math.round(sec || 0), at: Date.now() };
+        const s = Math.round(sec || 0);
+        if (s <= 0) return;
         const cutoff = Date.now() - 60 * DAY;
-        set({ listens: [entry, ...get().listens.filter((l) => l.at > cutoff)].slice(0, 2000) });
+        const list = get().listens.filter((l) => l.at > cutoff);
+        // If the most recent listen is the same track within 5 minutes, accumulate duration instead of duplicating play count
+        const first = list[0];
+        if (first && first.id === track.id && Date.now() - first.at < 5 * 60 * 1000) {
+          first.sec += s;
+          first.at = Date.now();
+          set({ listens: [...list] });
+        } else {
+          const entry = { id: track.id, title: track.title, artist: track.artists?.[0]?.name || '', thumb: track.thumb, sec: s, at: Date.now() };
+          set({ listens: [entry, ...list].slice(0, 2000) });
+        }
       },
 
       createPlaylist(name, tracks = [], extra = {}) {

@@ -128,7 +128,7 @@ function Browse() {
           </div>
         </section>
       )}
-      {recent.length > 0 && <Shelf title="최근 들은 곡" items={recent.map((t) => ({ ...t, kind: 'track' }))} />}
+      {recent.length > 0 && <Shelf title="최근 들은 곡" items={recent.map((t) => ({ ...t, kind: 'track', isRecent: true }))} />}
       <section>
         <h2 data-enter>모두 둘러보기</h2>
         <div className="browse-grid">

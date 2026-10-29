@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { Radio, X, Maximize2, ListMusic, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Radio, X, Maximize2, ListMusic, Sparkles, Mic2 } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useLibrary } from '../../store/library.js';
+import { api } from '../../lib/api.js';
 import { Thumb, ArtistLinks, Equalizer } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
@@ -73,6 +74,86 @@ function Idle() {
   );
 }
 
+function LyricsView({ track }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const currentTime = usePlayer((s) => s.time);
+  const seek = usePlayer((s) => s.seek);
+  const activeLineRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setData(null);
+    api.lyrics(track)
+      .then((res) => { if (!cancelled) { setData(res); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setData(null); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [track?.id]);
+
+  const lines = data?.lines || [];
+  const activeIdx = lines.length > 0
+    ? lines.reduce((best, l, i) => (l.time <= currentTime + 0.3 ? i : best), -1)
+    : -1;
+
+  useEffect(() => {
+    if (activeLineRef.current) {
+      activeLineRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [activeIdx]);
+
+  if (loading) {
+    return (
+      <div className="lyrics-sk">
+        <div className="sk" style={{ width: '60%' }} />
+        <div className="sk" style={{ width: '85%' }} />
+        <div className="sk" style={{ width: '45%' }} />
+        <div className="sk" style={{ width: '75%' }} />
+        <div className="sk" style={{ width: '65%' }} />
+        <div className="sk" style={{ width: '80%' }} />
+      </div>
+    );
+  }
+
+  const hasLyrics = lines.length > 0 || !!data?.plainLyrics;
+  if (!hasLyrics) {
+    return (
+      <div className="lyrics-empty">
+        <Mic2 size={32} opacity={0.35} />
+        <p>가사가 제공되지 않는 곡입니다</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="lyrics-view">
+      <div className="lyrics-meta">
+        <h3>{track.title}</h3>
+        <p>{track.artists?.map((a) => a.name).join(', ')}</p>
+      </div>
+      {lines.length > 0 ? (
+        <div className="lyrics-lines">
+          {lines.map((l, i) => {
+            const isActive = i === activeIdx;
+            return (
+              <div
+                key={l.time + '-' + i}
+                ref={isActive ? activeLineRef : null}
+                className={`lyrics-line ${isActive ? 'active' : ''}`}
+                onClick={() => seek(l.time)}
+              >
+                {l.text || '...'}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="lyrics-plain">{data.plainLyrics}</div>
+      )}
+    </div>
+  );
+}
+
 export default function NowPanel() {
   const { queue, index, jumpTo, removeAt, autoplay, toggleAutoplay, context } = usePlayer();
   const panelTab = useUI((s) => s.panelTab);
@@ -87,12 +168,14 @@ export default function NowPanel() {
         <div className="seg">
           <button className={panelTab === 'next' ? 'on' : ''} onClick={() => setPanelTab('next')}><Sparkles size={14} /> 지금 재생</button>
           <button className={panelTab === 'queue' ? 'on' : ''} onClick={() => setPanelTab('queue')}><ListMusic size={14} /> 대기열</button>
+          <button className={panelTab === 'lyrics' ? 'on' : ''} onClick={() => setPanelTab('lyrics')}><Mic2 size={14} /> 가사</button>
         </div>
         <button className="icon-btn circle" onClick={togglePanel} aria-label="패널 닫기"><X size={16} /></button>
       </div>
 
       <div className="np-body">
         {!cur && <Idle />}
+        {cur && panelTab === 'lyrics' && <LyricsView track={cur} />}
         {cur && panelTab === 'next' && (
           <>
             <NowCard track={cur} />

@@ -8,6 +8,7 @@ export const api = {
   playlist: (id) => call('playlist', id),
   related: (id) => call('related', id),
   home: () => call('home'),
+  lyrics: (track) => call('lyrics', track),
   prefetch: (id) => call('prefetch', id),
   status: () => call('status'),
   diagnose: () => call('diagnose'),

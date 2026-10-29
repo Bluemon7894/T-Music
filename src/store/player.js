@@ -34,6 +34,45 @@ const shuffled = (list) => {
 let radioFor = null; // track id we already fetched related tracks for
 let retried = new Set();
 
+// Actual listening time tracker (measures real wall-clock listening duration while audio is playing)
+let currentListenTrack = null;
+let listenStartTime = null;
+let accumulatedListenSec = 0;
+
+function commitListen() {
+  if (listenStartTime != null) {
+    accumulatedListenSec += (performance.now() - listenStartTime) / 1000;
+    listenStartTime = null;
+  }
+  const sec = Math.round(accumulatedListenSec);
+  if (currentListenTrack && sec >= 3) {
+    useLibrary.getState().addListen(currentListenTrack, sec);
+  }
+  accumulatedListenSec = 0;
+}
+
+function startListening(track) {
+  if (!track) return;
+  if (currentListenTrack && currentListenTrack.id !== track.id) {
+    commitListen();
+  }
+  currentListenTrack = track;
+  if (listenStartTime == null) {
+    listenStartTime = performance.now();
+  }
+}
+
+function pauseListening() {
+  if (listenStartTime != null) {
+    accumulatedListenSec += (performance.now() - listenStartTime) / 1000;
+    listenStartTime = null;
+  }
+}
+
+window.addEventListener('beforeunload', () => {
+  commitListen();
+});
+
 export const usePlayer = create((set, get) => ({
   queue: [],
   index: -1,
@@ -54,6 +93,7 @@ export const usePlayer = create((set, get) => ({
 
   playList(tracks, start = 0, context = null) {
     if (!tracks?.length) return;
+    commitListen();
     let queue = tracks.slice();
     let index = start;
     if (get().shuffle) {
@@ -95,6 +135,7 @@ export const usePlayer = create((set, get) => ({
   },
 
   jumpTo(i) {
+    commitListen();
     set({ index: i });
     get()._load();
   },
@@ -108,16 +149,13 @@ export const usePlayer = create((set, get) => ({
 
   next(auto = false) {
     const { queue, index, repeat } = get();
-    if (!auto) {
-      // Count a skipped track once it has been listened to for a while.
-      const t = queue[index];
-      if (t && active().currentTime > 30) useLibrary.getState().addListen(t, active().currentTime);
-    }
     if (auto && repeat === 'one') {
+      commitListen();
       active().currentTime = 0;
       active().play().catch(() => {});
       return;
     }
+    commitListen();
     if (index + 1 < queue.length) {
       set({ index: index + 1 });
       get()._load();
@@ -135,6 +173,7 @@ export const usePlayer = create((set, get) => ({
   },
 
   prev() {
+    commitListen();
     const a = active();
     if (a.currentTime > 3 || get().index <= 0) {
       a.currentTime = 0;
@@ -145,8 +184,11 @@ export const usePlayer = create((set, get) => ({
   },
 
   seek(t) {
-    active().currentTime = t;
-    set({ time: t });
+    const a = active();
+    const dur = a.duration || get().duration || 0;
+    const safeT = Math.max(0, dur > 0 ? Math.min(t, Math.max(0, dur - 0.5)) : t);
+    a.currentTime = safeT;
+    set({ time: safeT });
   },
 
   setVolume(v) {
@@ -187,8 +229,10 @@ export const usePlayer = create((set, get) => ({
   // ---- internals ----
 
   _load() {
+    commitListen();
     const track = get().current();
     if (!track) return;
+    currentListenTrack = track;
     const src = streamUrl(track.id);
     retried.delete(track.id);
     if (spare().dataset.id === track.id) {
@@ -258,10 +302,30 @@ export const usePlayer = create((set, get) => ({
 // Wire audio events. Events from the spare element are ignored.
 audios.forEach((a, i) => {
   const isActive = () => i === cur;
-  a.addEventListener('playing', () => isActive() && usePlayer.setState({ playing: true, loading: false }));
-  a.addEventListener('pause', () => isActive() && usePlayer.setState({ playing: false }));
-  a.addEventListener('waiting', () => isActive() && usePlayer.setState({ loading: true }));
-  a.addEventListener('canplay', () => isActive() && usePlayer.setState({ loading: false }));
+  a.addEventListener('playing', () => {
+    if (isActive()) {
+      usePlayer.setState({ playing: true, loading: false });
+      startListening(usePlayer.getState().current());
+    }
+  });
+  a.addEventListener('pause', () => {
+    if (isActive()) {
+      usePlayer.setState({ playing: false });
+      pauseListening();
+    }
+  });
+  a.addEventListener('waiting', () => {
+    if (isActive()) {
+      usePlayer.setState({ loading: true });
+      pauseListening();
+    }
+  });
+  a.addEventListener('canplay', () => {
+    if (isActive()) {
+      usePlayer.setState({ loading: false });
+      if (!a.paused) startListening(usePlayer.getState().current());
+    }
+  });
   a.addEventListener('timeupdate', () => {
     if (!isActive()) return;
     const b = a.buffered.length ? a.buffered.end(a.buffered.length - 1) : 0;
@@ -269,12 +333,23 @@ audios.forEach((a, i) => {
     if ('mediaSession' in navigator && a.duration) {
       try { navigator.mediaSession.setPositionState({ duration: a.duration, position: Math.min(a.currentTime, a.duration), playbackRate: 1 }); } catch { /* ignore */ }
     }
+    // Flush listening progress periodically every 30 seconds of actual playback
+    if (listenStartTime != null && performance.now() - listenStartTime >= 30000) {
+      commitListen();
+      listenStartTime = performance.now();
+    }
   });
   a.addEventListener('durationchange', () => isActive() && isFinite(a.duration) && usePlayer.setState({ duration: a.duration }));
   a.addEventListener('ended', () => {
     if (!isActive()) return;
-    const t = usePlayer.getState().current();
-    if (t) useLibrary.getState().addListen(t, a.duration || t.duration);
+    const dur = a.duration || 0;
+    // Guard against premature 'ended' events caused by network truncations:
+    if (dur > 0 && dur - a.currentTime > 3) {
+      console.warn('Playback ended prematurely at', a.currentTime, 'of', dur);
+      a.play().catch(() => {});
+      return;
+    }
+    commitListen();
     usePlayer.getState().next(true);
   });
   a.addEventListener('error', () => {

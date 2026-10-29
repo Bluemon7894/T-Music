@@ -65,19 +65,19 @@
 .lib-cta p { font-size: 13px; line-height: 1.5; color: var(--v-100); font-weight: 600; }
 
 /* ---------- top bar ---------- */
-.topbar { grid-area: top; display: flex; align-items: center; gap: 14px; padding-right: 148px; -webkit-app-region: drag; }
+.topbar { grid-area: top; display: flex; align-items: center; gap: 14px; padding-right: 148px; -webkit-app-region: drag; position: relative; z-index: 100; }
 .topbar button, .topbar input, .searchbox { -webkit-app-region: no-drag; }
 .tb-nav { display: flex; gap: 6px; }
 .tb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .searchbox { position: relative; flex: 0 1 480px; display: flex; align-items: center; height: 44px; padding: 0 12px 0 16px; border-radius: 22px; background: var(--glass-2); border: 1px solid var(--line); transition: border-color 0.2s, background 0.2s, box-shadow 0.3s, flex-basis 0.4s var(--out); }
 .searchbox:hover { background: var(--glass-3); }
-.searchbox.focus { flex-basis: 560px; border-color: rgba(196, 181, 253, 0.55); background: rgba(20, 12, 38, 0.85); box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18), var(--glow); }
+.searchbox.focus { flex-basis: 560px; border-color: rgba(196, 181, 253, 0.55); background: rgba(20, 12, 38, 0.85); box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18), var(--glow); z-index: 110; }
 .searchbox input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; font-size: 14.5px; padding: 0 10px; height: 100%; }
 .searchbox input::placeholder { color: var(--dim); }
 .sb-icon { color: var(--v-300); cursor: pointer; flex: none; }
 .sb-clear { color: var(--sub); }
 .sb-kbd { opacity: 0.7; }
-.suggestions { position: absolute; top: 52px; left: 0; right: 0; z-index: 60; list-style: none; margin: 0; padding: 6px; background: rgba(22, 14, 40, 0.96); backdrop-filter: blur(20px); border: 1px solid var(--line-2); border-radius: 16px; box-shadow: var(--shadow); }
+.suggestions { position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 200; list-style: none; margin: 0; padding: 6px; background: rgba(18, 12, 32, 0.98); backdrop-filter: blur(24px); border: 1px solid var(--line-2); border-radius: 16px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), var(--shadow); max-height: 380px; overflow-y: auto; }
 .suggestions li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; cursor: pointer; color: var(--v-100); }
 .suggestions li svg { color: var(--v-400); }
 .suggestions li:hover, .suggestions li.hi { background: rgba(139, 92, 246, 0.2); }
@@ -89,7 +89,9 @@
 
 /* ---------- now panel ---------- */
 .now-panel { grid-area: panel; display: flex; flex-direction: column; min-height: 0; border-radius: var(--r-lg); background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)); border: 1px solid var(--line); overflow: hidden; }
-.np-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 6px; }
+.np-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 6px; gap: 8px; }
+.np-head .seg { min-width: 0; }
+.np-head .seg button { padding: 0 8px; font-size: 12px; gap: 4px; }
 .np-body { flex: 1; overflow-y: auto; padding: 6px 14px 14px; }
 .np-section { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 18px 4px 8px; font-weight: 800; font-size: 15px; }
 .np-section small { color: var(--dim); font-weight: 500; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -132,6 +134,20 @@
 .autoplay.on .switch { background: var(--grad); box-shadow: var(--glow); }
 .autoplay.on .switch::after { transform: translateX(16px); }
 
+/* lyrics view */
+.lyrics-view { display: flex; flex-direction: column; gap: 8px; padding: 8px 4px; }
+.lyrics-meta { margin-bottom: 12px; padding: 0 4px; }
+.lyrics-meta h3 { font-size: 16px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lyrics-meta p { color: var(--sub); font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lyrics-lines { display: flex; flex-direction: column; gap: 12px; padding: 4px 0; }
+.lyrics-line { font-size: 15.5px; font-weight: 600; line-height: 1.5; color: var(--dim); cursor: pointer; transition: color 0.25s, transform 0.25s, font-size 0.25s; padding: 4px 8px; border-radius: 8px; user-select: none; word-break: keep-all; overflow-wrap: break-word; }
+.lyrics-line:hover { color: var(--v-200); background: rgba(139, 92, 246, 0.08); }
+.lyrics-line.active { color: #fff; font-size: 18px; font-weight: 800; transform: scale(1.02); transform-origin: left center; text-shadow: 0 0 20px rgba(139, 92, 246, 0.6); }
+.lyrics-plain { font-size: 14.5px; line-height: 1.9; color: var(--v-100); white-space: pre-wrap; word-break: break-word; font-weight: 500; padding: 4px 8px; }
+.lyrics-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; padding: 60px 14px; color: var(--dim); font-size: 13.5px; }
+.lyrics-sk { display: flex; flex-direction: column; gap: 12px; padding: 12px 6px; }
+.lyrics-sk .sk { height: 18px; border-radius: 6px; }
+
 /* ---------- player dock ---------- */
 .dock {
   grid-area: dock;
@@ -151,12 +167,13 @@
 }
 .dock-glow { position: absolute; left: 0; top: 0; height: 2px; background: var(--grad-hot); box-shadow: 0 0 16px 2px rgba(217, 70, 239, 0.6); transition: width 0.25s linear; pointer-events: none; }
 .dock-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.dock-left .like, .dock-left .dl { flex: none; }
 .dock-art { position: relative; width: 60px; height: 60px; flex: none; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.8); transition: transform 0.35s var(--spring); }
 .dock-art:hover { transform: translateY(-4px) scale(1.06) rotate(-2deg); }
 .dock-art .thumb { width: 100%; height: 100%; border-radius: 0; }
 .dock-art-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(10, 7, 18, 0.5); opacity: 0; transition: opacity 0.2s; }
 .dock-art:hover .dock-art-hint { opacity: 1; }
-.dock-text { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dock-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .dock-title { font-size: 14.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .dock-title:hover { color: var(--v-200); }
 .dock-artist { font-size: 12.5px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -182,3 +199,10 @@
 .slider-knob { position: absolute; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.35), 0 2px 8px rgba(0, 0, 0, 0.5); transform: scale(0); transition: transform 0.25s var(--spring); pointer-events: none; }
 .slider:hover .slider-knob, .slider.dragging .slider-knob { transform: scale(1); }
 .slider-tip { position: absolute; bottom: 20px; transform: translateX(-50%); padding: 3px 7px; border-radius: 6px; background: rgba(22, 14, 40, 0.95); border: 1px solid var(--line-2); font-size: 11px; font-weight: 700; pointer-events: none; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1220px) {
+  .dock { gap: 12px; padding: 0 14px 0 10px; }
+  .dock-controls { gap: 14px; }
+  .dock-right { gap: 10px; }
+  .slider.volume { width: 75px; }
+}

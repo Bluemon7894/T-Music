@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
+import { useUI, toast } from '../store/ui.js';
+import { useLibrary } from '../store/library.js';
 import { api } from '../lib/api.js';
-import { toast } from '../store/ui.js';
 import { useTilt, useEnter, animate, ease, utils } from '../lib/motion.js';
 import { Thumb, PlayButton } from './common.jsx';
+import { trackMenuItems } from './TrackList.jsx';
 
 // Loads an album/playlist/artist and plays it straight from a card.
 export async function playItem(item) {
@@ -42,15 +44,41 @@ export function subtitleOf(item) {
 
 export function Card({ item, size }) {
   const go = useNav((s) => s.go);
+  const openMenu = useUI((s) => s.openMenu);
+  const removeRecent = useLibrary((s) => s.removeRecent);
   const art = useRef(null);
   useTilt(art, { max: 9, scale: 1.04 });
   const round = item.kind === 'artist';
+
+  const onContextMenu = (e) => {
+    if (item.kind === 'track') {
+      openMenu(e, trackMenuItems(item));
+    }
+  };
+
+  const onRemove = (e) => {
+    e.stopPropagation();
+    removeRecent(item.id);
+    toast('최근 들은 곡에서 삭제했습니다');
+  };
+
   return (
-    <div className={`card ${round ? 'is-artist' : ''}`} data-enter onClick={() => openItem(item, go)} style={size ? { width: size } : undefined}>
+    <div
+      className={`card ${round ? 'is-artist' : ''}`}
+      data-enter
+      onClick={() => openItem(item, go)}
+      onContextMenu={onContextMenu}
+      style={size ? { width: size } : undefined}
+    >
       <div className={`card-art ${round ? 'round' : ''}`} ref={art}>
         <Thumb src={item.thumb} round={round} />
         <span className="glare" />
         <PlayButton className="card-play" size={44} onClick={() => playItem(item)} />
+        {item.isRecent && (
+          <button className="card-remove" onClick={onRemove} title="최근 들은 곡에서 삭제" aria-label="최근 들은 곡에서 삭제">
+            <X size={15} />
+          </button>
+        )}
       </div>
       <div className="card-title">{item.title || item.name}</div>
       <div className="card-sub">{subtitleOf(item)}</div>

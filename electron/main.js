@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import * as catalog from './youtube/catalog.js';
 import * as stream from './youtube/stream.js';
 import * as ytdlp from './youtube/ytdlp.js';
+import * as lyrics from './youtube/lyrics.js';
 import { getClient } from './youtube/client.js';
 import * as downloads from './downloads.js';
 import { registerScheme, handleProtocol } from './protocol.js';
@@ -22,6 +23,7 @@ const api = {
   playlist: (id) => catalog.playlist(id),
   related: (id) => catalog.related(id),
   home: () => catalog.home(),
+  lyrics: (track) => lyrics.getLyrics(track),
   prefetch: (id) => { if (!downloads.localFile(id)) stream.prefetch(id); return true; },
   status: () => ({ methods: stream.status(), ytdlp: ytdlp.state, version: app.getVersion() }),
   diagnose: () => stream.diagnose(),

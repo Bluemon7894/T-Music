@@ -43,6 +43,14 @@ export function trackMenuItems(track, extra = []) {
     downloaded
       ? { label: '다운로드 삭제', icon: Trash2, onClick: () => removeDownload(track.id) }
       : { label: '다운로드', icon: ArrowDownToLine, onClick: () => download(track) },
+    lib.recent.some((t) => t.id === track.id) && {
+      label: '최근 들은 곡에서 삭제',
+      icon: Trash2,
+      onClick: () => {
+        lib.removeRecent(track.id);
+        toast('최근 들은 곡에서 삭제했습니다');
+      },
+    },
     { divider: true },
     artist && { label: '아티스트로 이동', icon: User, onClick: () => nav.go('artist', { id: artist.id }) },
     track.album?.id && { label: '앨범으로 이동', icon: Disc3, onClick: () => nav.go('album', { id: track.album.id }) },
