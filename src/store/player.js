@@ -31,7 +31,8 @@ const shuffled = (list) => {
   return a;
 };
 
-let radioFor = null; // track id we already fetched related tracks for
+let extendingPromise = null;
+const usedRadioSeeds = new Set();
 let retried = new Set();
 
 // Actual listening time tracker (measures real wall-clock listening duration while audio is playing)
@@ -104,7 +105,8 @@ export const usePlayer = create((set, get) => ({
     } else {
       set({ unshuffled: null });
     }
-    radioFor = null;
+    usedRadioSeeds.clear();
+    extendingPromise = null;
     set({ queue, index, context });
     get()._load();
   },
@@ -147,7 +149,7 @@ export const usePlayer = create((set, get) => ({
     else a.pause();
   },
 
-  next(auto = false) {
+  async next(auto = false) {
     const { queue, index, repeat } = get();
     if (auto && repeat === 'one') {
       commitListen();
@@ -159,16 +161,26 @@ export const usePlayer = create((set, get) => ({
     if (index + 1 < queue.length) {
       set({ index: index + 1 });
       get()._load();
-    } else if (repeat === 'all' && queue.length) {
+      return;
+    }
+    if (repeat === 'all' && queue.length) {
       set({ index: 0 });
       get()._load();
-    } else if (get().autoplay) {
-      get()._extendWithRadio().then((added) => {
-        if (added) { set({ index: get().index + 1 }); get()._load(); }
-        else set({ playing: false });
-      });
+      return;
+    }
+
+    // End of queue reached: fetch related tracks so the queue NEVER runs out
+    set({ loading: true });
+    await get()._ensureNextTracks();
+    const updated = get();
+    if (updated.index + 1 < updated.queue.length) {
+      set({ index: updated.index + 1 });
+      get()._load();
     } else {
+      // If truly all network/fallback attempts failed:
       active().pause();
+      set({ playing: false, loading: false });
+      toast('다음 곡을 불러올 수 없습니다 (네트워크 확인)');
     }
   },
 
@@ -253,8 +265,10 @@ export const usePlayer = create((set, get) => ({
     useLibrary.getState().pushRecent(track);
     updateMediaSession(track);
     get()._preloadNext();
-    // Fetch radio ahead of time so the queue never runs dry.
-    if (get().autoplay && get().index >= get().queue.length - 2) get()._extendWithRadio();
+    // Fetch related songs ahead of time so the queue NEVER runs dry (when within 4 tracks of the end)
+    if (get().index >= get().queue.length - 4) {
+      get()._ensureNextTracks();
+    }
   },
 
   _nextIndex() {
@@ -282,20 +296,89 @@ export const usePlayer = create((set, get) => ({
     if (after) api.prefetch(after.id);
   },
 
-  async _extendWithRadio() {
-    const seed = get().current();
-    if (!seed || radioFor === seed.id) return false;
-    radioFor = seed.id;
-    try {
-      const have = new Set(get().queue.map((t) => t.id));
-      const more = (await api.related(seed.id)).filter((t) => !have.has(t.id)).slice(0, 15);
-      if (!more.length) return false;
-      set({ queue: [...get().queue, ...more] });
-      get()._preloadNext();
-      return true;
-    } catch {
-      return false;
-    }
+  async _ensureNextTracks() {
+    if (extendingPromise) return extendingPromise;
+    extendingPromise = (async () => {
+      try {
+        const { queue, index } = get();
+        if (!queue.length) return false;
+
+        const have = new Set(queue.map((t) => t.id));
+
+        // Candidates to seed recommendations from:
+        // 1. Current track
+        // 2. The last track in queue
+        // 3. Other recent tracks in queue (moving backwards)
+        const candidates = [];
+        const cur = queue[index];
+        const last = queue[queue.length - 1];
+        if (cur) candidates.push(cur);
+        if (last && last.id !== cur?.id) candidates.push(last);
+        for (let i = index - 1; i >= 0 && candidates.length < 5; i--) {
+          if (queue[i] && !candidates.some((c) => c.id === queue[i].id)) {
+            candidates.push(queue[i]);
+          }
+        }
+
+        // Pick seeds that haven't been fetched yet
+        let seed = candidates.find((c) => !usedRadioSeeds.has(c.id));
+        if (!seed) {
+          usedRadioSeeds.clear();
+          seed = last || cur;
+        }
+
+        if (seed) {
+          usedRadioSeeds.add(seed.id);
+          try {
+            const rel = await api.related(seed.id);
+            const more = (rel || []).filter((t) => t && t.id && !have.has(t.id)).slice(0, 15);
+            if (more.length > 0) {
+              set({ queue: [...get().queue, ...more] });
+              get()._preloadNext();
+              return true;
+            }
+          } catch (err) {
+            console.warn('Failed to fetch related for seed', seed.id, err);
+          }
+        }
+
+        // Secondary fallback: try another seed from candidates
+        for (const alt of candidates) {
+          if (alt.id === seed?.id || usedRadioSeeds.has(alt.id)) continue;
+          usedRadioSeeds.add(alt.id);
+          try {
+            const rel = await api.related(alt.id);
+            const more = (rel || []).filter((t) => t && t.id && !have.has(t.id)).slice(0, 15);
+            if (more.length > 0) {
+              set({ queue: [...get().queue, ...more] });
+              get()._preloadNext();
+              return true;
+            }
+          } catch { /* ignore */ }
+        }
+
+        // Tertiary fallback: fetch home recommendations
+        try {
+          const homeData = await api.home();
+          const shelfItems = (homeData?.shelves || []).flatMap((s) => s.items || []);
+          const more = shelfItems.filter((t) => t && t.id && !have.has(t.id)).slice(0, 15);
+          if (more.length > 0) {
+            set({ queue: [...get().queue, ...more] });
+            get()._preloadNext();
+            return true;
+          }
+        } catch { /* ignore */ }
+
+        return false;
+      } finally {
+        extendingPromise = null;
+      }
+    })();
+    return extendingPromise;
+  },
+
+  _extendWithRadio() {
+    return this._ensureNextTracks();
   },
 }));
 
