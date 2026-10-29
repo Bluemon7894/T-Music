@@ -38,9 +38,32 @@ function StageLyrics({ track }) {
     ? lines.reduce((best, l, i) => (l.time + offset <= currentTime + 0.1 ? i : best), -1)
     : -1;
 
+  // Reset lyrics scroll to top when track changes
   useEffect(() => {
-    if (activeLineRef.current) {
-      activeLineRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+  }, [track?.id]);
+
+  // Smoothly center the active lyric inside the scrollable container only,
+  // NEVER scrolling ancestors or the stage window container.
+  useEffect(() => {
+    const container = containerRef.current;
+    const activeLine = activeLineRef.current;
+    if (container && activeLine) {
+      const containerRect = container.getBoundingClientRect();
+      const lineRect = activeLine.getBoundingClientRect();
+      const currentScrollTop = container.scrollTop;
+      const targetScrollTop =
+        currentScrollTop +
+        (lineRect.top - containerRect.top) -
+        containerRect.height / 2 +
+        lineRect.height / 2;
+
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: 'smooth',
+      });
     }
   }, [activeIdx]);
 
@@ -144,8 +167,19 @@ export default function Stage() {
   const duration = p.duration || track.duration || 0;
   const upcoming = p.queue.slice(p.index + 1, p.index + 9);
 
+  // Lock stage container to never scroll vertically
+  useLayoutEffect(() => {
+    if (root.current) root.current.scrollTop = 0;
+  });
+
   return (
-    <div className="stage" ref={root}>
+    <div
+      className="stage"
+      ref={root}
+      onScroll={(e) => {
+        if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
+      }}
+    >
       <div className="stage-bg" style={{ backgroundImage: track.thumb ? `url("${track.thumb}")` : undefined }} />
       <div className="stage-shade" />
       <div className="stage-top-gradient" />

@@ -152,15 +152,15 @@ export default function Settings() {
 
         <section className="set-card about-app" data-enter>
           <img src={logo} alt="" />
-          <div>
+          <div className="about-app-info">
             <h2><Info size={18} /> T-Music {status.data?.version ? `v${status.data.version}` : ''}</h2>
             <p className="muted">광고 없는 나만의 음악 플레이어. 개인 학습·사용 목적으로 만들었어요.</p>
-            <div className="update-check-row" style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div className="update-check-row">
               <button className="btn" onClick={() => checkUpdate(false)} disabled={checkingUpdate}>
                 <RefreshCw size={14} className={checkingUpdate ? 'spin' : ''} /> {checkingUpdate ? '확인 중…' : '업데이트 확인'}
               </button>
               {hasUpdate && (
-                <button className="btn grad" onClick={openModal}>
+                <button className="btn grad update-available-btn" onClick={openModal}>
                   <Sparkles size={14} /> v{latestVersion} 업데이트 가능
                 </button>
               )}

@@ -98,8 +98,23 @@ function LyricsView({ track }) {
     : -1;
 
   useEffect(() => {
-    if (activeLineRef.current) {
-      activeLineRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const activeLine = activeLineRef.current;
+    if (activeLine) {
+      const container = activeLine.closest('.np-body');
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const lineRect = activeLine.getBoundingClientRect();
+        const currentScrollTop = container.scrollTop;
+        const targetScrollTop =
+          currentScrollTop +
+          (lineRect.top - containerRect.top) -
+          containerRect.height / 2 +
+          lineRect.height / 2;
+        container.scrollTo({
+          top: Math.max(0, targetScrollTop),
+          behavior: 'smooth',
+        });
+      }
     }
   }, [activeIdx]);
 
