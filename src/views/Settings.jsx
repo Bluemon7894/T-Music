@@ -15,7 +15,6 @@ const METHOD_LABEL = {
   IOS: 'InnerTube · iOS',
   ANDROID_VR: 'InnerTube · Android VR',
   VISIONOS: 'InnerTube · visionOS',
-  'yt-dlp': 'yt-dlp (자동 업데이트)',
 };
 
 export default function Settings() {

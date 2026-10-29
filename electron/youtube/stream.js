@@ -5,7 +5,6 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { getClient } from './client.js';
-import * as ytdlp from './ytdlp.js';
 
 async function innertube(id, clientName) {
   const yt = await getClient();
@@ -23,10 +22,9 @@ const METHODS = {
   VISIONOS: (id) => innertube(id, 'VISIONOS'),
   IOS: (id) => innertube(id, 'IOS'),
   ANDROID_VR: (id) => innertube(id, 'ANDROID_VR'),
-  'yt-dlp': (id) => ytdlp.resolve(id),
 };
 const DEFAULT_ORDER = Object.keys(METHODS);
-const TIMEOUT = { 'yt-dlp': 50000 };
+const TIMEOUT_MS = 12000;
 const DEMOTE_MS = 6 * 60 * 60 * 1000;
 
 const statsFile = () => path.join(app.getPath('userData'), 'stream-stats.json');
@@ -84,7 +82,7 @@ export async function resolve(id, { exclude = [] } = {}) {
     for (const name of order()) {
       if (exclude.includes(name)) continue;
       try {
-        const r = await withTimeout(METHODS[name](id), TIMEOUT[name] || 12000);
+        const r = await withTimeout(METHODS[name](id), TIMEOUT_MS);
         const entry = { ...r, id, method: name, expires: r.expires || expiryOf(r.url) };
         cache.set(id, entry);
         mark(name, true);
@@ -118,7 +116,7 @@ export async function diagnose(id = 'OIHlzvEKncQ') {
   for (const name of DEFAULT_ORDER) {
     const t = Date.now();
     try {
-      const r = await withTimeout(METHODS[name](id), TIMEOUT[name] || 12000);
+      const r = await withTimeout(METHODS[name](id), TIMEOUT_MS);
       const res = await fetch(r.url, { headers: { ...r.headers, Range: 'bytes=0-1023' } });
       results.push({ name, ok: res.status === 206 || res.status === 200, ms: Date.now() - t, http: res.status, mime: r.mime });
     } catch (e) {

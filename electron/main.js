@@ -4,7 +4,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as catalog from './youtube/catalog.js';
 import * as stream from './youtube/stream.js';
-import * as ytdlp from './youtube/ytdlp.js';
 import * as lyrics from './youtube/lyrics.js';
 import * as updater from './updater.js';
 import { getClient } from './youtube/client.js';
@@ -29,7 +28,7 @@ const api = {
   home: () => catalog.home(),
   lyrics: (track) => lyrics.getLyrics(track),
   prefetch: (id) => { if (!downloads.localFile(id)) stream.prefetch(id); return true; },
-  status: () => ({ methods: stream.status(), ytdlp: ytdlp.state, version: app.getVersion() }),
+  status: () => ({ methods: stream.status(), version: app.getVersion() }),
   diagnose: () => stream.diagnose(),
   downloads: () => downloads.list(),
   download: (tracks) => downloads.enqueue(tracks),
@@ -187,8 +186,6 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     handleProtocol();
     if (process.env.TMUSIC_DIAGNOSE) {
-      await ytdlp.ensure().catch((e) => console.log('yt-dlp setup failed:', e.message));
-      console.log('yt-dlp', JSON.stringify(ytdlp.state));
       for (const r of await stream.diagnose()) console.log('DIAG', JSON.stringify(r));
       app.quit();
       return;
@@ -197,7 +194,6 @@ if (!app.requestSingleInstanceLock()) {
     createTray(win);
     // Warm up in the background so the first click plays quickly.
     getClient().catch(() => {});
-    ytdlp.ensure().catch(() => {});
   });
 
   app.on('window-all-closed', () => {
