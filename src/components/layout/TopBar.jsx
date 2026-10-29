@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search, X, Settings, PanelRight, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X, Settings, PanelRight, Sparkles, History } from 'lucide-react';
 import { useNav, useRoute } from '../../store/nav.js';
 import { useUI } from '../../store/ui.js';
 import { useDownloads } from '../../store/downloads.js';
 import { useUpdater } from '../../store/updater.js';
 import { api } from '../../lib/api.js';
 import { ProgressRing } from '../DownloadButton.jsx';
+import { readHistory, removeHistory, HISTORY_KEY } from '../../views/Search.jsx';
 
 function UpdatePill() {
   const hasUpdate = useUpdater((s) => s.hasUpdate);
@@ -46,9 +47,16 @@ export default function TopBar() {
   const togglePanel = useUI((s) => s.togglePanel);
   const [text, setText] = useState('');
   const [sugs, setSugs] = useState([]);
+  const [history, setHistory] = useState(readHistory);
   const [focus, setFocus] = useState(false);
   const [hi, setHi] = useState(-1);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    const onHist = () => setHistory(readHistory());
+    window.addEventListener('search-history-changed', onHist);
+    return () => window.removeEventListener('search-history-changed', onHist);
+  }, []);
 
   useEffect(() => {
     if (route.name === 'search') setText(route.params.q || '');
@@ -83,11 +91,24 @@ export default function TopBar() {
     else go('search', { q: query });
   };
 
+  const removeHistoryItem = (item) => {
+    const next = removeHistory(item);
+    setHistory(next);
+  };
+
+  const clearAllHistory = () => {
+    try { localStorage.removeItem(HISTORY_KEY); } catch { /* ignore */ }
+    setHistory([]);
+    window.dispatchEvent(new CustomEvent('search-history-changed'));
+  };
+
+  const activeList = text.trim() ? sugs : history;
+
   const onKeyDown = (e) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setHi((h) => Math.min(sugs.length - 1, h + 1)); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHi((h) => Math.min(activeList.length - 1, h + 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setHi((h) => Math.max(-1, h - 1)); }
-    else if (e.key === 'Enter') submit(hi >= 0 ? sugs[hi] : text);
-    else if (e.key === 'Escape') inputRef.current?.blur();
+    else if (e.key === 'Enter') submit(hi >= 0 ? activeList[hi] : text);
+    else if (e.key === 'Escape') { inputRef.current?.blur(); setFocus(false); }
   };
 
   return (
@@ -104,7 +125,7 @@ export default function TopBar() {
           placeholder="노래, 아티스트, 앨범 검색"
           onChange={(e) => { setText(e.target.value); setHi(-1); }}
           onFocus={() => { setFocus(true); if (route.name !== 'search' && !text) go('search', {}); }}
-          onBlur={() => setTimeout(() => setFocus(false), 120)}
+          onBlur={() => setTimeout(() => setFocus(false), 150)}
           onKeyDown={onKeyDown}
           spellCheck={false}
         />
@@ -113,11 +134,50 @@ export default function TopBar() {
         ) : (
           <kbd className="sb-kbd">Ctrl K</kbd>
         )}
-        {focus && sugs.length > 0 && (
+        {focus && !text.trim() && history.length > 0 && (
+          <ul className="suggestions">
+            <li className="sug-header" onMouseDown={(e) => e.preventDefault()}>
+              <span>최근 검색</span>
+              <button
+                type="button"
+                className="text-btn"
+                style={{ padding: '2px 6px', fontSize: '11px' }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  clearAllHistory();
+                }}
+              >
+                모두 지우기
+              </button>
+            </li>
+            {history.map((h, i) => (
+              <li key={h} className={i === hi ? 'hi' : ''} onMouseDown={() => submit(h)}>
+                <History size={14} />
+                <span className="sug-text">{h}</span>
+                <button
+                  type="button"
+                  className="sug-del"
+                  title={`'${h}' 검색 기록 삭제`}
+                  aria-label="삭제"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    removeHistoryItem(h);
+                  }}
+                >
+                  <X size={13} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {focus && text.trim() && sugs.length > 0 && (
           <ul className="suggestions">
             {sugs.map((s, i) => (
               <li key={s} className={i === hi ? 'hi' : ''} onMouseDown={() => submit(s)}>
-                <Search size={14} /> {s}
+                <Search size={14} />
+                <span className="sug-text">{s}</span>
               </li>
             ))}
           </ul>

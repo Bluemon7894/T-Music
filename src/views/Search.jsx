@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
-import { History, Music, Play, Search as SearchIcon } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { History, Music, Play, Search as SearchIcon, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useNav } from '../store/nav.js';
 import { useLibrary } from '../store/library.js';
 import { usePlayer } from '../store/player.js';
+import { useUI } from '../store/ui.js';
 import { useAsync, Thumb, PlayButton, ArtistLinks, SkeletonRows, SkeletonCards, ErrorMsg, Empty } from '../components/common.jsx';
 import TrackList from '../components/TrackList.jsx';
 import { Shelf, Grid, openItem, playItem } from '../components/Cards.jsx';
@@ -164,10 +165,25 @@ const TABS = [
   { id: 'playlists', label: '플레이리스트' },
 ];
 
-const HISTORY_KEY = 't-music-search-history';
-const readHistory = () => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; } };
-function remember(q) {
-  try { localStorage.setItem(HISTORY_KEY, JSON.stringify([q, ...readHistory().filter((x) => x !== q)].slice(0, 12))); } catch { /* ignore */ }
+export const HISTORY_KEY = 't-music-search-history';
+export const readHistory = () => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; } };
+export function remember(q) {
+  if (!q || !q.trim()) return;
+  try {
+    const next = [q.trim(), ...readHistory().filter((x) => x !== q.trim())].slice(0, 14);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent('search-history-changed'));
+  } catch { /* ignore */ }
+}
+export function removeHistory(item) {
+  try {
+    const next = readHistory().filter((x) => x !== item);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent('search-history-changed'));
+    return next;
+  } catch {
+    return [];
+  }
 }
 
 function TopResult({ item }) {
@@ -318,19 +334,63 @@ function BrowseTile({ item }) {
 
 function Browse() {
   const go = useNav((s) => s.go);
+  const openMenu = useUI((s) => s.openMenu);
   const recent = useLibrary((s) => s.recent).slice(0, 8);
   const [history, setHistory] = useState(readHistory);
   const ref = useRef(null);
   useEnter(ref, [], { step: 22 });
-  const clear = () => { try { localStorage.removeItem(HISTORY_KEY); } catch { /* ignore */ } setHistory([]); };
+
+  useEffect(() => {
+    const onHist = () => setHistory(readHistory());
+    window.addEventListener('search-history-changed', onHist);
+    return () => window.removeEventListener('search-history-changed', onHist);
+  }, []);
+
+  const clear = () => {
+    try { localStorage.removeItem(HISTORY_KEY); } catch { /* ignore */ }
+    setHistory([]);
+    window.dispatchEvent(new CustomEvent('search-history-changed'));
+  };
+
+  const removeItem = (item, e) => {
+    e?.stopPropagation();
+    const next = removeHistory(item);
+    setHistory(next);
+  };
+
   return (
     <div ref={ref}>
       {history.length > 0 && (
         <section className="history" data-enter>
-          <div className="row-between"><h2>최근 검색</h2><button className="text-btn" onClick={clear}>모두 지우기</button></div>
+          <div className="row-between">
+            <h2>최근 검색</h2>
+            <button className="text-btn" onClick={clear}>모두 지우기</button>
+          </div>
           <div className="chips">
             {history.map((h) => (
-              <button key={h} className="chip ghost" onClick={() => go('search', { q: h })}><History size={13} /> {h}</button>
+              <div
+                key={h}
+                className="chip ghost history-chip"
+                onClick={() => go('search', { q: h })}
+                onContextMenu={(e) => {
+                  openMenu(e, [
+                    { label: `'${h}' 검색`, icon: SearchIcon, onClick: () => go('search', { q: h }) },
+                    { divider: true },
+                    { label: '이 검색 기록 삭제', icon: X, onClick: (ev) => removeItem(h, ev) },
+                  ]);
+                }}
+              >
+                <History size={13} className="h-icon" />
+                <span className="h-text">{h}</span>
+                <button
+                  className="chip-del-btn"
+                  onClick={(e) => removeItem(h, e)}
+                  title={`'${h}' 검색 기록 삭제`}
+                  aria-label="삭제"
+                >
+                  <X size={12} />
+                </button>
+              </div>
             ))}
           </div>
         </section>
