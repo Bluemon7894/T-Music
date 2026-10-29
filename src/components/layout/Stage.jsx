@@ -1,7 +1,7 @@
 // Fullscreen "stage": a spinning 3D vinyl with the cover as its label, a ring
 // visualizer around it, synchronized real-time lyrics, and the up-next strip. Esc or the button closes it.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ChevronDown, Shuffle, SkipBack, SkipForward, Repeat, Repeat1, Mic2 } from 'lucide-react';
+import { ChevronDown, Shuffle, SkipBack, SkipForward, Repeat, Repeat1, Mic2, Volume2, Volume1, VolumeX } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { api } from '../../lib/api.js';
@@ -200,6 +200,8 @@ export default function Stage() {
   const duration = p.duration || track.duration || 0;
   const upcoming = p.queue.slice(p.index + 1, p.index + 9);
 
+  const VolIcon = p.muted || p.volume === 0 ? VolumeX : p.volume < 0.5 ? Volume1 : Volume2;
+
   // Lock all stage containers and window to never scroll vertically
   useLayoutEffect(() => {
     if (root.current) root.current.scrollTop = 0;
@@ -212,9 +214,14 @@ export default function Stage() {
     const el = root.current;
     if (!el) return;
     const onWheel = (e) => {
-      if (!e.target.closest('.stage-lyrics-container')) {
-        e.preventDefault();
+      if (e.target.closest('.stage-lyrics-container')) {
+        return; // Allow lyrics scrolling
       }
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.04 : -0.04;
+      const curV = usePlayer.getState().volume;
+      const nextV = Math.max(0, Math.min(1, Math.round((curV + delta) * 100) / 100));
+      usePlayer.getState().setVolume(nextV);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -310,6 +317,26 @@ export default function Stage() {
             <PlayButton size={72} playing={p.playing} onClick={p.toggle} />
             <button className="icon-btn" onClick={() => p.next()}><SkipForward size={28} fill="currentColor" /></button>
             <button className={`icon-btn toggle ${p.repeat !== 'off' ? 'on' : ''}`} onClick={p.cycleRepeat}>{p.repeat === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}</button>
+            <div
+              className="stage-volume"
+              onWheel={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 0.05 : -0.05;
+                p.setVolume(Math.max(0, Math.min(1, Math.round((p.volume + delta) * 100) / 100)));
+              }}
+            >
+              <button
+                className="icon-btn"
+                onClick={p.toggleMute}
+                aria-label={p.muted ? '음소거 해제' : '음소거'}
+                title={p.muted ? '음소거 해제' : `음량: ${Math.round((p.muted ? 0 : p.volume) * 100)}%`}
+              >
+                <VolIcon size={20} />
+              </button>
+              <Slider className="volume" value={p.muted ? 0 : p.volume} max={1} onChange={p.setVolume} />
+              <span className="stage-vol-percent">{Math.round((p.muted ? 0 : p.volume) * 100)}%</span>
+            </div>
           </div>
         </div>
       </div>

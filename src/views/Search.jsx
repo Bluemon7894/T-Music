@@ -241,7 +241,7 @@ function Results({ q }) {
             {songs.length > 0 && (
               <section className="search-songs" data-enter>
                 <h2 className="link" onClick={() => setTab('songs')}>노래</h2>
-                <TrackList tracks={songs.slice(0, 5)} context={ctx} showAlbum={false} numbered={false} compact animate={false} />
+                <TrackList tracks={songs.slice(0, 5)} context={ctx} showAlbum={false} numbered={false} compact animate={false} playSingle />
               </section>
             )}
           </div>
@@ -251,12 +251,12 @@ function Results({ q }) {
           {songs.length > 5 && (
             <section data-enter>
               <h2>노래 더 보기</h2>
-              <TrackList tracks={songs.slice(5, 15)} context={ctx} showAlbum={false} compact animate={false} />
+              <TrackList tracks={songs.slice(5, 15)} context={ctx} showAlbum={false} compact animate={false} playSingle />
             </section>
           )}
         </>
       )}
-      {tab === 'songs' && <TrackList tracks={songs} context={ctx} />}
+      {tab === 'songs' && <TrackList tracks={songs} context={ctx} playSingle />}
       {tab === 'artists' && <Grid items={artists} />}
       {tab === 'albums' && <Grid items={albums} />}
       {tab === 'playlists' && <Grid items={playlists} />}

@@ -79,7 +79,7 @@ export function LikeButton({ track, size = 16, className = '' }) {
   );
 }
 
-export default function TrackList({ tracks, context, showAlbum = true, showThumb = true, numbered = true, onRemove, onReorder, compact, animate = true }) {
+export default function TrackList({ tracks, context, showAlbum = true, showThumb = true, numbered = true, onRemove, onReorder, compact, animate = true, playSingle = false }) {
   const currentId = usePlayer((s) => s.queue[s.index]?.id);
   const playing = usePlayer((s) => s.playing);
   const playList = usePlayer((s) => s.playList);
@@ -92,8 +92,13 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
   const hasAlbum = showAlbum && !compact;
 
   const play = (i) => {
-    if (tracks[i].id === currentId) usePlayer.getState().toggle();
-    else playList(tracks, i, context);
+    if (tracks[i].id === currentId) {
+      usePlayer.getState().toggle();
+    } else if (playSingle) {
+      playList([tracks[i]], 0, context);
+    } else {
+      playList(tracks, i, context);
+    }
   };
 
   return (

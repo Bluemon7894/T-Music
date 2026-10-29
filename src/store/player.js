@@ -193,9 +193,10 @@ export const usePlayer = create((set, get) => ({
 
   playNext(track) {
     const { queue, index } = get();
-    if (index < 0) return get().playList([track]);
+    const cleanTrack = { ...track, isAutoplay: false };
+    if (index < 0) return get().playList([cleanTrack]);
     const q = queue.slice();
-    q.splice(index + 1, 0, track);
+    q.splice(index + 1, 0, cleanTrack);
     set({ queue: q });
     savePlayerState();
     get()._preloadNext();
@@ -203,9 +204,21 @@ export const usePlayer = create((set, get) => ({
   },
 
   addToQueue(tracks) {
-    const list = Array.isArray(tracks) ? tracks : [tracks];
-    if (get().index < 0) return get().playList(list);
-    set({ queue: [...get().queue, ...list] });
+    const list = (Array.isArray(tracks) ? tracks : [tracks]).map((t) => ({ ...t, isAutoplay: false }));
+    if (!list.length) return;
+    const { queue, index } = get();
+    if (index < 0) return get().playList(list);
+    const q = queue.slice();
+
+    // Priority insertion: user manually added tracks must appear BEFORE any auto-recommended tracks
+    const firstAutoIndex = q.findIndex((t, i) => i > index && t.isAutoplay);
+    if (firstAutoIndex !== -1) {
+      q.splice(firstAutoIndex, 0, ...list);
+    } else {
+      q.push(...list);
+    }
+
+    set({ queue: q });
     savePlayerState();
     get()._preloadNext();
     toast(list.length > 1 ? `${list.length}곡을 대기열에 추가했습니다` : '대기열에 추가했습니다');

@@ -616,6 +616,46 @@
     0 10px 28px rgba(0, 0, 0, 0.4);
 }
 
+.stage-volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.stage-volume:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.stage-volume .slider.volume {
+  width: 76px;
+  height: 20px;
+}
+.stage-volume .icon-btn {
+  color: var(--v-100);
+  padding: 4px;
+}
+.stage-volume .icon-btn:hover {
+  color: #fff;
+}
+.stage-vol-percent {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--v-100);
+  min-width: 30px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+@media (max-width: 900px) {
+  .stage-volume .slider.volume { width: 56px; }
+  .stage-vol-percent { display: none; }
+}
+
 /* stage lyrics scrolling container */
 .stage-lyrics-wrapper {
   flex: 1 1 0;
