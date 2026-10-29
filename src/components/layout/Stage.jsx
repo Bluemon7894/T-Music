@@ -22,11 +22,13 @@ function StageLyrics({ track }) {
   const activeLineRef = useRef(null);
   const containerRef = useRef(null);
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [showPlain, setShowPlain] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setData(null);
+    setShowPlain(false);
     if (!track?.id) { setLoading(false); return; }
     api.lyrics(track)
       .then((res) => { if (!cancelled) { setData(res); setLoading(false); } })
@@ -109,12 +111,27 @@ function StageLyrics({ track }) {
     );
   }
 
-  const hasLyrics = lines.length > 0 || !!data?.plainLyrics;
-  if (!hasLyrics) {
+  if (lines.length === 0) {
     return (
       <div className="stage-lyrics-empty">
         <Mic2 size={36} opacity={0.35} />
-        <p>가사가 제공되지 않는 곡입니다</p>
+        <p>싱크 데이터를 찾을 수 없습니다</p>
+        {data?.plainLyrics && (
+          <div className="stage-lyrics-plain-fallback">
+            <button
+              className="stage-lyrics-plain-btn"
+              onClick={() => setShowPlain((v) => !v)}
+            >
+              {showPlain ? '일반 가사 접기' : '일반 가사 보기'}
+            </button>
+            {showPlain && (
+              <div className="stage-lyrics-plain-box" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+                <div className="stage-lyrics-plain">{data.plainLyrics}</div>
+                {data.footer && <div className="stage-lyrics-footer">{data.footer}</div>}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -122,27 +139,21 @@ function StageLyrics({ track }) {
   return (
     <div className="stage-lyrics-wrapper">
       <div className="stage-lyrics-container" ref={containerRef}>
-        {lines.length > 0 ? (
-          <div className="stage-lyrics-lines">
-            {lines.map((l, i) => {
-              const isActive = i === activeIdx;
-              return (
-                <div
-                  key={l.time + '-' + i}
-                  ref={isActive ? activeLineRef : null}
-                  className={`stage-lyrics-line ${isActive ? 'active' : ''}`}
-                  onClick={() => seek(Math.max(0, l.time + autoOffset))}
-                >
-                  {l.text || '...'}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="stage-lyrics-plain-box">
-            <div className="stage-lyrics-plain">{data.plainLyrics}</div>
-          </div>
-        )}
+        <div className="stage-lyrics-lines">
+          {lines.map((l, i) => {
+            const isActive = i === activeIdx;
+            return (
+              <div
+                key={l.time + '-' + i}
+                ref={isActive ? activeLineRef : null}
+                className={`stage-lyrics-line ${isActive ? 'active' : ''}`}
+                onClick={() => seek(Math.max(0, l.time + autoOffset))}
+              >
+                {l.text || '...'}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
