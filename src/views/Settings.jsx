@@ -86,16 +86,23 @@ export default function Settings() {
   };
 
   // Auto-start with Windows
-  const [autoStart, setAutoStartState] = useState(false);
+  const [autoStart, setAutoStartState] = useState(() => {
+    try { return localStorage.getItem('t-music-autostart') === '1'; } catch { return false; }
+  });
   useEffect(() => {
-    api.getAutoStart().then((v) => setAutoStartState(Boolean(v))).catch(() => {});
+    api.getAutoStart().then((v) => {
+      setAutoStartState(Boolean(v));
+      try { localStorage.setItem('t-music-autostart', v ? '1' : '0'); } catch {}
+    }).catch(() => {});
   }, []);
   const toggleAutoStart = async () => {
     const next = !autoStart;
     try {
       const res = await api.setAutoStart(next);
-      setAutoStartState(Boolean(res));
-      toast(res ? '윈도우 시작 시 자동 실행을 켰습니다' : '윈도우 시작 시 자동 실행을 껐습니다');
+      const isEnabled = Boolean(res);
+      setAutoStartState(isEnabled);
+      try { localStorage.setItem('t-music-autostart', isEnabled ? '1' : '0'); } catch {}
+      toast(isEnabled ? '윈도우 시작 시 자동 실행을 켰습니다' : '윈도우 시작 시 자동 실행을 껐습니다');
     } catch {
       toast('설정을 변경할 수 없습니다');
     }

@@ -79,14 +79,34 @@ const api = {
   setDiscordClientId: (id) => discord.setClientId(id),
   updateDiscordActivity: (data) => { discord.setActivity(data); return true; },
   clearDiscordActivity: () => { discord.clearActivity(); return true; },
-  getAutoStart: () => app.getLoginItemSettings().openAtLogin,
+  getAutoStart: () => {
+    try {
+      const s = app.getLoginItemSettings({
+        path: process.execPath,
+        args: ['--hidden'],
+      });
+      return Boolean(s.openAtLogin);
+    } catch {
+      return false;
+    }
+  },
   setAutoStart: (val) => {
-    app.setLoginItemSettings({
-      openAtLogin: Boolean(val),
-      path: process.execPath,
-      args: ['--hidden'],
-    });
-    return app.getLoginItemSettings().openAtLogin;
+    const enable = Boolean(val);
+    try {
+      app.setLoginItemSettings({
+        openAtLogin: enable,
+        path: process.execPath,
+        args: ['--hidden'],
+      });
+      const s = app.getLoginItemSettings({
+        path: process.execPath,
+        args: ['--hidden'],
+      });
+      return s.openAtLogin !== undefined ? Boolean(s.openAtLogin) : enable;
+    } catch (e) {
+      console.warn('setAutoStart error:', e);
+      return enable;
+    }
   },
   openExternal: (url) => { if (url) shell.openExternal(url); },
 };

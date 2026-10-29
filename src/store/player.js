@@ -515,6 +515,21 @@ export const usePlayer = create((set, get) => ({
           }
         } catch { /* ignore */ }
 
+        // Quaternary fallback: popular tracks search
+        try {
+          const searchData = await api.search('인기곡 차트');
+          const searchItems = (searchData?.tracks || searchData?.songs || []).filter(Boolean);
+          const more = searchItems
+            .filter((t) => t && t.id && !have.has(t.id))
+            .slice(0, 15)
+            .map((t) => ({ ...t, isAutoplay: true }));
+          if (more.length > 0 && get().autoplay) {
+            set({ queue: [...get().queue, ...more] });
+            get()._preloadNext();
+            return true;
+          }
+        } catch { /* ignore */ }
+
         return false;
       } finally {
         extendingPromise = null;
@@ -530,10 +545,15 @@ export const usePlayer = create((set, get) => ({
 
 // Wire audio events. Events from the spare element are ignored.
 let lastTimeSave = 0;
+let consecutiveErrors = 0;
+let errorSkipTimer = null;
+
 audios.forEach((a, i) => {
   const isActive = () => i === cur;
   a.addEventListener('playing', () => {
     if (isActive()) {
+      consecutiveErrors = 0;
+      clearTimeout(errorSkipTimer);
       usePlayer.setState({ playing: true, loading: false });
       startListening(usePlayer.getState().current());
       savePlayerState({ wasPlaying: true, time: a.currentTime });
@@ -560,6 +580,9 @@ audios.forEach((a, i) => {
   });
   a.addEventListener('timeupdate', () => {
     if (!isActive()) return;
+    if (a.currentTime > 1) {
+      consecutiveErrors = 0;
+    }
     const b = a.buffered.length ? a.buffered.end(a.buffered.length - 1) : 0;
     usePlayer.setState({ time: a.currentTime, buffered: b });
     if ('mediaSession' in navigator && a.duration) {
@@ -580,6 +603,7 @@ audios.forEach((a, i) => {
   a.addEventListener('durationchange', () => isActive() && isFinite(a.duration) && usePlayer.setState({ duration: a.duration }));
   a.addEventListener('ended', () => {
     if (!isActive()) return;
+    consecutiveErrors = 0;
     const dur = a.duration || 0;
     // Guard against premature 'ended' events caused by network truncations:
     if (dur > 0 && dur - a.currentTime > 3) {
@@ -604,10 +628,25 @@ audios.forEach((a, i) => {
       a.play().catch(() => {});
       return;
     }
+    consecutiveErrors++;
     const track = usePlayer.getState().current();
-    toast(`재생할 수 없어 건너뜁니다: ${track?.title || id}`);
     usePlayer.setState({ loading: false });
-    usePlayer.getState().next(true);
+
+    // Circuit breaker: prevent rapid cascading skip of entire queue on network/stream outage
+    if (consecutiveErrors >= 3) {
+      active().pause();
+      usePlayer.setState({ playing: false, loading: false });
+      toast('연속으로 음원을 재생할 수 없어 재생을 일시정지했습니다. 네트워크 연결을 확인해주세요.');
+      consecutiveErrors = 0;
+      clearTimeout(errorSkipTimer);
+      return;
+    }
+
+    toast(`재생할 수 없어 건너뜁니다: ${track?.title || id}`);
+    clearTimeout(errorSkipTimer);
+    errorSkipTimer = setTimeout(() => {
+      usePlayer.getState().next(true);
+    }, 600);
   });
 });
 
