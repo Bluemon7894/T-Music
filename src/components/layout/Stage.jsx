@@ -122,6 +122,8 @@ export default function Stage() {
   const setStage = useUI((s) => s.setStage);
   const track = p.queue[p.index];
   const root = useRef(null);
+  const mainRef = useRef(null);
+  const infoRef = useRef(null);
   const disc = useRef(null);
   const tilt = useRef(null);
   const [showLyrics, setShowLyrics] = useState(() => {
@@ -167,15 +169,23 @@ export default function Stage() {
   const duration = p.duration || track.duration || 0;
   const upcoming = p.queue.slice(p.index + 1, p.index + 9);
 
-  // Lock stage container to never scroll vertically
+  // Lock all stage containers to never scroll vertically
   useLayoutEffect(() => {
     if (root.current) root.current.scrollTop = 0;
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+    if (infoRef.current) infoRef.current.scrollTop = 0;
   });
+
+  const preventNonLyricsWheel = (e) => {
+    if (e.target.closest('.stage-lyrics-container')) return;
+    e.preventDefault();
+  };
 
   return (
     <div
       className="stage"
       ref={root}
+      onWheel={preventNonLyricsWheel}
       onScroll={(e) => {
         if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
       }}
@@ -193,7 +203,13 @@ export default function Stage() {
         <Mic2 size={20} />
       </button>
 
-      <div className={`stage-main ${showLyrics ? 'with-lyrics' : ''}`}>
+      <div
+        ref={mainRef}
+        className={`stage-main ${showLyrics ? 'with-lyrics' : ''}`}
+        onScroll={(e) => {
+          if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
+        }}
+      >
         <div className="stage-disc-wrap" ref={tilt}>
           <Visualizer variant="ring" bars={96} className="stage-ring" />
           <div className="turntable-deck">
@@ -214,7 +230,13 @@ export default function Stage() {
           </div>
         </div>
 
-        <div className={`stage-info ${showLyrics ? 'with-lyrics' : ''}`}>
+        <div
+          ref={infoRef}
+          className={`stage-info ${showLyrics ? 'with-lyrics' : ''}`}
+          onScroll={(e) => {
+            if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
+          }}
+        >
           <div className="stage-header" data-rise>
             <span className="stage-kicker">{p.context?.name || '지금 재생 중'}</span>
             <h1 title={track.title}>{track.title}</h1>

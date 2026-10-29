@@ -100,7 +100,27 @@ export default function UpdateModal() {
         {error && (
           <div className="update-error-msg">
             <AlertCircle size={18} />
-            <span>{error}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: 0 }}>
+              <span>{error}</span>
+              <button
+                type="button"
+                className="btn-text"
+                style={{
+                  alignSelf: 'flex-start',
+                  color: '#c4b5fd',
+                  textDecoration: 'underline',
+                  padding: 0,
+                  fontSize: '12px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+                onClick={openReleasePage}
+              >
+                웹 브라우저에서 직접 설치 파일(.exe) 다운로드하기 →
+              </button>
+            </div>
           </div>
         )}
 

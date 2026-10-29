@@ -272,11 +272,13 @@ function BrowseTile({ item }) {
     return Math.floor(Math.random() * item.tracks.length);
   });
   const [attempts, setAttempts] = useState(0);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const currentTrack = item.tracks?.[trackIdx];
-  const thumbUrl = currentTrack ? `https://i.ytimg.com/vi/${currentTrack.id}/mqdefault.jpg` : null;
+  const thumbUrl = currentTrack ? `https://i.ytimg.com/vi/${currentTrack.id}/hqdefault.jpg` : null;
 
   const onFail = () => {
+    setImgLoaded(false);
     if (attempts + 1 < (item.tracks?.length || 1)) {
       setAttempts((a) => a + 1);
       setTrackIdx((idx) => (idx + 1) % item.tracks.length);
@@ -297,9 +299,12 @@ function BrowseTile({ item }) {
   };
 
   const handleImgLoad = (e) => {
+    const img = e.currentTarget || e.target;
     // YouTube returns a 120x90 grey placeholder image with 3 dots on 404
-    if (e.target.naturalWidth <= 120) {
+    if (!img || img.naturalWidth <= 120 || img.naturalHeight <= 90) {
       onFail();
+    } else {
+      setImgLoaded(true);
     }
   };
 
@@ -312,7 +317,7 @@ function BrowseTile({ item }) {
       style={{ '--c1': item.c1, '--c2': item.c2 }}
       onClick={() => go('search', { q: item.query })}
     >
-      {showArt && thumbUrl && (
+      {showArt && thumbUrl && imgLoaded && (
         <div
           className="browse-tile-bg"
           style={{ backgroundImage: `url(${thumbUrl})` }}
@@ -331,7 +336,14 @@ function BrowseTile({ item }) {
       )}
 
       {showArt && thumbUrl ? (
-        <div className="browse-tile-art-wrap">
+        <div
+          className="browse-tile-art-wrap"
+          style={{
+            opacity: imgLoaded ? 1 : 0,
+            pointerEvents: imgLoaded ? 'auto' : 'none',
+            transition: 'opacity 0.25s ease',
+          }}
+        >
           <img
             key={thumbUrl}
             src={thumbUrl}
@@ -345,7 +357,9 @@ function BrowseTile({ item }) {
             <Play size={18} fill="currentColor" />
           </div>
         </div>
-      ) : (
+      ) : null}
+
+      {(!showArt || !imgLoaded) && (
         <>
           <i className="bt-shape a" />
           <i className="bt-shape b" />

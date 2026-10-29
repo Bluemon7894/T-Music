@@ -88,7 +88,8 @@ export async function checkUpdate() {
 
     // Find the Windows .exe installer asset
     const exeAsset = Array.isArray(release.assets)
-      ? release.assets.find((a) => a.name && a.name.endsWith('.exe'))
+      ? release.assets.find((a) => a.name && a.name.endsWith('.exe') && (a.state === 'uploaded' || !a.state)) ||
+        release.assets.find((a) => a.name && a.name.endsWith('.exe'))
       : null;
 
     return {
@@ -100,6 +101,7 @@ export async function checkUpdate() {
       releaseNotes: release.body || '',
       releaseUrl: release.html_url || `https://github.com/${REPO}/releases/latest`,
       downloadUrl: exeAsset?.browser_download_url || null,
+      assetId: exeAsset?.id || null,
       assetName: exeAsset?.name || null,
       assetSize: exeAsset?.size || 0,
       downloaded: Boolean(downloadedInstallerPath && fs.existsSync(downloadedInstallerPath)),
@@ -117,7 +119,7 @@ export async function checkUpdate() {
 function downloadFileWithRedirect(targetUrl, destPath, onProgress) {
   return new Promise((resolve, reject) => {
     function request(curUrl, depth = 0) {
-      if (depth > 8) return reject(new Error('Too many redirects'));
+      if (depth > 10) return reject(new Error('Too many redirects'));
       const u = new URL(curUrl);
       const isHttps = u.protocol === 'https:';
       const client = isHttps ? https : http;
@@ -126,7 +128,9 @@ function downloadFileWithRedirect(targetUrl, destPath, onProgress) {
         'User-Agent': 'T-Music-App',
         Accept: 'application/octet-stream',
       };
-      if (githubToken && (u.hostname === 'api.github.com' || u.hostname === 'github.com')) {
+      // Only attach Authorization header to api.github.com endpoints.
+      // Attaching Authorization to github.com release download URLs causes 404 / signature errors.
+      if (githubToken && u.hostname === 'api.github.com') {
         headers.Authorization = `Bearer ${githubToken}`;
       }
 
@@ -135,7 +139,8 @@ function downloadFileWithRedirect(targetUrl, destPath, onProgress) {
         { headers },
         (res) => {
           if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-            return request(res.headers.location, depth + 1);
+            const redirectUrl = new URL(res.headers.location, curUrl).href;
+            return request(redirectUrl, depth + 1);
           }
           if (res.statusCode !== 200) {
             return reject(new Error(`Download failed with status ${res.statusCode}`));
@@ -185,7 +190,7 @@ export async function downloadUpdate(webContents) {
   }
 
   const info = await checkUpdate();
-  if (!info.downloadUrl) {
+  if (!info.downloadUrl && !info.assetId) {
     throw new Error('최신 버전의 설치 파일(.exe)을 찾을 수 없습니다.');
   }
 
@@ -196,15 +201,48 @@ export async function downloadUpdate(webContents) {
   downloading = true;
   try {
     webContents?.send('update-progress', { status: 'downloading', percent: 0 });
-    await downloadFileWithRedirect(info.downloadUrl, targetPath, (progress) => {
-      webContents?.send('update-progress', {
-        status: 'downloading',
-        ...progress,
+
+    const tryDownload = async (url) => {
+      await downloadFileWithRedirect(url, targetPath, (progress) => {
+        webContents?.send('update-progress', {
+          status: 'downloading',
+          ...progress,
+        });
       });
-    });
-    downloadedInstallerPath = targetPath;
-    webContents?.send('update-progress', { status: 'completed', percent: 100, path: targetPath });
-    return { success: true, path: targetPath };
+    };
+
+    let downloadErr = null;
+
+    // 1. Primary attempt: direct browser_download_url
+    if (info.downloadUrl) {
+      try {
+        console.log('[updater] Downloading via browser_download_url:', info.downloadUrl);
+        await tryDownload(info.downloadUrl);
+        downloadedInstallerPath = targetPath;
+        webContents?.send('update-progress', { status: 'completed', percent: 100, path: targetPath });
+        return { success: true, path: targetPath };
+      } catch (err) {
+        console.warn('[updater] Primary downloadUrl failed:', err.message);
+        downloadErr = err;
+      }
+    }
+
+    // 2. Secondary fallback: GitHub API asset endpoint
+    if (info.assetId) {
+      const apiAssetUrl = `https://api.github.com/repos/${REPO}/releases/assets/${info.assetId}`;
+      try {
+        console.log('[updater] Trying GitHub API asset fallback:', apiAssetUrl);
+        await tryDownload(apiAssetUrl);
+        downloadedInstallerPath = targetPath;
+        webContents?.send('update-progress', { status: 'completed', percent: 100, path: targetPath });
+        return { success: true, path: targetPath };
+      } catch (fallbackErr) {
+        console.warn('[updater] Fallback asset download failed:', fallbackErr.message);
+        downloadErr = fallbackErr;
+      }
+    }
+
+    throw downloadErr || new Error('업데이트 설치 파일 다운로드에 실패했습니다.');
   } catch (err) {
     webContents?.send('update-progress', { status: 'error', error: err.message });
     throw err;
