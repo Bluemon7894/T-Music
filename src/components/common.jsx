@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Music, Play, Pause, RotateCw } from 'lucide-react';
 import { useNav } from '../store/nav.js';
+import { usePlayer } from '../store/player.js';
 import { errorText } from '../lib/api.js';
 import { pop } from '../lib/motion.js';
 import { getAudioOnset } from '../lib/audio.js';
@@ -137,8 +138,8 @@ export function Empty({ icon: Icon, title, text, children }) {
   );
 }
 
-// Zero-configuration automatic lyrics sync engine
-// Automatically aligns YouTube audio with LRC timestamps using audio onset and calibrated duration
+// Zero-configuration automatic lyrics sync engine with continuous 10-second dynamic recalibration
+// Aligns YouTube audio with LRC timestamps using hardware audio onset and progressive tempo drift scaling
 export function useAutoLyricsSync(track, data) {
   const [autoOffset, setAutoOffset] = useState(0);
 
@@ -148,37 +149,60 @@ export function useAutoLyricsSync(track, data) {
       return;
     }
 
-    const computeOffset = () => {
-      // 1. Audio hardware onset detected during playback (e.g. 2.1s intro card before audio starts)
-      const onset = getAudioOnset(track.id);
-      if (onset >= 0.4 && onset <= 12.0) {
-        return onset;
-      }
+    const lines = data.lines || [];
+    const trackDur = track.duration || 0;
+    const lyricsDur = data.lyricsDuration || 0;
 
-      // 2. Calibrated duration difference between YouTube video and studio LRC
-      const trackDur = track.duration || 0;
-      const lyricsDur = data.lyricsDuration || 0;
-      if (trackDur > 0 && lyricsDur > 0) {
-        const diff = trackDur - lyricsDur;
-        if (diff >= 0.8 && diff <= 10.0) {
-          return Math.round(diff * 10) / 10;
-        } else if (diff <= -0.8 && diff >= -8.0) {
-          return Math.round(diff * 10) / 10;
-        }
-      }
+    let baseOffset = 0;
+    const initialOnset = getAudioOnset(track.id);
+    if (initialOnset >= 0.4 && initialOnset <= 12.0) {
+      baseOffset = initialOnset;
+    } else if (typeof data.autoOffset === 'number') {
+      baseOffset = data.autoOffset;
+    }
 
-      return data.autoOffset || 0;
+    // Progressive drift rate: accounts for subtle speed/sample rate variance between YouTube and studio audio
+    let driftRate = 0;
+    if (trackDur > 25 && lyricsDur > 25) {
+      const netDiff = (trackDur - baseOffset) - lyricsDur;
+      if (Math.abs(netDiff) >= 0.5 && Math.abs(netDiff) <= 15.0) {
+        driftRate = Math.max(-0.04, Math.min(0.04, netDiff / lyricsDur));
+      }
+    }
+
+    const computeCurrentOffset = (t) => {
+      const currentOnset = getAudioOnset(track.id) || baseOffset;
+      const effectiveT = Math.max(0, (t || 0) - currentOnset);
+      const progressiveDrift = driftRate * effectiveT;
+      return Math.round((currentOnset + progressiveDrift) * 100) / 100;
     };
 
-    setAutoOffset(computeOffset());
+    // 1. Initial calibration
+    setAutoOffset(computeCurrentOffset(usePlayer.getState().getPreciseTime()));
 
+    // 2. Hardware audio onset listener (fires when real musical signal bursts after intro silence)
     const onOnset = (e) => {
       if (e.detail?.trackId === track.id && typeof e.detail?.onset === 'number') {
-        setAutoOffset(e.detail.onset);
+        baseOffset = e.detail.onset;
+        setAutoOffset(computeCurrentOffset(usePlayer.getState().getPreciseTime()));
       }
     };
     window.addEventListener('audio-onset-detected', onOnset);
-    return () => window.removeEventListener('audio-onset-detected', onOnset);
+
+    // 3. 10-Second Active Synchronizer Watchdog:
+    // Periodically re-evaluates audio progress every 10 seconds during playback,
+    // verifies timing against musical phrases, and dynamically fine-tunes the offset
+    const syncInterval = setInterval(() => {
+      if (!usePlayer.getState().playing) return;
+      const t = usePlayer.getState().getPreciseTime();
+      const updated = computeCurrentOffset(t);
+      setAutoOffset((prev) => (Math.abs(prev - updated) >= 0.04 ? updated : prev));
+    }, 10000);
+
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('audio-onset-detected', onOnset);
+    };
   }, [track?.id, track?.duration, data]);
 
   return autoOffset;

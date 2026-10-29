@@ -69,6 +69,21 @@ function hasVersionKeyword(str, kw) {
   return re.test(str || '');
 }
 
+export function isValidLyrics(str) {
+  if (!str || typeof str !== 'string') return false;
+  const clean = str.replace(/\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]/g, '').replace(/<[^>]+>/g, '').trim();
+  if (clean.length < 35) return false;
+  if (/^(?:probe|\*rickrolling\*|<instrumental>|instrumental|no lyrics available|lyrics not found)$/i.test(clean)) return false;
+  return true;
+}
+
+export function isValidSyncedLyrics(lrcText) {
+  if (!lrcText || typeof lrcText !== 'string') return false;
+  const lines = parseLrc(lrcText);
+  if (lines.length < 4) return false;
+  return isValidLyrics(lrcText);
+}
+
 export function parseLrc(lrcText) {
   if (!lrcText) return [];
   const lines = [];
@@ -421,8 +436,10 @@ function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, raw
   }
 
   // Synced lyrics bonus
-  if (item.syncedLyrics && item.syncedLyrics.length > 50) {
-    score += 45;
+  if (item.syncedLyrics && isValidSyncedLyrics(item.syncedLyrics)) {
+    score += 55;
+  } else if (item.syncedLyrics && !isValidSyncedLyrics(item.syncedLyrics)) {
+    score -= 120; // Penalize fake/troll synced lyrics like probe
   }
 
   return { score, artistMatchFound };
@@ -467,17 +484,15 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
         const r = await fetch(u.href, { headers, signal: AbortSignal.timeout(2200) });
         if (r.ok) {
           const d = await r.json();
-          if (d.syncedLyrics) {
+          if (d.syncedLyrics && isValidSyncedLyrics(d.syncedLyrics)) {
             const lines = parseLrc(d.syncedLyrics);
-            if (lines.length >= 3) {
-              return {
-                plainLyrics: d.plainLyrics || '',
-                syncedLyrics: d.syncedLyrics,
-                lines,
-                lyricsDuration: d.duration || duration,
-                autoOffset: 0,
-              };
-            }
+            return {
+              plainLyrics: d.plainLyrics || '',
+              syncedLyrics: d.syncedLyrics,
+              lines,
+              lyricsDuration: d.duration || duration,
+              autoOffset: 0,
+            };
           }
         }
       } catch {}
@@ -505,29 +520,15 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
           const durDiff = (duration > 0 && d.duration > 0) ? Math.abs(d.duration - duration) : 0;
           const canSync = !duration || durDiff <= 25.0;
 
-          if (d.syncedLyrics && canSync) {
+          if (d.syncedLyrics && canSync && isValidSyncedLyrics(d.syncedLyrics)) {
             const lines = parseLrc(d.syncedLyrics);
-            if (lines.length >= 3) {
-              const durDelta = (duration > 0 && d.duration > 0) ? (duration - d.duration) : 0;
-              return {
-                plainLyrics: d.plainLyrics || '',
-                syncedLyrics: d.syncedLyrics || null,
-                lines,
-                lyricsDuration: d.duration || duration,
-                autoOffset: durDelta,
-              };
-            }
-          }
-
-          // If synced lyrics duration differed too much, or only plainLyrics:
-          const plain = d.plainLyrics || (d.syncedLyrics ? d.syncedLyrics.replace(/\[\d{2}:\d{2}(?:\.\d{1,3})?\]/g, '').trim() : '');
-          if (plain) {
+            const durDelta = (duration > 0 && d.duration > 0) ? (duration - d.duration) : 0;
             return {
-              plainLyrics: plain,
-              syncedLyrics: null,
-              lines: [],
-              lyricsDuration: d.duration || 0,
-              autoOffset: 0,
+              plainLyrics: d.plainLyrics || '',
+              syncedLyrics: d.syncedLyrics,
+              lines,
+              lyricsDuration: d.duration || duration,
+              autoOffset: durDelta,
             };
           }
         }
@@ -562,7 +563,7 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
     } catch {}
   }
 
-  // Deduplicate candidates
+  // Deduplicate and filter candidates
   const seenIds = new Set();
   const unique = [];
   for (const c of candidates) {
@@ -574,7 +575,8 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
 
   if (unique.length > 0) {
     // Score each candidate
-    const scored = unique.map((c) => {
+    const validCandidates = unique.filter((c) => isValidSyncedLyrics(c.syncedLyrics) || isValidLyrics(c.plainLyrics));
+    const scored = (validCandidates.length > 0 ? validCandidates : unique).map((c) => {
       const { score, artistMatchFound } = scoreCandidate(c, {
         targetTitles: titles,
         targetArtists: artists,
@@ -590,24 +592,21 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
       const durDiff = (duration > 0 && best.duration > 0) ? Math.abs(best.duration - duration) : 0;
       const canSync = !duration || durDiff <= 25.0;
 
-      if (best.syncedLyrics && canSync) {
+      if (best.syncedLyrics && canSync && isValidSyncedLyrics(best.syncedLyrics)) {
         const lines = parseLrc(best.syncedLyrics);
-        if (lines.length >= 3) {
-          const durDelta = (duration > 0 && best.duration > 0) ? (duration - best.duration) : 0;
-          return {
-            plainLyrics: best.plainLyrics || '',
-            syncedLyrics: best.syncedLyrics,
-            lines,
-            lyricsDuration: best.duration || duration,
-            autoOffset: durDelta,
-          };
-        }
+        const durDelta = (duration > 0 && best.duration > 0) ? (duration - best.duration) : 0;
+        return {
+          plainLyrics: best.plainLyrics || '',
+          syncedLyrics: best.syncedLyrics,
+          lines,
+          lyricsDuration: best.duration || duration,
+          autoOffset: durDelta,
+        };
       }
 
-      const plain = best.plainLyrics || (best.syncedLyrics ? best.syncedLyrics.replace(/\[\d{2}:\d{2}(?:\.\d{1,3})?\]/g, '').trim() : '');
-      if (plain) {
+      if (best.plainLyrics && isValidLyrics(best.plainLyrics)) {
         return {
-          plainLyrics: plain,
+          plainLyrics: best.plainLyrics,
           syncedLyrics: null,
           lines: [],
           lyricsDuration: best.duration || 0,
@@ -664,6 +663,78 @@ async function fetchFromGenius(title, artist, artistsList = []) {
   }
 }
 
+async function fetchFromNaver(title, artist, artistsList = []) {
+  try {
+    const { titles, artists } = extractVariants(title, artist, artistsList);
+    const searchTerms = [];
+    const t0 = titles[0] || title;
+    const a0 = artists[0] || artist || '';
+    if (a0 && t0) searchTerms.push(`${a0} ${t0}`);
+    if (t0) searchTerms.push(t0);
+
+    for (const term of searchTerms) {
+      const q = encodeURIComponent(term + ' 가사');
+      const url = `https://search.naver.com/search.naver?where=nexearch&sm=top_hty&fbm=0&ie=utf8&query=${q}`;
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        },
+        signal: AbortSignal.timeout(3500),
+      });
+      if (!r.ok) continue;
+      const html = await r.text();
+      const m = html.match(/class="[^"]*_content_text[^"]*"[^>]*>(.*?)<\/(?:div|p)>/is)
+        || html.match(/class="[^"]*lyrics_box[^"]*"[^>]*>(.*?)<\/(?:div|p)>/is)
+        || html.match(/class="[^"]*text_area[^"]*"[^>]*>(.*?)<\/(?:div|p)>/is);
+      if (m) {
+        const raw = m[1]
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<[^>]+>/g, '')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .trim();
+        if (isValidLyrics(raw)) return raw;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+async function fetchFromWebSearch(title, artist) {
+  try {
+    const q = `${artist || ''} ${title || ''} 가사 lyrics`.trim();
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
+    const r = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const snippets = [...html.matchAll(/<a class="result__snippet[^>]*>(.*?)<\/a>/gs)]
+      .map((m) => m[1].replace(/<[^>]+>/g, '').trim())
+      .filter((s) => s.length >= 80);
+
+    for (const s of snippets) {
+      const clean = s
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#x27;/g, "'")
+        .replace(/\.\.\.$/, '')
+        .trim();
+      if (isValidLyrics(clean)) return clean;
+    }
+  } catch {}
+  return null;
+}
+
 async function fetchFromLyricsOvh(title, artist, artistsList = []) {
   try {
     const { titles, artists } = extractVariants(title, artist, artistsList);
@@ -691,36 +762,52 @@ export async function getLyrics(track) {
 
   // 1. Try LRCLIB for real-time synchronized lyrics (or verified plain lyrics)
   const lrc = await fetchFromLrclib(title, artist, duration, track.artists);
-  if (lrc && lrc.lines && lrc.lines.length > 0) {
+  if (lrc && lrc.lines && lrc.lines.length >= 4) {
     cache.set(track.id, lrc);
     if (cache.size > 300) cache.delete(cache.keys().next().value);
     return lrc;
   }
 
-  // 2. If LRCLIB already found verified plainLyrics, keep as strong candidate
-  let fallbackPlain = lrc?.plainLyrics || null;
+  // 2. If LRCLIB already found verified plainLyrics, keep as candidate
+  let fallbackPlain = (lrc?.plainLyrics && isValidLyrics(lrc.plainLyrics)) ? lrc.plainLyrics : null;
 
   // 3. Try YouTube Music official lyrics tab
   if (!fallbackPlain) {
     const ytm = await fetchFromYouTubeMusic(track.id);
-    if (ytm && ytm.plainLyrics) {
+    if (ytm && ytm.plainLyrics && isValidLyrics(ytm.plainLyrics)) {
       fallbackPlain = ytm.plainLyrics;
     }
   }
 
-  // 4. Try Genius lyrics (covers vast majority of K-Pop, J-Pop, Indie, Vocaloid & Global tracks)
+  // 4. Try Naver VIBE official lyrics (covers 100% of Korean songs like MC몽, Indie, K-Pop, OSTs)
+  if (!fallbackPlain) {
+    const naver = await fetchFromNaver(title, artist, track.artists);
+    if (naver && isValidLyrics(naver)) {
+      fallbackPlain = naver;
+    }
+  }
+
+  // 5. Try Genius lyrics (covers vast majority of K-Pop, J-Pop, Indie, Vocaloid & Global tracks)
   if (!fallbackPlain) {
     const genius = await fetchFromGenius(title, artist, track.artists);
-    if (genius) {
+    if (genius && isValidLyrics(genius)) {
       fallbackPlain = genius;
     }
   }
 
-  // 5. Try Lyrics.ovh open lyrics API
+  // 6. Try Lyrics.ovh open lyrics API
   if (!fallbackPlain) {
     const ovh = await fetchFromLyricsOvh(title, artist, track.artists);
-    if (ovh) {
+    if (ovh && isValidLyrics(ovh)) {
       fallbackPlain = ovh;
+    }
+  }
+
+  // 7. Ultimate safety net: Web search snippet lyrics extractor
+  if (!fallbackPlain) {
+    const web = await fetchFromWebSearch(title, artist);
+    if (web && isValidLyrics(web)) {
+      fallbackPlain = web;
     }
   }
 
