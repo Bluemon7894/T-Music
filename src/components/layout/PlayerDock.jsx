@@ -36,6 +36,8 @@ export function Slider({ value, max, onChange, onCommit, buffered = 0, className
     window.addEventListener('pointerup', up);
   };
 
+  const hoverPct = max > 0 && hover != null ? Math.max(0, Math.min(100, (hover / max) * 100)) : 0;
+
   return (
     <div
       className={`slider ${drag != null ? 'dragging' : ''} ${className}`}
@@ -49,7 +51,17 @@ export function Slider({ value, max, onChange, onCommit, buffered = 0, className
         <div className="slider-fill" style={{ width: `${ratio * 100}%` }} />
       </div>
       <div className="slider-knob" style={{ left: `${ratio * 100}%` }} />
-      {className.includes('seek') && hover != null && <span className="slider-tip" style={{ left: `${(hover / max) * 100}%` }}>{fmtTime(hover)}</span>}
+      {className.includes('seek') && hover != null && (
+        <span
+          className="slider-tip"
+          style={{
+            left: `${hoverPct}%`,
+            transform: `translateX(-${hoverPct}%)`,
+          }}
+        >
+          {fmtTime(hover)}
+        </span>
+      )}
     </div>
   );
 }

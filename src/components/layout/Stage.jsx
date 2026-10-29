@@ -1,7 +1,7 @@
 // Fullscreen "stage": a spinning 3D vinyl with the cover as its label, a ring
 // visualizer around it, synchronized real-time lyrics, and the up-next strip. Esc or the button closes it.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ChevronDown, Shuffle, SkipBack, SkipForward, Repeat, Repeat1, Mic2, Volume2, Volume1, VolumeX } from 'lucide-react';
+import { ChevronDown, Shuffle, SkipBack, SkipForward, Repeat, Repeat1, Mic2, Volume2, Volume1, VolumeX, ListMusic, Search } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { api } from '../../lib/api.js';
@@ -10,12 +10,14 @@ import { LikeButton } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
 import { Slider } from './PlayerDock.jsx';
+import LyricsPickerModal from './LyricsPickerModal.jsx';
 import { fmtTime } from '../../lib/util.js';
 import { animate, createTimeline, ease, stagger, useTilt } from '../../lib/motion.js';
 
 function StageLyrics({ track }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const autoOffset = useAutoLyricsSync(track, data);
   const seek = usePlayer((s) => s.seek);
   const playing = usePlayer((s) => s.playing);
@@ -32,6 +34,16 @@ function StageLyrics({ track }) {
       .then((res) => { if (!cancelled) { setData(res); setLoading(false); } })
       .catch(() => { if (!cancelled) { setData(null); setLoading(false); } });
     return () => { cancelled = true; };
+  }, [track?.id]);
+
+  useEffect(() => {
+    const onLyricsChanged = (e) => {
+      if (e.detail?.trackId === track?.id && e.detail?.lyrics) {
+        setData(e.detail.lyrics);
+      }
+    };
+    window.addEventListener('t-music:lyrics-changed', onLyricsChanged);
+    return () => window.removeEventListener('t-music:lyrics-changed', onLyricsChanged);
   }, [track?.id]);
 
   const lines = data?.lines || [];
@@ -114,15 +126,45 @@ function StageLyrics({ track }) {
 
   if (!hasSynced && !hasPlain) {
     return (
-      <div className="stage-lyrics-empty">
-        <Mic2 size={36} opacity={0.35} />
-        <p>가사를 찾을 수 없습니다</p>
-      </div>
+      <>
+        <div className="stage-lyrics-empty">
+          <Mic2 size={36} opacity={0.35} />
+          <p>가사를 찾을 수 없습니다</p>
+          <button
+            className="stage-lyrics-search-btn"
+            onClick={() => setPickerOpen(true)}
+          >
+            <Search size={14} /> 다른 가사 직접 찾기
+          </button>
+        </div>
+        {pickerOpen && (
+          <LyricsPickerModal
+            track={track}
+            currentData={data}
+            onSelect={(newData) => setData(newData)}
+            onClose={() => setPickerOpen(false)}
+          />
+        )}
+      </>
     );
   }
 
   return (
     <div className="stage-lyrics-wrapper">
+      <div className="stage-lyrics-top-bar">
+        {!hasSynced && hasPlain ? (
+          <div className="stage-lyrics-nosync-badge" style={{ marginBottom: 0 }}>
+            <Mic2 size={13} /> 싱크 미지원 (일반 가사)
+          </div>
+        ) : <div />}
+        <button
+          className="stage-lyrics-picker-btn"
+          onClick={() => setPickerOpen(true)}
+          title="다른 가사 선택 또는 검색"
+        >
+          <ListMusic size={13} /> 다른 가사
+        </button>
+      </div>
       <div className="stage-lyrics-container" ref={containerRef}>
         {hasSynced ? (
           <div className="stage-lyrics-lines">
@@ -142,14 +184,19 @@ function StageLyrics({ track }) {
           </div>
         ) : (
           <div className="stage-lyrics-plain-box">
-            <div className="stage-lyrics-nosync-badge">
-              <Mic2 size={13} /> 싱크 미지원 (일반 가사)
-            </div>
             <div className="stage-lyrics-plain">{data.plainLyrics}</div>
             {data.footer && <div className="stage-lyrics-footer">{data.footer}</div>}
           </div>
         )}
       </div>
+      {pickerOpen && (
+        <LyricsPickerModal
+          track={track}
+          currentData={data}
+          onSelect={(newData) => setData(newData)}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }

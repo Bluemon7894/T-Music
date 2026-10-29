@@ -2,6 +2,7 @@ import { call } from './client.js';
 import * as P from './parse.js';
 
 const cache = new Map();
+const customLyricsMap = new Map();
 
 const KOREAN_ARTIST_MAP = {
   '아이유': 'IU', '이지금': 'IU', '방탄소년단': 'BTS', '소녀시대': 'Girls\' Generation',
@@ -476,7 +477,7 @@ async function fetchFromNaver(title, artist, artistsList = []) {
 async function fetchFromLrclib(title, artist, duration, artistsList = []) {
   const { titles, artists } = extractVariants(title, artist, artistsList);
   const isKorean = isKoreanTrack(titles, artists);
-  const headers = { 'User-Agent': 'T-Music/0.3.21 (https://github.com/Bluemon7894/T-Music)' };
+  const headers = { 'User-Agent': 'T-Music/0.3.22 (https://github.com/Bluemon7894/T-Music)' };
 
   const getPairs = [];
   for (const t of titles.slice(0, 2)) {
@@ -611,8 +612,218 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
   return null;
 }
 
+export function setCustom(trackId, lyricsData) {
+  if (!trackId || !lyricsData) return { ok: false };
+  cache.set(trackId, lyricsData);
+  customLyricsMap.set(trackId, lyricsData);
+  return { ok: true };
+}
+
+export async function getCandidates(track, customQuery) {
+  if (!track) return [];
+  const title = track.rawTitle || track.title || '';
+  const artist = Array.isArray(track.artists) ? track.artists[0]?.name : track.artist || '';
+  const duration = track.duration || 0;
+  const headers = { 'User-Agent': 'T-Music/0.3.22 (https://github.com/Bluemon7894/T-Music)' };
+
+  const candidates = [];
+  const seenTexts = new Set();
+
+  function addCandidate(cand) {
+    if (!cand || !cand.data) return;
+    const textKey = (cand.data.syncedLyrics || cand.data.plainLyrics || '').trim();
+    if (!textKey || seenTexts.has(textKey)) return;
+    seenTexts.add(textKey);
+    candidates.push(cand);
+  }
+
+  function extractPreview(text) {
+    if (!text) return '';
+    const clean = text
+      .replace(/\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]/g, '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !/^\[(ti|ar|al|by|offset|length):/i.test(l));
+    return clean.slice(0, 3).join(' / ');
+  }
+
+  // 1. If custom query is provided by user search input
+  if (customQuery && typeof customQuery === 'string' && customQuery.trim().length > 0) {
+    try {
+      const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(customQuery.trim())}`;
+      const res = await fetch(searchUrl, { headers, signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        const list = await res.json();
+        if (Array.isArray(list)) {
+          for (const item of list) {
+            if (!item || item.instrumental) continue;
+            if (!item.plainLyrics && !item.syncedLyrics) continue;
+            const lines = item.syncedLyrics ? parseLrc(item.syncedLyrics) : [];
+            const hasSynced = lines.length >= 4 && isValidSyncedLyrics(item.syncedLyrics);
+            const preview = extractPreview(item.syncedLyrics || item.plainLyrics);
+            addCandidate({
+              id: `lrclib-${item.id}`,
+              source: hasSynced ? 'LRCLIB (싱크)' : 'LRCLIB (일반)',
+              trackName: item.trackName || '',
+              artistName: item.artistName || '',
+              albumName: item.albumName || '',
+              duration: item.duration || 0,
+              hasSynced,
+              lineCount: hasSynced ? lines.length : (item.plainLyrics?.split('\n').filter(Boolean).length || 0),
+              preview,
+              data: {
+                plainLyrics: item.plainLyrics || '',
+                syncedLyrics: hasSynced ? item.syncedLyrics : null,
+                lines: hasSynced ? lines : [],
+                lyricsDuration: item.duration || duration,
+                autoOffset: (duration > 0 && item.duration > 0) ? (duration - item.duration) : 0,
+                footer: `출처: LRCLIB (${item.artistName} - ${item.trackName})`,
+              },
+            });
+          }
+        }
+      }
+    } catch {}
+    return candidates;
+  }
+
+  // 2. Default: auto-populate all candidate lyrics for current track
+  if (customLyricsMap.has(track.id)) {
+    const custom = customLyricsMap.get(track.id);
+    const hasSynced = custom.lines?.length >= 4;
+    addCandidate({
+      id: `custom-${track.id}`,
+      source: '사용자 선택 가사',
+      trackName: title,
+      artistName: artist,
+      albumName: '',
+      duration: custom.lyricsDuration || duration,
+      hasSynced,
+      lineCount: hasSynced ? custom.lines.length : (custom.plainLyrics?.split('\n').filter(Boolean).length || 0),
+      preview: extractPreview(custom.syncedLyrics || custom.plainLyrics),
+      data: custom,
+      isCurrent: true,
+    });
+  }
+
+  const { titles, artists } = extractVariants(title, artist, track.artists);
+
+  // Search LRCLIB queries
+  const queries = [];
+  if (titles[0] && artists[0]) queries.push(`${titles[0]} ${artists[0]}`);
+  if (titles[0] && !queries.includes(titles[0])) queries.push(titles[0]);
+  if (titles[1] && artists[0]) queries.push(`${titles[1]} ${artists[0]}`);
+  const cleanedTitle = cleanTitleNoise(title);
+  if (cleanedTitle && !queries.includes(cleanedTitle)) queries.push(cleanedTitle);
+
+  for (const q of queries.slice(0, 3)) {
+    try {
+      const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(q)}`;
+      const res = await fetch(searchUrl, { headers, signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const list = await res.json();
+        if (Array.isArray(list)) {
+          for (const item of list) {
+            if (!item || item.instrumental) continue;
+            if (!item.plainLyrics && !item.syncedLyrics) continue;
+            const lines = item.syncedLyrics ? parseLrc(item.syncedLyrics) : [];
+            const hasSynced = lines.length >= 4 && isValidSyncedLyrics(item.syncedLyrics);
+            const preview = extractPreview(item.syncedLyrics || item.plainLyrics);
+            addCandidate({
+              id: `lrclib-${item.id}`,
+              source: hasSynced ? 'LRCLIB (싱크)' : 'LRCLIB (일반)',
+              trackName: item.trackName || '',
+              artistName: item.artistName || '',
+              albumName: item.albumName || '',
+              duration: item.duration || 0,
+              hasSynced,
+              lineCount: hasSynced ? lines.length : (item.plainLyrics?.split('\n').filter(Boolean).length || 0),
+              preview,
+              data: {
+                plainLyrics: item.plainLyrics || '',
+                syncedLyrics: hasSynced ? item.syncedLyrics : null,
+                lines: hasSynced ? lines : [],
+                lyricsDuration: item.duration || duration,
+                autoOffset: (duration > 0 && item.duration > 0) ? (duration - item.duration) : 0,
+                footer: `출처: LRCLIB (${item.artistName} - ${item.trackName})`,
+              },
+            });
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // YouTube Music official lyrics
+  try {
+    const ytm = await fetchFromYouTubeMusic(track.id);
+    if (ytm && ytm.plainLyrics && isValidLyrics(ytm.plainLyrics)) {
+      addCandidate({
+        id: `ytm-${track.id}`,
+        source: 'YouTube Music 공식 (일반)',
+        trackName: title,
+        artistName: artist,
+        albumName: track.album?.name || '',
+        duration: duration,
+        hasSynced: false,
+        lineCount: ytm.plainLyrics.split('\n').filter(Boolean).length,
+        preview: extractPreview(ytm.plainLyrics),
+        data: {
+          plainLyrics: ytm.plainLyrics,
+          syncedLyrics: null,
+          lines: [],
+          lyricsDuration: duration,
+          autoOffset: 0,
+          footer: ytm.footer || '출처: YouTube Music 공식 가사',
+        },
+      });
+    }
+  } catch {}
+
+  // Naver VIBE / KOMCA
+  try {
+    const naverText = await fetchFromNaver(title, artist, track.artists);
+    if (naverText && isValidLyrics(naverText)) {
+      addCandidate({
+        id: `naver-${track.id}`,
+        source: '네이버 VIBE / 한국저작권협회',
+        trackName: title,
+        artistName: artist,
+        albumName: '',
+        duration: duration,
+        hasSynced: false,
+        lineCount: naverText.split('\n').filter(Boolean).length,
+        preview: extractPreview(naverText),
+        data: {
+          plainLyrics: naverText,
+          syncedLyrics: null,
+          lines: [],
+          lyricsDuration: duration,
+          autoOffset: 0,
+          footer: '출처: 네이버 VIBE / 한국음악저작권협회',
+        },
+      });
+    }
+  } catch {}
+
+  candidates.sort((a, b) => {
+    if (a.isCurrent) return -1;
+    if (b.isCurrent) return 1;
+    if (a.hasSynced !== b.hasSynced) return a.hasSynced ? -1 : 1;
+    if (duration > 0) {
+      const diffA = a.duration > 0 ? Math.abs(a.duration - duration) : 999;
+      const diffB = b.duration > 0 ? Math.abs(b.duration - duration) : 999;
+      if (Math.abs(diffA - diffB) > 1.5) return diffA - diffB;
+    }
+    return (b.lineCount || 0) - (a.lineCount || 0);
+  });
+
+  return candidates;
+}
+
 export async function getLyrics(track) {
   if (!track || !track.id) return { plainLyrics: '', lines: [] };
+  if (customLyricsMap.has(track.id)) return customLyricsMap.get(track.id);
   if (cache.has(track.id)) return cache.get(track.id);
 
   const artist = Array.isArray(track.artists) ? track.artists[0]?.name : track.artist || '';

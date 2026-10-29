@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Radio, X, Maximize2, ListMusic, Sparkles, Mic2 } from 'lucide-react';
+import { Radio, X, Maximize2, ListMusic, Sparkles, Mic2, Search } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useLibrary } from '../../store/library.js';
@@ -8,6 +8,7 @@ import { Thumb, ArtistLinks, Equalizer, useAutoLyricsSync } from '../common.jsx'
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
+import LyricsPickerModal from './LyricsPickerModal.jsx';
 import { fmtTime } from '../../lib/util.js';
 import { useTilt, animate, ease } from '../../lib/motion.js';
 import logo from '../../assets/logo-mark.png';
@@ -77,6 +78,7 @@ function Idle() {
 function LyricsView({ track }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const autoOffset = useAutoLyricsSync(track, data);
   const seek = usePlayer((s) => s.seek);
   const playing = usePlayer((s) => s.playing);
@@ -91,6 +93,16 @@ function LyricsView({ track }) {
       .then((res) => { if (!cancelled) { setData(res); setLoading(false); } })
       .catch(() => { if (!cancelled) { setData(null); setLoading(false); } });
     return () => { cancelled = true; };
+  }, [track?.id]);
+
+  useEffect(() => {
+    const onLyricsChanged = (e) => {
+      if (e.detail?.trackId === track?.id && e.detail?.lyrics) {
+        setData(e.detail.lyrics);
+      }
+    };
+    window.addEventListener('t-music:lyrics-changed', onLyricsChanged);
+    return () => window.removeEventListener('t-music:lyrics-changed', onLyricsChanged);
   }, [track?.id]);
 
   const lines = data?.lines || [];
@@ -165,21 +177,46 @@ function LyricsView({ track }) {
 
   if (!hasSynced && !hasPlain) {
     return (
-      <div className="lyrics-empty">
-        <Mic2 size={32} opacity={0.35} />
-        <p>가사를 찾을 수 없습니다</p>
-      </div>
+      <>
+        <div className="lyrics-empty">
+          <Mic2 size={32} opacity={0.35} />
+          <p>가사를 찾을 수 없습니다</p>
+          <button
+            className="lyrics-search-btn"
+            onClick={() => setPickerOpen(true)}
+          >
+            <Search size={14} /> 다른 가사 직접 찾기
+          </button>
+        </div>
+        {pickerOpen && (
+          <LyricsPickerModal
+            track={track}
+            currentData={data}
+            onSelect={(newData) => setData(newData)}
+            onClose={() => setPickerOpen(false)}
+          />
+        )}
+      </>
     );
   }
 
   return (
     <div className="lyrics-view">
       <div className="lyrics-meta">
-        <h3>{track.title}</h3>
-        <p>{track.artists?.map((a) => a.name).join(', ')}</p>
-        {!hasSynced && hasPlain && (
-          <span className="lyrics-nosync-pill">싱크 미지원</span>
-        )}
+        <div className="lyrics-meta-left">
+          <h3>{track.title}</h3>
+          <p>{track.artists?.map((a) => a.name).join(', ')}</p>
+          {!hasSynced && hasPlain && (
+            <span className="lyrics-nosync-pill">싱크 미지원</span>
+          )}
+        </div>
+        <button
+          className="lyrics-picker-pill"
+          onClick={() => setPickerOpen(true)}
+          title="다른 가사 선택"
+        >
+          <ListMusic size={13} /> 다른 가사
+        </button>
       </div>
       {hasSynced ? (
         <div className="lyrics-lines">
@@ -202,6 +239,14 @@ function LyricsView({ track }) {
           <div className="lyrics-plain">{data.plainLyrics}</div>
           {data.footer && <div className="stage-lyrics-footer" style={{ textAlign: 'left', marginTop: '12px' }}>{data.footer}</div>}
         </div>
+      )}
+      {pickerOpen && (
+        <LyricsPickerModal
+          track={track}
+          currentData={data}
+          onSelect={(newData) => setData(newData)}
+          onClose={() => setPickerOpen(false)}
+        />
       )}
     </div>
   );

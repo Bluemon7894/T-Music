@@ -248,7 +248,7 @@
 .slider-fill { position: absolute; inset: 0 auto 0 0; background: var(--grad); border-radius: 4px; }
 .slider-knob { position: absolute; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.35), 0 2px 8px rgba(0, 0, 0, 0.5); transform: scale(0); transition: transform 0.25s var(--spring); pointer-events: none; }
 .slider:hover .slider-knob, .slider.dragging .slider-knob { transform: scale(1); }
-.slider-tip { position: absolute; bottom: 20px; transform: translateX(-50%); padding: 3px 7px; border-radius: 6px; background: rgba(22, 14, 40, 0.95); border: 1px solid var(--line-2); font-size: 11px; font-weight: 700; pointer-events: none; font-variant-numeric: tabular-nums; }
+.slider-tip { position: absolute; bottom: 22px; padding: 3px 8px; border-radius: 6px; background: rgba(22, 14, 40, 0.96); border: 1px solid var(--line-2); font-size: 11px; font-weight: 700; pointer-events: none; font-variant-numeric: tabular-nums; white-space: nowrap; z-index: 50; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6); }
 
 @media (max-width: 1220px) {
   .dock { gap: 12px; padding: 0 14px 0 10px; }
