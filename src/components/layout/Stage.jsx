@@ -11,7 +11,6 @@ import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
 import { Slider } from './PlayerDock.jsx';
 import LyricsPickerModal from './LyricsPickerModal.jsx';
-import PlaybackRateControl from '../common/PlaybackRateControl.jsx';
 import { fmtTime } from '../../lib/util.js';
 import { animate, createTimeline, ease, stagger, useTilt } from '../../lib/motion.js';
 
@@ -369,7 +368,6 @@ export default function Stage() {
             <PlayButton size={72} playing={p.playing} onClick={p.toggle} />
             <button className="icon-btn" onClick={() => p.next()}><SkipForward size={28} fill="currentColor" /></button>
             <button className={`icon-btn toggle ${p.repeat !== 'off' ? 'on' : ''}`} onClick={p.cycleRepeat}>{p.repeat === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}</button>
-            <PlaybackRateControl variant="stage" />
             <div
               className="stage-volume"
               onWheel={(e) => {
