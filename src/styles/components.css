@@ -5,7 +5,7 @@
 .icon-btn.circle { width: 34px; height: 34px; border-radius: 50%; }
 .icon-btn.circle:hover:not(:disabled) { background: var(--glass-3); }
 .icon-btn.circle.glass { background: var(--glass-2); border: 1px solid var(--line); color: var(--ink); }
-.icon-btn.circle.accent { background: var(--grad); color: #fff; box-shadow: var(--glow); }
+.icon-btn.circle.accent { background: var(--grad); border: 0; background-origin: border-box; background-repeat: no-repeat; color: #fff; box-shadow: var(--glow); }
 .icon-btn.big { width: 44px; height: 44px; }
 .icon-btn.big:hover:not(:disabled) { transform: scale(1.1); }
 .icon-btn.on, .icon-btn.toggle.on { color: var(--v-300); }
@@ -21,11 +21,11 @@
 
 .play-btn {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
-  border-radius: 50%; background: var(--grad); color: #fff;
-  box-shadow: 0 10px 26px -8px rgba(139, 92, 246, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  border-radius: 50%; background: var(--grad); border: 0; background-origin: border-box; background-repeat: no-repeat; color: #fff;
+  box-shadow: 0 10px 26px -8px rgba(139, 92, 246, 0.9);
   transition: transform 0.3s var(--spring), box-shadow 0.3s;
 }
-.play-btn:hover { transform: scale(1.07); box-shadow: 0 14px 34px -8px rgba(167, 139, 250, 1), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+.play-btn:hover { transform: scale(1.07); box-shadow: 0 14px 34px -8px rgba(167, 139, 250, 1); }
 
 .btn {
   display: inline-flex; align-items: center; gap: 8px;
@@ -38,7 +38,7 @@
 .btn:active:not(:disabled) { transform: scale(0.96); }
 .btn.sm { height: 32px; padding: 0 14px; font-size: 12.5px; }
 .btn.lg { height: 46px; padding: 0 24px; border-radius: 23px; font-size: 15px; }
-.btn.grad { background: var(--grad); border-color: transparent; color: #fff; box-shadow: var(--glow); }
+.btn.grad { background: var(--grad); border: 0; background-origin: border-box; background-repeat: no-repeat; color: #fff; box-shadow: var(--glow); }
 .btn.grad:hover:not(:disabled) { box-shadow: 0 14px 36px -10px rgba(167, 139, 250, 0.95); background: var(--grad); }
 .btn.outline { background: transparent; }
 .btn.outline.on { border-color: var(--v-400); color: var(--v-200); }
