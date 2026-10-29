@@ -128,7 +128,8 @@ export default function Stage() {
 
   // New track: drop the record back in with a bounce.
   useEffect(() => {
-    if (disc.current) animate(disc.current, { scale: [0.85, 1], ease: ease.bouncy });
+    const deck = root.current?.querySelector('.turntable-deck');
+    if (deck) animate(deck, { scale: [0.94, 1], ease: ease.bouncy, duration: 400 });
   }, [track?.id]);
 
   const close = () => {
@@ -155,12 +156,22 @@ export default function Stage() {
       <div className={`stage-main ${showLyrics ? 'with-lyrics' : ''}`}>
         <div className="stage-disc-wrap" ref={tilt}>
           <Visualizer variant="ring" bars={96} className="stage-ring" />
-          <div className={`stage-disc ${p.playing ? 'spinning' : ''}`} ref={disc}>
-            <div className="vinyl-grooves" />
-            <div className="vinyl-label"><Thumb src={track.thumb} /></div>
-            <div className="vinyl-hole" />
+          <div className="turntable-deck">
+            <div className="turntable-platter">
+              <div className={`platter-strobe ${p.playing ? 'spinning' : ''}`} />
+            </div>
+            <div className={`stage-disc ${p.playing ? 'spinning' : ''}`} ref={disc}>
+              <div className="vinyl-grooves" />
+              <div className="vinyl-sheen" />
+              <div className="vinyl-label"><Thumb src={track.thumb} /></div>
+              <div className="vinyl-hole" />
+            </div>
+            <div className={`tonearm ${p.playing ? 'on' : 'resting'}`}><i /></div>
+            <div className="turntable-indicator">
+              <span className={`turntable-indicator-dot ${p.playing ? 'on' : ''}`} />
+              <span>33 RPM</span>
+            </div>
           </div>
-          <div className={`tonearm ${p.playing ? 'on' : ''}`}><i /></div>
         </div>
 
         <div className={`stage-info ${showLyrics ? 'with-lyrics' : ''}`}>
