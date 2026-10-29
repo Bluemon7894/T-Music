@@ -3,7 +3,6 @@ import { Sparkles, Download, ExternalLink, X, CheckCircle2, AlertCircle, ArrowRi
 import { marked } from 'marked';
 import { useUpdater } from '../store/updater.js';
 import { api } from '../lib/api.js';
-import { isAndroid, isElectron } from '../lib/device.js';
 import { fmtBytes } from '../lib/util.js';
 
 export default function UpdateModal() {
@@ -13,7 +12,6 @@ export default function UpdateModal() {
   const latestVersion = useUpdater((s) => s.latestVersion);
   const releaseName = useUpdater((s) => s.releaseName);
   const releaseNotes = useUpdater((s) => s.releaseNotes);
-  const isApk = useUpdater((s) => s.isApk);
   const downloading = useUpdater((s) => s.downloading);
   const downloaded = useUpdater((s) => s.downloaded);
   const progress = useUpdater((s) => s.progress);
@@ -21,8 +19,6 @@ export default function UpdateModal() {
   const download = useUpdater((s) => s.download);
   const install = useUpdater((s) => s.install);
   const openReleasePage = useUpdater((s) => s.openReleasePage);
-
-  const isMobileTarget = isAndroid || isApk || !isElectron;
 
   const renderedNotes = useMemo(() => {
     if (!releaseNotes) return '';
@@ -51,7 +47,7 @@ export default function UpdateModal() {
             <div className="update-modal-versions">
               <span className="v-tag cur">v{currentVersion || '0.3.8'}</span>
               <ArrowRight size={14} className="v-arrow" />
-              <span className="v-tag next">v{latestVersion}{isMobileTarget ? ' · Android' : ' · PC'}</span>
+              <span className="v-tag next">v{latestVersion}</span>
             </div>
           </div>
         </div>
@@ -77,7 +73,7 @@ export default function UpdateModal() {
           </div>
         )}
 
-        {downloading && !isMobileTarget && (
+        {downloading && (
           <div className="update-progress-section">
             <div className="update-progress-labels">
               <span>다운로드 중...</span>
@@ -92,7 +88,7 @@ export default function UpdateModal() {
           </div>
         )}
 
-        {downloaded && !isMobileTarget && (
+        {downloaded && (
           <div className="update-completed-msg">
             <CheckCircle2 size={18} className="text-success" />
             <span>설치 파일 다운로드가 완료되었습니다. 지금 재시작하여 설치할 수 있습니다.</span>
@@ -120,7 +116,7 @@ export default function UpdateModal() {
                 }}
                 onClick={openReleasePage}
               >
-                웹 브라우저에서 직접 설치 파일({isMobileTarget ? '.apk' : '.exe'}) 다운로드하기 →
+                웹 브라우저에서 직접 설치 파일(.exe) 다운로드하기 →
               </button>
             </div>
           </div>
@@ -134,11 +130,7 @@ export default function UpdateModal() {
           <button className="btn-secondary" onClick={closeModal}>
             나가기
           </button>
-          {isMobileTarget ? (
-            <button className="btn-primary" onClick={download}>
-              <Download size={16} /> APK 다운로드 및 설치
-            </button>
-          ) : downloaded ? (
+          {downloaded ? (
             <button className="btn-primary" onClick={install}>
               <CheckCircle2 size={16} /> 지금 설치 및 재시작
             </button>

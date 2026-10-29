@@ -8,7 +8,6 @@ import { useUpdater } from './store/updater.js';
 import Sidebar from './components/layout/Sidebar.jsx';
 import TopBar from './components/layout/TopBar.jsx';
 import PlayerDock from './components/layout/PlayerDock.jsx';
-import BottomNav from './components/layout/BottomNav.jsx';
 import NowPanel from './components/layout/NowPanel.jsx';
 import Stage from './components/layout/Stage.jsx';
 import UpdateModal from './components/UpdateModal.jsx';
@@ -129,7 +128,6 @@ export default function App() {
       </main>
       {panelOpen && <NowPanel />}
       <PlayerDock />
-      <BottomNav />
       {stage && <Stage />}
       <ContextMenu />
       <Dialog />

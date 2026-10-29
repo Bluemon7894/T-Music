@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { api } from '../lib/api.js';
-import { isAndroid, isElectron } from '../lib/device.js';
 import { toast } from './ui.js';
 
 export const useUpdater = create((set, get) => ({
@@ -13,7 +12,6 @@ export const useUpdater = create((set, get) => ({
   releaseUrl: '',
   downloadUrl: '',
   assetSize: 0,
-  isApk: !isElectron || isAndroid,
   downloading: false,
   downloaded: false,
   progress: { percent: 0, received: 0, total: 0 },
@@ -25,7 +23,7 @@ export const useUpdater = create((set, get) => ({
     const savedToken = localStorage.getItem('tmusic_github_token');
     if (savedToken) api.setGithubToken(savedToken).catch(() => {});
 
-    // Register progress listener (for PC electron in-app download)
+    // Register progress listener
     api.onUpdateProgress((data) => {
       if (data.status === 'downloading') {
         set({
@@ -60,11 +58,6 @@ export const useUpdater = create((set, get) => ({
     set({ checking: true, error: null });
     try {
       const res = await api.checkUpdate();
-      if (!res) {
-        set({ checking: false });
-        return;
-      }
-      const isApkTarget = Boolean(res.isApk || (!isElectron && isAndroid));
       set({
         checking: false,
         lastChecked: Date.now(),
@@ -77,13 +70,12 @@ export const useUpdater = create((set, get) => ({
         downloadUrl: res.downloadUrl || '',
         assetSize: res.assetSize || 0,
         downloaded: Boolean(res.downloaded),
-        isApk: isApkTarget,
       });
 
       if (res.hasUpdate) {
         set({ modalOpen: true });
       } else if (!silent) {
-        toast(`현재 최신 버전(v${res.currentVersion || '0.3.9'})을 사용하고 있습니다.`);
+        toast(`현재 최신 버전(v${res.currentVersion})을 사용하고 있습니다.`);
       }
     } catch (err) {
       set({ checking: false, error: err.message });
@@ -94,19 +86,7 @@ export const useUpdater = create((set, get) => ({
   },
 
   download: async () => {
-    const { isApk, downloadUrl, downloading, downloaded } = get();
-    // On Android / Mobile: trigger APK download directly
-    if (isApk || isAndroid || !isElectron) {
-      if (downloadUrl) {
-        api.openExternal(downloadUrl);
-        toast('APK 다운로드를 시작합니다. 완료 후 실행하여 설치해주세요.');
-      } else {
-        get().openReleasePage();
-      }
-      return;
-    }
-
-    // On Windows / Electron: in-app background download
+    const { downloading, downloaded } = get();
     if (downloading) return;
     if (downloaded) {
       return get().install();
@@ -121,11 +101,6 @@ export const useUpdater = create((set, get) => ({
   },
 
   install: async () => {
-    const { isApk, downloadUrl } = get();
-    if (isApk || isAndroid || !isElectron) {
-      if (downloadUrl) api.openExternal(downloadUrl);
-      return;
-    }
     try {
       await api.installUpdate();
     } catch (err) {
