@@ -1,6 +1,4 @@
-// Turns a video id into a direct audio URL, trying several methods in order.
-// Methods that recently failed (while a later one worked) get pushed to the back
-// for a few hours, then retried, so the app routes around breakage on its own.
+// Turns a video id into a direct audio URL using InnerTube visionOS.
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -17,15 +15,12 @@ async function innertube(id, clientName) {
   return { url, headers: {}, mime: fmt.mime_type, bitrate: fmt.bitrate };
 }
 
-// Default order: fastest and most reliable first (measured).
+// Dedicated playback engine: InnerTube visionOS
 const METHODS = {
   VISIONOS: (id) => innertube(id, 'VISIONOS'),
-  IOS: (id) => innertube(id, 'IOS'),
-  ANDROID_VR: (id) => innertube(id, 'ANDROID_VR'),
 };
-const DEFAULT_ORDER = Object.keys(METHODS);
+const DEFAULT_ORDER = ['VISIONOS'];
 const TIMEOUT_MS = 12000;
-const DEMOTE_MS = 6 * 60 * 60 * 1000;
 
 const statsFile = () => path.join(app.getPath('userData'), 'stream-stats.json');
 let stats = null;
@@ -47,17 +42,6 @@ function mark(name, ok, error) {
   saveStats();
 }
 
-function order() {
-  const now = Date.now();
-  const st = loadStats();
-  // One odd video shouldn't sink a method; two failures in a row do.
-  const demoted = (n) => {
-    const s = st[n];
-    return s?.streak >= 2 && now - s.lastFail < DEMOTE_MS;
-  };
-  return [...DEFAULT_ORDER.filter((n) => !demoted(n)), ...DEFAULT_ORDER.filter(demoted)];
-}
-
 function withTimeout(p, ms) {
   return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 }
@@ -71,62 +55,51 @@ function expiryOf(url) {
 const cache = new Map();
 const inflight = new Map();
 
-export async function resolve(id, { exclude = [] } = {}) {
+export async function resolve(id) {
   const hit = cache.get(id);
-  if (hit && hit.expires > Date.now() && !exclude.includes(hit.method)) return { ...hit, fresh: false };
-  const key = id + '|' + exclude.join(',');
-  if (inflight.has(key)) return inflight.get(key);
+  if (hit && hit.expires > Date.now()) return { ...hit, fresh: false };
+  if (inflight.has(id)) return inflight.get(id);
 
   const job = (async () => {
-    const failed = [];
-    for (const name of order()) {
-      if (exclude.includes(name)) continue;
-      try {
-        const r = await withTimeout(METHODS[name](id), TIMEOUT_MS);
-        const entry = { ...r, id, method: name, expires: r.expires || expiryOf(r.url) };
-        cache.set(id, entry);
-        mark(name, true);
-        // Only blame earlier methods when a later one proved the video is playable.
-        for (const f of failed) mark(f.name, false, f.error);
-        return { ...entry, fresh: true };
-      } catch (e) {
-        failed.push({ name, error: e.message });
-      }
+    try {
+      const r = await withTimeout(METHODS.VISIONOS(id), TIMEOUT_MS);
+      const entry = { ...r, id, method: 'VISIONOS', expires: r.expires || expiryOf(r.url) };
+      cache.set(id, entry);
+      mark('VISIONOS', true);
+      return { ...entry, fresh: true };
+    } catch (e) {
+      mark('VISIONOS', false, e.message);
+      throw new Error('재생할 수 없는 곡입니다: ' + e.message);
     }
-    throw new Error('재생할 수 없는 곡입니다: ' + failed.map((f) => `${f.name}(${f.error})`).join(', '));
-  })().finally(() => inflight.delete(key));
+  })().finally(() => inflight.delete(id));
 
-  inflight.set(key, job);
+  inflight.set(id, job);
   return job;
 }
 
 // Called when a URL we handed out stopped working.
 export function invalidate(id, method, blame) {
   cache.delete(id);
-  if (blame) mark(method, false, 'stream request rejected');
+  if (blame) mark('VISIONOS', false, 'stream request rejected');
 }
 
 export function prefetch(id) {
   resolve(id).catch(() => {});
 }
 
-// Runs every method on its own (no fallback) and reports which ones work.
+// Reports visionOS playback engine diagnosis.
 export async function diagnose(id = 'OIHlzvEKncQ') {
-  const results = [];
-  for (const name of DEFAULT_ORDER) {
-    const t = Date.now();
-    try {
-      const r = await withTimeout(METHODS[name](id), TIMEOUT_MS);
-      const res = await fetch(r.url, { headers: { ...r.headers, Range: 'bytes=0-1023' } });
-      results.push({ name, ok: res.status === 206 || res.status === 200, ms: Date.now() - t, http: res.status, mime: r.mime });
-    } catch (e) {
-      results.push({ name, ok: false, ms: Date.now() - t, error: e.message.slice(0, 160) });
-    }
+  const t = Date.now();
+  try {
+    const r = await withTimeout(METHODS.VISIONOS(id), TIMEOUT_MS);
+    const res = await fetch(r.url, { headers: { ...r.headers, Range: 'bytes=0-1023' } });
+    return [{ name: 'VISIONOS', ok: res.status === 206 || res.status === 200, ms: Date.now() - t, http: res.status, mime: r.mime }];
+  } catch (e) {
+    return [{ name: 'VISIONOS', ok: false, ms: Date.now() - t, error: e.message.slice(0, 160) }];
   }
-  return results;
 }
 
 export function status() {
   const st = loadStats();
-  return order().map((name) => ({ name, ...(st[name] || { ok: 0, fail: 0 }) }));
+  return [{ name: 'VISIONOS', ...(st.VISIONOS || { ok: 0, fail: 0 }) }];
 }

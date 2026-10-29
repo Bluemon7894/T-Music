@@ -73,7 +73,8 @@ export function isValidLyrics(str) {
   if (!str || typeof str !== 'string') return false;
   const clean = str.replace(/\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]/g, '').replace(/<[^>]+>/g, '').trim();
   if (clean.length < 35) return false;
-  if (/^(?:probe|\*rickrolling\*|<instrumental>|instrumental|no lyrics available|lyrics not found)$/i.test(clean)) return false;
+  if (/^(?:probe|\*rickrolling\*|<instrumental>|instrumental|no lyrics available|lyrics not found|暂无歌词|纯音乐.*)$/i.test(clean)) return false;
+  if (clean.includes('暂无歌词')) return false;
   return true;
 }
 
@@ -619,137 +620,69 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
   return null;
 }
 
-async function fetchFromGenius(title, artist, artistsList = []) {
+export async function fetchFromNetEase(title, artist, duration, artistsList = []) {
   try {
     const { titles, artists } = extractVariants(title, artist, artistsList);
-    const primaryT = titles[0] || title;
-    const primaryA = artists[0] || artist || '';
-    const q = `${primaryT} ${primaryA}`.trim();
-    if (!q) return null;
+    const searchQueries = [];
 
-    const res = await fetch(`https://genius.com/api/search/multi?q=${encodeURIComponent(q)}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-      signal: AbortSignal.timeout(3500),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const sections = data.response?.sections || [];
-    const songSection = sections.find((s) => s.type === 'song') || sections[0];
-    const hit = songSection?.hits?.[0]?.result;
-    if (!hit?.url) return null;
-
-    const pageRes = await fetch(hit.url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!pageRes.ok) return null;
-    const html = await pageRes.text();
-    const matches = [...html.matchAll(/data-lyrics-container="true"[^>]*>(.*?)<\/div>/gs)];
-    if (matches.length === 0) return null;
-
-    const raw = matches.map((m) => m[1]).join('\n');
-    const clean = raw
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .replace(/&#x27;/g, "'")
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-
-    return clean.length >= 15 ? clean : null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchFromNaver(title, artist, artistsList = []) {
-  try {
-    const { titles, artists } = extractVariants(title, artist, artistsList);
-    const searchTerms = [];
     const t0 = titles[0] || title;
     const a0 = artists[0] || artist || '';
-    if (a0 && t0) searchTerms.push(`${a0} ${t0}`);
-    if (t0) searchTerms.push(t0);
 
-    for (const term of searchTerms) {
-      const q = encodeURIComponent(term + ' 가사');
-      const url = `https://search.naver.com/search.naver?where=nexearch&sm=top_hty&fbm=0&ie=utf8&query=${q}`;
-      const r = await fetch(url, {
+    if (a0 && t0) searchQueries.push(`${a0} ${t0}`);
+    if (t0) searchQueries.push(t0);
+
+    for (const q of searchQueries) {
+      const url = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(q)}&type=1&offset=0&limit=5`;
+      const res = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Referer': 'https://music.163.com',
         },
         signal: AbortSignal.timeout(3500),
       });
-      if (!r.ok) continue;
-      const html = await r.text();
-      const m = html.match(/class="[^"]*_content_text[^"]*"[^>]*>(.*?)<\/(?:div|p)>/is)
-        || html.match(/class="[^"]*lyrics_box[^"]*"[^>]*>(.*?)<\/(?:div|p)>/is)
-        || html.match(/class="[^"]*text_area[^"]*"[^>]*>(.*?)<\/(?:div|p)>/is);
-      if (m) {
-        const raw = m[1]
-          .replace(/<br\s*\/?>/gi, '\n')
-          .replace(/<[^>]+>/g, '')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .trim();
-        if (isValidLyrics(raw)) return raw;
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      const songs = data.result?.songs || [];
+      if (!songs || songs.length === 0) continue;
+
+      for (const song of songs) {
+        // Duration tolerance: within 25s if duration available
+        const songDur = song.dt ? song.dt / 1000 : 0;
+        if (duration > 0 && songDur > 0 && Math.abs(duration - songDur) > 25.0) {
+          continue;
+        }
+
+        const lrcUrl = `https://music.163.com/api/song/lyric?os=pc&id=${song.id}&lv=-1&kv=-1&tv=-1`;
+        const lrcRes = await fetch(lrcUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': 'https://music.163.com',
+          },
+          signal: AbortSignal.timeout(3000),
+        });
+        if (!lrcRes.ok) continue;
+
+        const lrcData = await lrcRes.json();
+        const rawLrc = lrcData.lrc?.lyric;
+
+        if (rawLrc && isValidSyncedLyrics(rawLrc)) {
+          const lines = parseLrc(rawLrc);
+          if (lines.length >= 4) {
+            const durDelta = (duration > 0 && songDur > 0) ? (duration - songDur) : 0;
+            return {
+              plainLyrics: rawLrc.replace(/\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]/g, '').trim(),
+              syncedLyrics: rawLrc,
+              lines,
+              lyricsDuration: songDur || duration,
+              autoOffset: durDelta,
+            };
+          }
+        }
       }
     }
   } catch {}
   return null;
-}
-
-async function fetchFromWebSearch(title, artist) {
-  try {
-    const q = `${artist || ''} ${title || ''} 가사 lyrics`.trim();
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
-    const r = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!r.ok) return null;
-    const html = await r.text();
-    const snippets = [...html.matchAll(/<a class="result__snippet[^>]*>(.*?)<\/a>/gs)]
-      .map((m) => m[1].replace(/<[^>]+>/g, '').trim())
-      .filter((s) => s.length >= 80);
-
-    for (const s of snippets) {
-      const clean = s
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#x27;/g, "'")
-        .replace(/\.\.\.$/, '')
-        .trim();
-      if (isValidLyrics(clean)) return clean;
-    }
-  } catch {}
-  return null;
-}
-
-async function fetchFromLyricsOvh(title, artist, artistsList = []) {
-  try {
-    const { titles, artists } = extractVariants(title, artist, artistsList);
-    const cleanT = titles[0] || title;
-    const cleanA = artists[0] || artist;
-    if (!cleanA || !cleanT) return null;
-
-    const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(cleanA)}/${encodeURIComponent(cleanT)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.lyrics?.trim() || null;
-  } catch {
-    return null;
-  }
 }
 
 export async function getLyrics(track) {
@@ -760,7 +693,7 @@ export async function getLyrics(track) {
   const title = track.rawTitle || track.title || '';
   const duration = track.duration || 0;
 
-  // 1. Try LRCLIB for real-time synchronized lyrics (or verified plain lyrics)
+  // 1. 순회 1순위: LRCLIB (검증된 정품 타임스탬프 LRC 데이터베이스)
   const lrc = await fetchFromLrclib(title, artist, duration, track.artists);
   if (lrc && lrc.lines && lrc.lines.length >= 4) {
     cache.set(track.id, lrc);
@@ -768,60 +701,24 @@ export async function getLyrics(track) {
     return lrc;
   }
 
-  // 2. If LRCLIB already found verified plainLyrics, keep as candidate
-  let fallbackPlain = (lrc?.plainLyrics && isValidLyrics(lrc.plainLyrics)) ? lrc.plainLyrics : null;
-
-  // 3. Try YouTube Music official lyrics tab
-  if (!fallbackPlain) {
-    const ytm = await fetchFromYouTubeMusic(track.id);
-    if (ytm && ytm.plainLyrics && isValidLyrics(ytm.plainLyrics)) {
-      fallbackPlain = ytm.plainLyrics;
-    }
-  }
-
-  // 4. Try Naver VIBE official lyrics (covers 100% of Korean songs like MC몽, Indie, K-Pop, OSTs)
-  if (!fallbackPlain) {
-    const naver = await fetchFromNaver(title, artist, track.artists);
-    if (naver && isValidLyrics(naver)) {
-      fallbackPlain = naver;
-    }
-  }
-
-  // 5. Try Genius lyrics (covers vast majority of K-Pop, J-Pop, Indie, Vocaloid & Global tracks)
-  if (!fallbackPlain) {
-    const genius = await fetchFromGenius(title, artist, track.artists);
-    if (genius && isValidLyrics(genius)) {
-      fallbackPlain = genius;
-    }
-  }
-
-  // 6. Try Lyrics.ovh open lyrics API
-  if (!fallbackPlain) {
-    const ovh = await fetchFromLyricsOvh(title, artist, track.artists);
-    if (ovh && isValidLyrics(ovh)) {
-      fallbackPlain = ovh;
-    }
-  }
-
-  // 7. Ultimate safety net: Web search snippet lyrics extractor
-  if (!fallbackPlain) {
-    const web = await fetchFromWebSearch(title, artist);
-    if (web && isValidLyrics(web)) {
-      fallbackPlain = web;
-    }
-  }
-
-  if (fallbackPlain) {
-    const res = {
-      plainLyrics: fallbackPlain,
-      syncedLyrics: null,
-      lines: [],
-    };
-    cache.set(track.id, res);
+  // 2. 순회 2순위: NetEase Cloud Music (공식 대형 라이브러리 LRC 타임스탬프 서비스)
+  const netease = await fetchFromNetEase(title, artist, duration, track.artists);
+  if (netease && netease.lines && netease.lines.length >= 4) {
+    cache.set(track.id, netease);
     if (cache.size > 300) cache.delete(cache.keys().next().value);
-    return res;
+    return netease;
   }
 
+  // 3. 순회 3순위: YouTube Music 공식 가사 (공식 라이선스 계약 가사)
+  const ytm = await fetchFromYouTubeMusic(track.id);
+  if (ytm && ytm.plainLyrics && isValidLyrics(ytm.plainLyrics)) {
+    cache.set(track.id, ytm);
+    if (cache.size > 300) cache.delete(cache.keys().next().value);
+    return ytm;
+  }
+
+  // 4. 공식 사이트들에 가사가 전혀 없는 경우:
+  // 검증되지 않은 외부 사이트나 웹 검색 스니펫을 긁어오지 않고 깨끗하게 없음으로 표시
   const empty = { plainLyrics: '', lines: [] };
   cache.set(track.id, empty);
   return empty;

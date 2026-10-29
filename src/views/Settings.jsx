@@ -1,23 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Activity,
-  CheckCircle2,
-  XCircle,
   Download,
   Upload,
   FolderOpen,
   FolderEdit,
-  Gauge,
   Library,
   Keyboard,
   Info,
   RefreshCw,
   Sparkles,
   Radio,
-  Volume2,
   Monitor,
-  MessageSquare,
-  Speaker,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useAsync } from '../components/common.jsx';
@@ -31,16 +24,8 @@ import { useEnter } from '../lib/motion.js';
 import { isNormalizeEnabled, setNormalize, getAudioSinkId, setAudioSinkId } from '../lib/audio.js';
 import logo from '../assets/logo-mark.png';
 
-const METHOD_LABEL = {
-  IOS: 'InnerTube · iOS',
-  ANDROID_VR: 'InnerTube · Android VR',
-  VISIONOS: 'InnerTube · visionOS',
-};
-
 export default function Settings() {
   const status = useAsync(() => api.status(), []);
-  const [diag, setDiag] = useState(null);
-  const [running, setRunning] = useState(false);
   const lib = useLibrary();
   const dl = useDownloads();
   const autoplay = usePlayer((s) => s.autoplay);
@@ -147,11 +132,6 @@ export default function Settings() {
 
   const ref = useRef(null);
   useEnter(ref, [], { step: 50 });
-
-  const runDiag = async () => {
-    setRunning(true);
-    try { setDiag(await api.diagnose()); } finally { setRunning(false); }
-  };
 
   const exportLib = () => {
     const blob = new Blob([JSON.stringify({ liked: lib.liked, playlists: lib.playlists, savedAlbums: lib.savedAlbums, followed: lib.followed }, null, 1)], { type: 'application/json' });
@@ -298,59 +278,37 @@ export default function Settings() {
         </section>
 
         <section className="set-card" data-enter>
-          <h2><Gauge size={18} /> 재생 엔진</h2>
-          <p className="muted">곡마다 아래 방법을 순서대로 시도해요. 최근에 실패한 방법은 몇 시간 동안 뒤로 밀렸다가 다시 시도됩니다.</p>
-          <div className="method-list">
-            {status.data?.methods.map((m, i) => (
-              <div key={m.name} className="method">
-                <span className="method-order">{i + 1}</span>
-                <span className="method-name">{METHOD_LABEL[m.name] || m.name}</span>
-                <span className="muted small">성공 {m.ok} · 실패 {m.fail}</span>
-              </div>
-            ))}
-          </div>
-          <button className="btn grad" onClick={runDiag} disabled={running}><Activity size={15} /> {running ? '진단 중… (최대 1분)' : '재생 진단 실행'}</button>
-          {diag && (
-            <div className="method-list">
-              {diag.map((d) => (
-                <div key={d.name} className="method">
-                  {d.ok ? <CheckCircle2 size={17} className="ok" /> : <XCircle size={17} className="bad" />}
-                  <span className="method-name">{METHOD_LABEL[d.name] || d.name}</span>
-                  <span className="muted small">{d.ok ? `${d.ms}ms` : d.error}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="set-card" data-enter>
           <h2><Keyboard size={18} /> 단축키</h2>
           <div className="shortcuts">
             <span><kbd>Space</kbd> 재생 / 일시정지</span>
             <span><kbd>Ctrl</kbd> <kbd>→</kbd> 다음 곡</span>
             <span><kbd>Ctrl</kbd> <kbd>←</kbd> 이전 곡</span>
-            <span><kbd>Ctrl</kbd> <kbd>↑</kbd> <kbd>↓</kbd> 볼륨</span>
-            <span><kbd>Ctrl</kbd> <kbd>K</kbd> 검색</span>
-            <span><kbd>Alt</kbd> <kbd>←</kbd> <kbd>→</kbd> 뒤로 / 앞으로</span>
+            <span><kbd>Ctrl</kbd> <kbd>↑</kbd> <kbd>↓</kbd> 볼륨 조절</span>
+            <span><kbd>Ctrl</kbd> <kbd>K</kbd> 검색창 열기</span>
+            <span><kbd>Alt</kbd> <kbd>←</kbd> <kbd>→</kbd> 뒤로 / 앞으로 이동</span>
             <span><kbd>Esc</kbd> 전체 화면 닫기</span>
+            <span><kbd>마우스</kbd> 4/5번 앞뒤 이동</span>
           </div>
         </section>
 
         <section className="set-card about-app" data-enter>
-          <img src={logo} alt="" />
-          <div className="about-app-info">
-            <h2><Info size={18} /> T-Music {status.data?.version ? `v${status.data.version}` : ''}</h2>
-            <p className="muted">광고 없는 나만의 음악 플레이어. 개인 학습·사용 목적으로 만들었어요.</p>
-            <div className="update-check-row">
-              <button className="btn" onClick={() => checkUpdate(false)} disabled={checkingUpdate}>
-                <RefreshCw size={14} className={checkingUpdate ? 'spin' : ''} /> {checkingUpdate ? '확인 중…' : '업데이트 확인'}
-              </button>
-              {hasUpdate && (
-                <button className="btn grad update-available-btn" onClick={openModal}>
-                  <Sparkles size={14} /> v{latestVersion} 업데이트 가능
-                </button>
-              )}
+          <h2><Info size={18} /> 앱 정보 및 업데이트</h2>
+          <div className="about-app-body">
+            <img src={logo} alt="T-Music" />
+            <div className="about-app-text">
+              <span className="about-app-title">T-Music {status.data?.version ? `v${status.data.version}` : ''}</span>
+              <p className="muted small">광고 없는 나만의 음악 플레이어. 개인 학습·사용 목적으로 만들었어요.</p>
             </div>
+          </div>
+          <div className="update-check-row">
+            <button className="btn" onClick={() => checkUpdate(false)} disabled={checkingUpdate}>
+              <RefreshCw size={14} className={checkingUpdate ? 'spin' : ''} /> {checkingUpdate ? '확인 중…' : '업데이트 확인'}
+            </button>
+            {hasUpdate && (
+              <button className="btn grad update-available-btn" onClick={openModal}>
+                <Sparkles size={14} /> v{latestVersion} 업데이트 가능
+              </button>
+            )}
           </div>
         </section>
       </div>
