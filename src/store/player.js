@@ -18,9 +18,54 @@ for (const a of audios) {
 const saved = (() => {
   try { return JSON.parse(localStorage.getItem('t-music-player') || '{}'); } catch { return {}; }
 })();
-const persistPrefs = (s) => {
-  try { localStorage.setItem('t-music-player', JSON.stringify({ volume: s.volume, muted: s.muted, repeat: s.repeat, autoplay: s.autoplay })); } catch { /* ignore */ }
-};
+
+function savePlayerState(extra = {}) {
+  try {
+    const s = usePlayer.getState();
+    const curTrack = s.current();
+    const a = active();
+    const currentTime = isFinite(a.currentTime) && a.currentTime > 0 ? a.currentTime : (s.time || 0);
+    const data = {
+      volume: s.volume,
+      muted: s.muted,
+      repeat: s.repeat,
+      autoplay: s.autoplay,
+      queue: (s.queue || []).slice(0, 100).map((t) => ({
+        id: t.id,
+        title: t.title,
+        artists: t.artists || [],
+        album: t.album || null,
+        duration: t.duration || 0,
+        thumb: t.thumb || '',
+      })),
+      index: s.index,
+      context: s.context,
+      time: currentTime,
+      duration: curTrack?.duration || s.duration || 0,
+      wasPlaying: s.playing && !a.paused,
+      lastSaved: Date.now(),
+      ...extra,
+    };
+    localStorage.setItem('t-music-player', JSON.stringify(data));
+  } catch {
+    /* ignore */
+  }
+}
+const persistPrefs = () => savePlayerState();
+
+const initialQueue = Array.isArray(saved.queue)
+  ? saved.queue.filter((t) => t && typeof t.id === 'string')
+  : [];
+const initialIndex = (typeof saved.index === 'number' && saved.index >= 0 && saved.index < initialQueue.length)
+  ? saved.index
+  : (initialQueue.length > 0 ? 0 : -1);
+const initialTrack = initialIndex >= 0 ? initialQueue[initialIndex] : null;
+const initialTime = (typeof saved.time === 'number' && isFinite(saved.time) && saved.time > 0)
+  ? saved.time
+  : 0;
+const initialDuration = (typeof saved.duration === 'number' && isFinite(saved.duration) && saved.duration > 0)
+  ? saved.duration
+  : (initialTrack?.duration || 0);
 
 const shuffled = (list) => {
   const a = list.slice();
@@ -72,16 +117,20 @@ function pauseListening() {
 
 window.addEventListener('beforeunload', () => {
   commitListen();
+  savePlayerState({
+    time: active().currentTime,
+    wasPlaying: !active().paused,
+  });
 });
 
 export const usePlayer = create((set, get) => ({
-  queue: [],
-  index: -1,
-  context: null, // { name, route } shown in the queue panel
+  queue: initialQueue,
+  index: initialIndex,
+  context: saved.context || null, // { name, route } shown in the queue panel
   playing: false,
   loading: false,
-  time: 0,
-  duration: 0,
+  time: initialTime,
+  duration: initialDuration,
   buffered: 0,
   volume: saved.volume ?? 0.8,
   muted: saved.muted ?? false,
@@ -108,6 +157,7 @@ export const usePlayer = create((set, get) => ({
     usedRadioSeeds.clear();
     extendingPromise = null;
     set({ queue, index, context });
+    savePlayerState({ time: 0, wasPlaying: true });
     get()._load();
   },
 
@@ -117,6 +167,7 @@ export const usePlayer = create((set, get) => ({
     const q = queue.slice();
     q.splice(index + 1, 0, track);
     set({ queue: q });
+    savePlayerState();
     get()._preloadNext();
     toast('다음에 재생합니다');
   },
@@ -125,6 +176,7 @@ export const usePlayer = create((set, get) => ({
     const list = Array.isArray(tracks) ? tracks : [tracks];
     if (get().index < 0) return get().playList(list);
     set({ queue: [...get().queue, ...list] });
+    savePlayerState();
     get()._preloadNext();
     toast(list.length > 1 ? `${list.length}곡을 대기열에 추가했습니다` : '대기열에 추가했습니다');
   },
@@ -133,24 +185,34 @@ export const usePlayer = create((set, get) => ({
     const { queue, index } = get();
     if (i === index) return;
     set({ queue: queue.filter((_, j) => j !== i), index: i < index ? index - 1 : index });
+    savePlayerState();
     get()._preloadNext();
   },
 
   jumpTo(i) {
     commitListen();
     set({ index: i });
+    savePlayerState({ time: 0, wasPlaying: true });
     get()._load();
   },
 
   toggle() {
     const a = active();
     if (get().index < 0) return;
-    if (a.paused) { attach(a); a.play().catch(() => {}); }
-    else a.pause();
+    if (a.paused) {
+      attach(a);
+      const targetTime = get().time;
+      if (targetTime > 0 && Math.abs(a.currentTime - targetTime) > 1) {
+        try { a.currentTime = targetTime; } catch {}
+      }
+      a.play().catch(() => {});
+    } else {
+      a.pause();
+    }
   },
 
   async next(auto = false) {
-    const { queue, index, repeat } = get();
+    const { queue, index, repeat, autoplay } = get();
     if (auto && repeat === 'one') {
       commitListen();
       active().currentTime = 0;
@@ -169,7 +231,20 @@ export const usePlayer = create((set, get) => ({
       return;
     }
 
-    // End of queue reached: fetch related tracks so the queue NEVER runs out
+    // End of queue reached:
+    // If autoplay is OFF, stop playback cleanly!
+    if (!autoplay) {
+      active().pause();
+      active().currentTime = 0;
+      set({ playing: false, loading: false, time: 0 });
+      savePlayerState({ time: 0, wasPlaying: false });
+      if (!auto) {
+        toast('대기열의 마지막 곡입니다.');
+      }
+      return;
+    }
+
+    // End of queue reached with autoplay ON: fetch related recommendations
     set({ loading: true });
     await get()._ensureNextTracks();
     const updated = get();
@@ -180,7 +255,7 @@ export const usePlayer = create((set, get) => ({
       // If truly all network/fallback attempts failed:
       active().pause();
       set({ playing: false, loading: false });
-      toast('다음 곡을 불러올 수 없습니다 (네트워크 확인)');
+      toast('추천곡을 불러올 수 없습니다 (네트워크 확인)');
     }
   },
 
@@ -201,18 +276,19 @@ export const usePlayer = create((set, get) => ({
     const safeT = Math.max(0, dur > 0 ? Math.min(t, Math.max(0, dur - 0.5)) : t);
     a.currentTime = safeT;
     set({ time: safeT });
+    savePlayerState({ time: safeT });
   },
 
   setVolume(v) {
     set({ volume: v, muted: v === 0 });
     for (const a of audios) { a.volume = v; a.muted = v === 0; }
-    persistPrefs(get());
+    persistPrefs();
   },
   toggleMute() {
     const muted = !get().muted;
     set({ muted });
     for (const a of audios) a.muted = muted;
-    persistPrefs(get());
+    persistPrefs();
   },
 
   toggleShuffle() {
@@ -225,17 +301,36 @@ export const usePlayer = create((set, get) => ({
       const base = unshuffled || queue;
       set({ shuffle: false, unshuffled: null, queue: base, index: cur ? Math.max(0, base.findIndex((t) => t.id === cur.id)) : -1 });
     }
+    savePlayerState();
     get()._preloadNext();
   },
   cycleRepeat() {
     const order = ['off', 'all', 'one'];
     set({ repeat: order[(order.indexOf(get().repeat) + 1) % 3] });
-    persistPrefs(get());
+    persistPrefs();
     get()._preloadNext();
   },
   toggleAutoplay() {
-    set({ autoplay: !get().autoplay });
-    persistPrefs(get());
+    const next = !get().autoplay;
+    set({ autoplay: next });
+    persistPrefs();
+    savePlayerState();
+
+    if (!next) {
+      // Switched OFF: prune any unplayed auto-added recommendation tracks from queue
+      const { queue, index } = get();
+      const pruned = queue.filter((t, i) => i <= index || !t.isAutoplay);
+      if (pruned.length !== queue.length) {
+        set({ queue: pruned });
+        get()._preloadNext();
+        savePlayerState();
+      }
+    } else {
+      // Switched ON: if near the end of the queue, proactively fetch recommendations
+      if (get().index >= get().queue.length - 2) {
+        get()._ensureNextTracks();
+      }
+    }
   },
 
   // ---- internals ----
@@ -264,9 +359,10 @@ export const usePlayer = create((set, get) => ({
     a.play().catch(() => {});
     useLibrary.getState().pushRecent(track);
     updateMediaSession(track);
+    savePlayerState({ time: 0, wasPlaying: true });
     get()._preloadNext();
-    // Fetch related songs ahead of time so the queue NEVER runs dry (when within 4 tracks of the end)
-    if (get().index >= get().queue.length - 4) {
+    // Fetch related songs ahead of time ONLY when autoplay is enabled
+    if (get().autoplay && get().index >= get().queue.length - 4) {
       get()._ensureNextTracks();
     }
   },
@@ -297,11 +393,12 @@ export const usePlayer = create((set, get) => ({
   },
 
   async _ensureNextTracks() {
+    if (!get().autoplay) return false;
     if (extendingPromise) return extendingPromise;
     extendingPromise = (async () => {
       try {
-        const { queue, index } = get();
-        if (!queue.length) return false;
+        const { queue, index, autoplay } = get();
+        if (!autoplay || !queue.length) return false;
 
         const have = new Set(queue.map((t) => t.id));
 
@@ -331,8 +428,11 @@ export const usePlayer = create((set, get) => ({
           usedRadioSeeds.add(seed.id);
           try {
             const rel = await api.related(seed.id);
-            const more = (rel || []).filter((t) => t && t.id && !have.has(t.id)).slice(0, 15);
-            if (more.length > 0) {
+            const more = (rel || [])
+              .filter((t) => t && t.id && !have.has(t.id))
+              .slice(0, 15)
+              .map((t) => ({ ...t, isAutoplay: true }));
+            if (more.length > 0 && get().autoplay) {
               set({ queue: [...get().queue, ...more] });
               get()._preloadNext();
               return true;
@@ -348,8 +448,11 @@ export const usePlayer = create((set, get) => ({
           usedRadioSeeds.add(alt.id);
           try {
             const rel = await api.related(alt.id);
-            const more = (rel || []).filter((t) => t && t.id && !have.has(t.id)).slice(0, 15);
-            if (more.length > 0) {
+            const more = (rel || [])
+              .filter((t) => t && t.id && !have.has(t.id))
+              .slice(0, 15)
+              .map((t) => ({ ...t, isAutoplay: true }));
+            if (more.length > 0 && get().autoplay) {
               set({ queue: [...get().queue, ...more] });
               get()._preloadNext();
               return true;
@@ -361,8 +464,11 @@ export const usePlayer = create((set, get) => ({
         try {
           const homeData = await api.home();
           const shelfItems = (homeData?.shelves || []).flatMap((s) => s.items || []);
-          const more = shelfItems.filter((t) => t && t.id && !have.has(t.id)).slice(0, 15);
-          if (more.length > 0) {
+          const more = shelfItems
+            .filter((t) => t && t.id && !have.has(t.id))
+            .slice(0, 15)
+            .map((t) => ({ ...t, isAutoplay: true }));
+          if (more.length > 0 && get().autoplay) {
             set({ queue: [...get().queue, ...more] });
             get()._preloadNext();
             return true;
@@ -383,18 +489,21 @@ export const usePlayer = create((set, get) => ({
 }));
 
 // Wire audio events. Events from the spare element are ignored.
+let lastTimeSave = 0;
 audios.forEach((a, i) => {
   const isActive = () => i === cur;
   a.addEventListener('playing', () => {
     if (isActive()) {
       usePlayer.setState({ playing: true, loading: false });
       startListening(usePlayer.getState().current());
+      savePlayerState({ wasPlaying: true, time: a.currentTime });
     }
   });
   a.addEventListener('pause', () => {
     if (isActive()) {
       usePlayer.setState({ playing: false });
       pauseListening();
+      savePlayerState({ wasPlaying: false, time: a.currentTime });
     }
   });
   a.addEventListener('waiting', () => {
@@ -421,6 +530,12 @@ audios.forEach((a, i) => {
       commitListen();
       listenStartTime = performance.now();
     }
+    // Throttle saving playback position to localStorage every 1.5 seconds
+    const now = performance.now();
+    if (now - lastTimeSave > 1500) {
+      lastTimeSave = now;
+      savePlayerState({ time: a.currentTime, wasPlaying: !a.paused });
+    }
   });
   a.addEventListener('durationchange', () => isActive() && isFinite(a.duration) && usePlayer.setState({ duration: a.duration }));
   a.addEventListener('ended', () => {
@@ -433,6 +548,7 @@ audios.forEach((a, i) => {
       return;
     }
     commitListen();
+    savePlayerState({ time: 0, wasPlaying: true });
     usePlayer.getState().next(true);
   });
   a.addEventListener('error', () => {
@@ -456,7 +572,14 @@ audios.forEach((a, i) => {
 });
 
 function updateMediaSession(track) {
-  if (!('mediaSession' in navigator)) return;
+  if (track) {
+    const artistStr = (track.artists || []).map((a) => a.name).join(', ');
+    const tip = artistStr ? `${track.title} - ${artistStr}` : (track.title || 'T-Music');
+    try { api.updateTrayTooltip(tip); } catch { /* ignore */ }
+  } else {
+    try { api.updateTrayTooltip('T-Music'); } catch { /* ignore */ }
+  }
+  if (!('mediaSession' in navigator) || !track) return;
   navigator.mediaSession.metadata = new MediaMetadata({
     title: track.title,
     artist: (track.artists || []).map((a) => a.name).join(', '),
@@ -472,4 +595,47 @@ if ('mediaSession' in navigator) {
   navigator.mediaSession.setActionHandler('nexttrack', () => p().next());
   navigator.mediaSession.setActionHandler('previoustrack', () => p().prev());
   navigator.mediaSession.setActionHandler('seekto', (d) => p().seek(d.seekTime));
+}
+
+// Restore playback session on startup
+if (initialTrack) {
+  const a = active();
+  const src = streamUrl(initialTrack.id);
+  a.src = src;
+  a.dataset.id = initialTrack.id;
+  a.volume = saved.volume ?? 0.8;
+  a.muted = saved.muted ?? false;
+  currentListenTrack = initialTrack;
+
+  updateMediaSession(initialTrack);
+
+  let restored = false;
+  const restorePosition = () => {
+    if (restored) return;
+    restored = true;
+    try {
+      const dur = a.duration || initialDuration;
+      const safeT = Math.max(0, Math.min(initialTime, dur > 0 ? dur - 0.5 : initialTime));
+      a.currentTime = safeT;
+      usePlayer.setState({ time: safeT, duration: dur });
+      if (saved.wasPlaying) {
+        attach(a);
+        a.play().catch(() => {
+          usePlayer.setState({ playing: false });
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to restore position:', e);
+    }
+  };
+
+  a.addEventListener('loadedmetadata', restorePosition, { once: true });
+  a.addEventListener('canplay', restorePosition, { once: true });
+  setTimeout(() => {
+    if (!restored && (a.readyState >= 1 || isFinite(a.duration))) restorePosition();
+  }, 1200);
+
+  setTimeout(() => {
+    try { usePlayer.getState()._preloadNext(); } catch {}
+  }, 2000);
 }

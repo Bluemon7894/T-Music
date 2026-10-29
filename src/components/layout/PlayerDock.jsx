@@ -7,6 +7,7 @@ import { fmtTime } from '../../lib/util.js';
 import { Thumb, ArtistLinks, PlayButton } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
+import logo from '../../assets/logo-mark.png';
 
 export function Slider({ value, max, onChange, onCommit, buffered = 0, className = '' }) {
   const ref = useRef(null);
@@ -86,7 +87,15 @@ export default function PlayerDock() {
             <DownloadButton track={track} size={17} />
           </>
         ) : (
-          <div className="dock-empty"><span className="dock-empty-dot" />재생할 곡을 골라보세요</div>
+          <div className="dock-empty">
+            <div className="dock-art idle">
+              <img src={logo} alt="T-Music" className="thumb" />
+            </div>
+            <div className="dock-text">
+              <div className="dock-title" style={{ cursor: 'default' }}>T-Music</div>
+              <div className="dock-artist"><span className="dock-empty-dot" /> 재생할 곡을 골라보세요</div>
+            </div>
+          </div>
         )}
       </div>
 

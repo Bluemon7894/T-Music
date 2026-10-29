@@ -39,7 +39,7 @@ function rank(tracks) {
 async function webSongs(query, limit = 20) {
   const d = await call('/search', { client: 'WEB', query, params: VIDEOS_ONLY });
   const vids = P.findAll(d, 'videoRenderer').map((v) => P.parseVideo(v, query)).filter(Boolean);
-  return rank(vids.filter((t) => t.score > -3)).slice(0, limit);
+  return rank(vids.filter((t) => t.score >= 1)).slice(0, limit);
 }
 
 // Auto-generated "Artist - Topic" uploads carry this line in their description,
@@ -48,7 +48,7 @@ async function officialAudio(query, limit = 20) {
   const d = await call('/search', { client: 'WEB', query: `${query} "Provided to YouTube"`, params: VIDEOS_ONLY });
   return P.findAll(d, 'videoRenderer')
     .map((v) => P.parseVideo(v, query))
-    .filter((t) => t && t.score > -3)
+    .filter((t) => t && (t.topic || t.score >= 1))
     .slice(0, limit);
 }
 
@@ -78,15 +78,39 @@ export function search(query) {
       ? P.findAll(ytm.value, 'musicResponsiveListItemRenderer').map((r) => P.parseResponsive(r)).filter(Boolean)
       : [];
     const of = (kind) => uniqueBy(items.filter((i) => i.kind === kind));
-    // Logged-out YT Music only returns fan uploads and episodes as "tracks" here, so
-    // official audio goes first and those clips (with a real duration) after it.
+    
     const ytmSongs = of('track').filter((t) => t.duration > 0);
-    const songs = uniqueBy([...(ok(official) || []), ...ytmSongs, ...(ok(web) || [])]).map(P.strip);
+
+    // Merge all candidate sources and rank globally by score, view count, and official status
+    const candidates = uniqueBy([
+      ...(ok(web) || []),
+      ...(ok(official) || []),
+      ...ytmSongs,
+    ]);
+
+    candidates.sort((a, b) => {
+      const sa = a.score ?? 0;
+      const sb = b.score ?? 0;
+      if (sb !== sa) return sb - sa;
+      const va = a.views ?? 0;
+      const vb = b.views ?? 0;
+      if (vb !== va) return vb - va;
+      return (b.officialArtist ? 1 : 0) - (a.officialArtist ? 1 : 0);
+    });
+
+    // Filter out low-quality/low-view noise, keep high-scoring official and verified music
+    const songs = candidates
+      .filter((t) => (t.score ?? 0) >= 1 || t.officialArtist || (t.views ?? 0) >= 50000)
+      .map(P.strip);
+
     const card = ok(ytm) ? parseCard(ytm.value) : null;
     let artists = of('artist');
     if (card?.kind === 'artist') artists = uniqueBy([card, ...artists]);
     const albums = of('album');
-    const playlists = of('playlist');
+    const playlists = of('playlist').filter((p) => {
+      const author = (p.author || '').toLowerCase();
+      return !/개인|사용자|user|cover|커버/i.test(author);
+    });
 
     const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '');
     const q = norm(query);

@@ -4,70 +4,62 @@ import * as P from './parse.js';
 const cache = new Map();
 
 const KOREAN_ARTIST_MAP = {
-  '아이유': 'IU',
-  '이지금': 'IU',
-  '방탄소년단': 'BTS',
-  '소녀시대': 'Girls\' Generation',
-  '동방신기': 'TVXQ',
-  '에스파': 'aespa',
-  '르세라핌': 'LE SSERAFIM',
-  '아이브': 'IVE',
-  '뉴진스': 'NewJeans',
-  '블랙핑크': 'BLACKPINK',
-  '트와이스': 'TWICE',
-  '(여자)아이들': '(G)I-DLE',
-  '여자아이들': '(G)I-DLE',
-  '세븐틴': 'SEVENTEEN',
-  '스트레이키즈': 'Stray Kids',
-  '엔하이픈': 'ENHYPEN',
-  '투모로우바이투게더': 'TOMORROW X TOGETHER',
-  '데이식스': 'DAY6',
-  '폴킴': 'Paul Kim',
-  '박재정': 'Park Jae Jung',
-  '성시경': 'Sung Si Kyung',
-  '태연': 'Taeyeon',
-  '악뮤': 'AKMU',
-  '악동뮤지션': 'AKMU',
-  '볼빨간사춘기': 'BOL4',
-  '십센치': '10cm',
-  '잔나비': 'JANNABI',
-  '멜로망스': 'MeloMance',
-  '헤이즈': 'Heize',
-  '크러쉬': 'Crush',
-  '자이언티': 'Zion.T',
-  '로이킴': 'Roy Kim',
-  '이하이': 'Lee Hi',
-  '권진아': 'Kwon Jin Ah',
-  '비비': 'BIBI',
-  '지코': 'ZICO',
-  '창모': 'CHANGMO',
-  '버즈': 'Buzz',
-  '윤하': 'YOUNHA',
-  '임영웅': 'Lim Young Woong',
-  '백현': 'Baekhyun',
-  '카더가든': 'Car, the garden',
-  '이승기': 'Lee Seung Gi',
-  '정승환': 'Jung Seung Hwan',
-  '적재': 'Jukjae',
-  '이무진': 'Lee Mu Jin',
-  '김범수': 'Kim Bum Soo',
-  '박효신': 'Park Hyo Shin',
-  '이적': 'Lee Juck',
-  '넬': 'NELL',
-  '치즈': 'CHEEZE',
-  '스텔라장': 'Stella Jang',
-  '선우정아': 'sunwoojunga',
-  '비오': 'BE\'O',
-  '기리보이': 'GIRIBOY',
-  '애쉬아일랜드': 'ASH ISLAND',
-  '릴러말즈': 'Leellamarz',
+  '아이유': 'IU', '이지금': 'IU', '방탄소년단': 'BTS', '소녀시대': 'Girls\' Generation',
+  '동방신기': 'TVXQ', '에스파': 'aespa', '르세라핌': 'LE SSERAFIM', '아이브': 'IVE',
+  '뉴진스': 'NewJeans', '블랙핑크': 'BLACKPINK', '트와이스': 'TWICE', '(여자)아이들': '(G)I-DLE',
+  '여자아이들': '(G)I-DLE', '세븐틴': 'SEVENTEEN', '스트레이키즈': 'Stray Kids', '엔하이픈': 'ENHYPEN',
+  '투모로우바이투게더': 'TOMORROW X TOGETHER', '데이식스': 'DAY6', '폴킴': 'Paul Kim',
+  '박재정': 'Park Jae Jung', '성시경': 'Sung Si Kyung', '태연': 'Taeyeon', '악뮤': 'AKMU',
+  '악동뮤지션': 'AKMU', '볼빨간사춘기': 'BOL4', '십센치': '10cm', '잔나비': 'JANNABI',
+  '멜로망스': 'MeloMance', '헤이즈': 'Heize', '크러쉬': 'Crush', '자이언티': 'Zion.T',
+  '로이킴': 'Roy Kim', '이하이': 'Lee Hi', '권진아': 'Kwon Jin Ah', '비비': 'BIBI',
+  '지코': 'ZICO', '창모': 'CHANGMO', '버즈': 'Buzz', '윤하': 'YOUNHA',
+  '임영웅': 'Lim Young Woong', '백현': 'Baekhyun', '카더가든': 'Car, the garden',
+  '이승기': 'Lee Seung Gi', '정승환': 'Jung Seung Hwan', '적재': 'Jukjae',
+  '이무진': 'Lee Mu Jin', '김범수': 'Kim Bum Soo', '박효신': 'Park Hyo Shin',
+  '이적': 'Lee Juck', '넬': 'NELL', '치즈': 'CHEEZE', '스텔라장': 'Stella Jang',
+  '선우정아': 'sunwoojunga', '비오': 'BE\'O', '기리보이': 'GIRIBOY', '애쉬아일랜드': 'ASH ISLAND',
+  '릴러말즈': 'Leellamarz', '플레이브': 'PLAVE', '투어스': 'TWS', '라이즈': 'RIIZE',
+  '아일릿': 'ILLIT', '보이넥스트도어': 'BOYNEXTDOOR', '엔믹스': 'NMIXX', '스테이씨': 'STAYC',
+  '키스오브라이프': 'KISS OF LIFE', '베이비몬스터': 'BABYMONSTER', '실리카겔': 'Silica Gel',
+  '검정치마': 'The Black Skirts', '쏜애플': 'Thornapple', '우즈': 'WOODZ', '이창섭': 'Lee Changsub',
+  '루시': 'LUCY', '소란': 'SORAN', '딘': 'DEAN', '디피알 라이브': 'DPR LIVE',
+  '이찬혁': 'Lee Chanhyuk', '이수현': 'Lee Suhyun', '화사': 'Hwa Sa', '청하': 'CHUNG HA',
+  '선미': 'SUNMI', '현아': 'HyunA', '제니': 'JENNIE', '로제': 'ROSÉ', '지수': 'JISOO', '리사': 'LISA',
 };
+
+const NOISE_TAG_RE = /[\(\[【][^\)\]】]*(?:official|music\s*video|m\/?v|audio|color\s*coded|lyrics?|가사|자막|live|라이브|lyric\s*video|딩고|dingo|4k|stage\s*mix|교차편집|노래방|반주|special\s*clip|clip|visualizer|tj\.\d+|ky\.\d+|side\s*[a-z0-9]+|mr제거|cover|커버|remaster|soundtrack|ost|원곡[^\)\]】]*)[^\)\]】]*[\)\]】]/gi;
+
+const GENERIC_TITLES = new Set(['hello', 'home', 'stay', 'rain', 'love', 'intro', 'outro', 'run', 'fly', 'one', 'you', 'me']);
+
+function cleanTitleNoise(str) {
+  let s = String(str || '');
+  s = s.replace(/^[\[【][^\]】]+[\]】]\s*/g, '');
+  s = s.replace(/^Official\s+(?:Music\s*)?Video:\s*/i, '');
+  s = s.replace(NOISE_TAG_RE, ' ');
+  s = s.replace(/\(?(?:원곡\s*[:：\-]\s*[^\)\],]+)\)?/gi, ' ');
+  s = s.replace(/\s*[|/]\s*(?:가사|lyrics?|자막|딩고라이브|딩고|dingo|live|라이브|cover|커버|교차편집|stage\s*mix|official|m\/?v|audio|4k).*$/gi, ' ');
+  s = s.replace(/\s*l\s*커버\s*by.*$/gi, ' ');
+  s = s.replace(/\s+(?:노래방|반주|MR제거|MR|TJ노래방|KY노래방|커버|Cover|Covered\s*by\s*.*|가사|자막|Lyrics?|M\/?V|Official|Live\s*Clip)\s*$/gi, ' ');
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+function isValidTitle(t) {
+  if (!t || t.length < 1) return false;
+  if (/^(?:가사|자막|lyrics?|official|music\s*video|m\/?v|audio|live|cover|커버)$/i.test(t)) return false;
+  return true;
+}
+
+function isValidArtist(a) {
+  if (!a || a.length < 1) return false;
+  if (/^(?:가사|자막|lyrics?|official|music\s*video|m\/?v|audio|live|cover|커버|딩고|dingo)$/i.test(a)) return false;
+  return true;
+}
 
 function normalize(str) {
   return String(str || '')
     .toLowerCase()
     .replace(/\s*[\(\[](?:feat\.?|prod\.?|official|mv|audio|live|remix|acoustic|ver\.|version|inst|instrumental)[^\)\]]*[\)\]]/gi, '')
-    .replace(/[\(\[\{][^\)\]\}]*[\)\]\}]/g, '')
     .replace(/[^\p{L}\p{N}]+/gu, '')
     .trim();
 }
@@ -81,7 +73,6 @@ export function parseLrc(lrcText) {
   if (!lrcText) return [];
   const lines = [];
 
-  // Parse global [offset: +/-ms] tag if present
   let offsetMs = 0;
   const offsetMatch = lrcText.match(/\[offset:\s*([+-]?\d+)\s*\]/i);
   if (offsetMatch) {
@@ -117,42 +108,95 @@ export function parseLrc(lrcText) {
 }
 
 function extractVariants(title, artist, artistsList = []) {
-  const titles = new Set();
-  const artists = new Set();
+  const primaryTitles = [];
+  const secondaryTitles = [];
+  const primaryArtists = [];
+  const secondaryArtists = [];
 
-  // 1. Title variants
-  if (title) {
-    const raw = String(title).trim();
-    titles.add(raw);
+  const rawTitle = String(title || '').trim();
+  const isCoverOrIndie = /cover|커버|가사|자막|lyrics?|딩고|live|라이브|교차편집|노래방|반주|원곡/i.test(rawTitle);
 
-    // Title inside quotes (e.g. NewJeans 'Ditto' Official MV)
-    const quoteMatch = raw.match(/['"']([^'"']+)['"']/);
-    if (quoteMatch && quoteMatch[1].trim()) {
-      titles.add(quoteMatch[1].trim());
-    }
+  // Extract "원곡: 가수명"
+  const origMatch = rawTitle.match(/원곡\s*[:：\-]\s*([^\)\],]+)/i);
+  if (origMatch && isValidArtist(origMatch[1].trim())) {
+    primaryArtists.push(origMatch[1].trim());
+  }
 
-    // Artist - Title format (e.g. IU - 밤편지)
-    const dashMatch = raw.match(/^[^-]+-\s*(.+)$/);
-    if (dashMatch && dashMatch[1].trim()) {
-      titles.add(dashMatch[1].trim());
-    }
+  const cleaned = cleanTitleNoise(rawTitle);
 
-    const noTags = raw
-      .replace(/\s*[\(\[](?:Official\s*(?:Music\s*)?Video|M\/?V|Audio|Color\s*Coded\s*Lyrics|가사|MV|Live|Lyric\s*Video)[^\)\]]*[\)\]]/gi, '')
-      .replace(/\s*[\(\[](?:feat\.?|prod\.?)[^\)\]]*[\)\]]/gi, '')
-      .trim();
-    if (noTags) titles.add(noTags);
+  // Pattern 1: Quotes (e.g. NewJeans 'Ditto' Official MV)
+  const quoteMatch = cleaned.match(/^(.*?)\s*['"「『“]([^'"」』”]+)['"」』”]\s*(.*)$/);
+  if (quoteMatch) {
+    const before = cleanTitleNoise(quoteMatch[1]).replace(/[-–—]\s*$/, '').trim();
+    const quoted = quoteMatch[2].trim();
+    const after = cleanTitleNoise(quoteMatch[3]).replace(/^[-–—]\s*/, '').trim();
 
-    const parenMatch = raw.match(/^([^\(\[]+)\s*[\(\[]([^\)\]]+)[\)\]]/);
-    if (parenMatch) {
-      const p1 = parenMatch[1].trim();
-      const p2 = parenMatch[2].trim();
-      if (p1) titles.add(p1);
-      if (p2 && !/feat|prod|official|mv|live|audio/i.test(p2)) titles.add(p2);
+    if (quoted) primaryTitles.push(quoted);
+    if (before) primaryArtists.push(before);
+    if (after) {
+      const subMatch = after.match(/^\(?([^)]+)\)?$/);
+      if (subMatch) secondaryTitles.push(subMatch[1].trim());
+      else secondaryTitles.push(after);
     }
   }
 
-  // 2. Artist variants
+  // Pattern 2: Dash (Artist - Title OR Title - Artist/Cover)
+  const dashParts = cleaned.split(/\s+[-–—]\s+/);
+  if (dashParts.length >= 2) {
+    const p1 = dashParts[0].trim();
+    const p2 = dashParts.slice(1).join(' - ').trim();
+
+    const p1IsKnownArtist = Object.keys(KOREAN_ARTIST_MAP).some((k) => p1.toLowerCase().includes(k.toLowerCase()));
+    const p2IsKnownArtist = Object.keys(KOREAN_ARTIST_MAP).some((k) => p2.toLowerCase().includes(k.toLowerCase()));
+
+    if (p1IsKnownArtist && !p2IsKnownArtist) {
+      primaryArtists.push(p1);
+      primaryTitles.push(p2);
+      secondaryTitles.push(p1);
+      secondaryArtists.push(p2);
+    } else if (p2IsKnownArtist && !p1IsKnownArtist) {
+      primaryTitles.push(p1);
+      primaryArtists.push(p2);
+      secondaryTitles.push(p2);
+      secondaryArtists.push(p1);
+    } else if (isCoverOrIndie || (artist && p2.toLowerCase().includes(artist.toLowerCase()))) {
+      primaryTitles.push(p1);
+      secondaryTitles.push(p2);
+      secondaryArtists.push(p2);
+    } else {
+      primaryArtists.push(p1);
+      primaryTitles.push(p2);
+      secondaryTitles.push(p1);
+      secondaryArtists.push(p2);
+    }
+
+    // If p2 has parentheses (e.g. "사건의 지평선 (Event Horizon)")
+    const p2Sub = p2.match(/^([^\(\[]+)\s*[\(\[]([^\)\]]+)[\)\]]/);
+    if (p2Sub) {
+      primaryTitles.push(p2Sub[1].trim());
+      if (!/feat|prod|with|ost|soundtrack/i.test(p2Sub[2])) {
+        secondaryTitles.push(p2Sub[2].trim());
+      }
+    }
+  } else {
+    // If no dash, check if starts with known artist: e.g. "버즈 가시" -> "버즈", "가시"
+    let matchedPrefix = false;
+    for (const [kor, eng] of Object.entries(KOREAN_ARTIST_MAP)) {
+      const re = new RegExp(`^(${kor}|${eng})\\s+`, 'i');
+      if (re.test(cleaned)) {
+        primaryArtists.push(kor);
+        const rest = cleaned.replace(re, '').trim();
+        if (rest) primaryTitles.push(rest);
+        matchedPrefix = true;
+        break;
+      }
+    }
+    if (!matchedPrefix && cleaned) {
+      primaryTitles.push(cleaned);
+    }
+  }
+
+  // Channel artist inputs
   const artistInputs = [
     artist,
     ...(Array.isArray(artistsList) ? artistsList.map((a) => (typeof a === 'string' ? a : a?.name)) : []),
@@ -160,45 +204,71 @@ function extractVariants(title, artist, artistsList = []) {
 
   for (const aIn of artistInputs) {
     const raw = String(aIn).trim();
-    artists.add(raw);
+    if (!raw) continue;
+    const clean = raw
+      .replace(/\s*-\s*Topic$/i, '')
+      .replace(/\s*(?:Official|공식|채널|Channel|Music|Entertainment|Records|Studio|VEVO).*$/gi, '')
+      .trim();
+    if (clean) secondaryArtists.push(clean);
+  }
 
+  // Expand and deduplicate artists
+  const allArtists = [...primaryArtists, ...secondaryArtists];
+  const finalArtists = new Set();
+  for (const a of allArtists) {
+    if (!a) continue;
+    const cleanA = a.replace(/[\(\[].*?[\)\]]/g, '').trim();
+    if (isValidArtist(cleanA)) finalArtists.add(cleanA);
+
+    // Bracket sub-names: e.g. "아이유 (IU)" -> "아이유", "IU"
+    const m = a.match(/^([^\(\[]+)\s*[\(\[]([^\)\]]+)[\)\]]/);
+    if (m) {
+      if (isValidArtist(m[1].trim())) finalArtists.add(m[1].trim());
+      if (isValidArtist(m[2].trim())) finalArtists.add(m[2].trim());
+    }
+
+    // Korean/English artist mapping
     for (const [kor, eng] of Object.entries(KOREAN_ARTIST_MAP)) {
-      if (raw.includes(kor)) {
-        artists.add(eng);
-        artists.add(kor);
+      if (a.toLowerCase().includes(kor.toLowerCase()) || a.toLowerCase().includes(eng.toLowerCase())) {
+        finalArtists.add(eng);
+        finalArtists.add(kor);
       }
     }
 
-    const bracket = raw.match(/\[([A-Za-z0-9\s]+?)(?:\s*Official)?\]/i);
-    if (bracket && bracket[1]) artists.add(bracket[1].trim());
+    // Multiple artists: "A, B & C"
+    a.split(/[,&/]/).forEach((sub) => {
+      const s = sub.trim();
+      if (isValidArtist(s)) finalArtists.add(s);
+    });
+  }
 
-    const paren = raw.match(/^([^\(\[]+)\s*[\(\[]([^\)\]]+)[\)\]]/);
-    if (paren) {
-      if (paren[1]) artists.add(paren[1].trim());
-      if (paren[2]) artists.add(paren[2].trim());
+  // Expand and deduplicate titles
+  const allTitles = [...primaryTitles, ...secondaryTitles];
+  const finalTitles = new Set();
+  for (const t of allTitles) {
+    if (!isValidTitle(t)) continue;
+    finalTitles.add(t);
+
+    const m = t.match(/^([^\(\[]+)\s*[\(\[]([^\)\]]+)[\)\]]/);
+    if (m) {
+      if (isValidTitle(m[1].trim())) finalTitles.add(m[1].trim());
+      if (!/feat|prod|official|mv|live|audio/i.test(m[2]) && isValidTitle(m[2].trim())) {
+        finalTitles.add(m[2].trim());
+      }
     }
 
-    const splitMixed = raw.replace(/([a-zA-Z]+)([가-힣]+)/g, '$1 $2').replace(/([가-힣]+)([a-zA-Z]+)/g, '$1 $2');
-    if (splitMixed !== raw) {
-      splitMixed.split(/\s+/).forEach((w) => { if (w.length >= 2) artists.add(w); });
-    }
-
-    const clean = raw
-      .replace(/\s*-\s*Topic/i, '')
-      .replace(/\s*\[.*?\]/g, '')
-      .replace(/\s*\(.*?\)/g, '')
-      .replace(/\s*(?:Official|공식|채널)/gi, '')
-      .trim();
-    if (clean) artists.add(clean);
+    const noFeat = t.replace(/\s*[\(\[](?:feat\.?|prod\.?|with)[^\)\]]*[\)\]]/gi, '').trim();
+    if (noFeat && noFeat !== t && isValidTitle(noFeat)) finalTitles.add(noFeat);
   }
 
   return {
-    titles: [...titles].filter(Boolean),
-    artists: [...artists].filter(Boolean),
+    titles: [...finalTitles],
+    artists: [...finalArtists],
+    isCoverOrIndie
   };
 }
 
-function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, rawTitle }) {
+function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, rawTitle, isCoverOrIndie }) {
   if (!item || item.instrumental) return { score: -1000, artistMatchFound: false };
   if (!item.plainLyrics && !item.syncedLyrics) return { score: -1000, artistMatchFound: false };
 
@@ -208,21 +278,41 @@ function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, raw
   const normCandTrack = normalize(candTrack);
   const normCandArtist = normalize(candArtist);
 
+  // Extract candidate title variants (handles bilingual titles like "Through the Night (밤편지)")
+  const candTitles = [candTrack];
+  const candMatch = candTrack.match(/^([^\(\[]+)\s*[\(\[]([^\)\]]+)[\)\]]/);
+  if (candMatch) {
+    candTitles.push(candMatch[1].trim());
+    candTitles.push(candMatch[2].trim());
+  }
+
+  // Extract candidate artist variants
+  const candArtists = [candArtist];
+  const artMatch = candArtist.match(/^([^\(\[]+)\s*[\(\[]([^\)\]]+)[\)\]]/);
+  if (artMatch) {
+    candArtists.push(artMatch[1].trim());
+    candArtists.push(artMatch[2].trim());
+  }
+
   // 1. Artist matching
   let artistExact = false;
   let artistMatchFound = false;
 
   for (const a of targetArtists) {
     const normTarget = normalize(a);
-    if (!normTarget) continue;
-    if (normCandArtist === normTarget) {
-      artistExact = true;
-      artistMatchFound = true;
-      break;
+    if (!normTarget || normTarget.length < 2) continue;
+    for (const ca of candArtists) {
+      const normCand = normalize(ca);
+      if (normCand === normTarget) {
+        artistExact = true;
+        artistMatchFound = true;
+        break;
+      }
+      if (normCand.includes(normTarget) || normTarget.includes(normCand)) {
+        artistMatchFound = true;
+      }
     }
-    if (normCandArtist.includes(normTarget) || normTarget.includes(normCandArtist)) {
-      artistMatchFound = true;
-    }
+    if (artistExact) break;
   }
 
   // Check for inverted track/artist upload (e.g. trackName: "NewJeans", artistName: "OMG")
@@ -230,22 +320,31 @@ function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, raw
   if (!artistMatchFound) {
     for (const a of targetArtists) {
       const normTargetA = normalize(a);
-      if (normTargetA && (normCandTrack === normTargetA || normCandTrack.includes(normTargetA))) {
-        for (const t of targetTitles) {
-          const normTargetT = normalize(t);
-          if (normTargetT && (normCandArtist === normTargetT || normCandArtist.includes(normTargetT))) {
-            invertedMatch = true;
-            artistMatchFound = true;
-            break;
+      if (normTargetA) {
+        for (const ct of candTitles) {
+          const normCT = normalize(ct);
+          if (normCT === normTargetA || normCT.includes(normTargetA)) {
+            for (const t of targetTitles) {
+              const normTargetT = normalize(t);
+              if (normTargetT) {
+                for (const ca of candArtists) {
+                  const normCA = normalize(ca);
+                  if (normCA === normTargetT || normCA.includes(normTargetT)) {
+                    invertedMatch = true;
+                    artistMatchFound = true;
+                    break;
+                  }
+                }
+              }
+              if (invertedMatch) break;
+            }
           }
+          if (invertedMatch) break;
         }
       }
+      if (invertedMatch) break;
     }
   }
-
-  if (artistExact) score += 60;
-  else if (artistMatchFound) score += 40;
-  else score -= 120; // Zero artist match penalty: completely disqualifies unrelated songs
 
   // 2. Title matching
   let titleExact = false;
@@ -254,13 +353,57 @@ function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, raw
   for (const t of targetTitles) {
     const normTarget = normalize(t);
     if (!normTarget) continue;
-    if (normCandTrack === normTarget) {
-      titleExact = true;
-      titleMatchFound = true;
-      break;
+    for (const ct of candTitles) {
+      const normCand = normalize(ct);
+      if (normCand === normTarget) {
+        titleExact = true;
+        titleMatchFound = true;
+        break;
+      }
+      if (normCand.includes(normTarget) || normTarget.includes(normCand)) {
+        titleMatchFound = true;
+      }
     }
-    if (normCandTrack.includes(normTarget) || normTarget.includes(normCandTrack)) {
-      titleMatchFound = true;
+    if (titleExact) break;
+  }
+
+  // Duration match calculation
+  let durationClose = false;
+  let durDiff = 999;
+  if (targetDuration > 0 && item.duration > 0) {
+    durDiff = Math.abs(item.duration - targetDuration);
+    if (durDiff <= 2.0) {
+      score += 45;
+      durationClose = true;
+    } else if (durDiff <= 5.0) {
+      score += 30;
+      durationClose = true;
+    } else if (durDiff <= 10.0) {
+      score += 15;
+      durationClose = true;
+    } else if (durDiff <= 20.0) {
+      score += 5;
+    } else if (durDiff <= 45.0) {
+      score -= 10;
+    } else {
+      score -= 25;
+    }
+  }
+
+  // Apply Artist & Title scores
+  if (artistExact) score += 60;
+  else if (artistMatchFound) score += 40;
+  else {
+    // If it's a cover or indie upload, OR non-generic title:
+    const isGeneric = GENERIC_TITLES.has(normCandTrack) || normCandTrack.length <= 2;
+    if (titleExact && !isGeneric) {
+      score += 35;
+      artistMatchFound = true; // allow acceptance for covers / indie uploads
+    } else if (titleMatchFound && !isGeneric) {
+      score += 20;
+      artistMatchFound = true;
+    } else {
+      score -= 80; // Disqualify unrelated songs
     }
   }
 
@@ -268,7 +411,7 @@ function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, raw
   else if (titleMatchFound) score += 35;
   else score -= 90;
 
-  // 3. Version keyword mismatch penalties
+  // Version keyword mismatch penalties
   const keywords = ['remix', 'acoustic', 'live', 'instrumental', 'inst', 'orchestra', 'speed up', 'slowed', 'cover'];
   for (const kw of keywords) {
     const targetHas = hasVersionKeyword(rawTitle, kw);
@@ -276,20 +419,9 @@ function scoreCandidate(item, { targetTitles, targetArtists, targetDuration, raw
     if (targetHas !== candHas) score -= 35;
   }
 
-  // 4. Synced lyrics bonus
+  // Synced lyrics bonus
   if (item.syncedLyrics && item.syncedLyrics.length > 50) {
     score += 45;
-  }
-
-  // 5. Duration match (closer duration = better sync guarantee)
-  if (targetDuration > 0 && item.duration > 0) {
-    const diff = Math.abs(item.duration - targetDuration);
-    if (diff <= 1.5) score += 40;
-    else if (diff <= 3.5) score += 25;
-    else if (diff <= 6) score += 10;
-    else if (diff <= 12) score -= 5;
-    else if (diff <= 20) score -= 25;
-    else score -= 60;
   }
 
   return { score, artistMatchFound };
@@ -315,89 +447,85 @@ async function fetchFromYouTubeMusic(videoId) {
 }
 
 async function fetchFromLrclib(title, artist, duration, artistsList = []) {
-  const { titles, artists } = extractVariants(title, artist, artistsList);
-  const headers = { 'User-Agent': 'T-Music/0.3.1 (https://github.com/Bluemon7894/T-Music)' };
+  const { titles, artists, isCoverOrIndie } = extractVariants(title, artist, artistsList);
+  const headers = { 'User-Agent': 'T-Music/0.3.4 (https://github.com/Bluemon7894/T-Music)' };
 
-  // 1. Direct GET if clean track and artist available with exact duration
-  for (const t of titles.slice(0, 2)) {
-    for (const a of artists.slice(0, 2)) {
-      try {
-        const u = new URL('https://lrclib.net/api/get');
-        u.searchParams.set('track_name', t);
-        u.searchParams.set('artist_name', a);
-        if (duration) u.searchParams.set('duration', String(Math.round(duration)));
-        const r = await fetch(u.href, { headers, signal: AbortSignal.timeout(3000) });
-        if (r.ok) {
-          const d = await r.json();
-          const { score, artistMatchFound } = scoreCandidate(d, {
-            targetTitles: titles,
-            targetArtists: artists,
-            targetDuration: duration,
-            rawTitle: title,
-          });
-          if (score >= 120 && artistMatchFound && d.syncedLyrics) {
-            const lines = parseLrc(d.syncedLyrics);
-            if (lines.length >= 3) {
-              return {
-                plainLyrics: d.plainLyrics || '',
-                syncedLyrics: d.syncedLyrics || null,
-                lines,
-              };
-            }
+  // 1. Direct GET if clean primary track and artist available with duration
+  if (titles[0] && artists[0]) {
+    try {
+      const u = new URL('https://lrclib.net/api/get');
+      u.searchParams.set('track_name', titles[0]);
+      u.searchParams.set('artist_name', artists[0]);
+      if (duration) u.searchParams.set('duration', String(Math.round(duration)));
+      const r = await fetch(u.href, { headers, signal: AbortSignal.timeout(2000) });
+      if (r.ok) {
+        const d = await r.json();
+        const { score, artistMatchFound } = scoreCandidate(d, {
+          targetTitles: titles,
+          targetArtists: artists,
+          targetDuration: duration,
+          rawTitle: title,
+          isCoverOrIndie,
+        });
+        if (score >= 120 && artistMatchFound && d.syncedLyrics) {
+          const lines = parseLrc(d.syncedLyrics);
+          if (lines.length >= 3) {
+            return {
+              plainLyrics: d.plainLyrics || '',
+              syncedLyrics: d.syncedLyrics || null,
+              lines,
+            };
           }
         }
-      } catch {}
+      }
+    } catch {}
+  }
+
+  // 2. Parallel candidate queries for speed and high hit-rate
+  const queries = [];
+  const primaryT = titles[0];
+  const primaryA = artists[0];
+
+  // Full-text q searches (matches titles with Korean subtitles or parenthesized names like "Let's Say Goodbye (헤어지자 말해요)")
+  for (const t of titles.slice(0, 3)) {
+    if (t && isValidTitle(t)) {
+      queries.push(`https://lrclib.net/api/search?q=${encodeURIComponent(t)}`);
     }
   }
 
-  // 2. Search queries: prefer specific field searches first, then targeted query
-  const candidates = [];
-
-  // 2a. Field-based search (/api/search?track_name=...&artist_name=...)
+  // Full-text q with artist
   for (const t of titles.slice(0, 2)) {
     for (const a of artists.slice(0, 2)) {
-      try {
-        const u = `https://lrclib.net/api/search?track_name=${encodeURIComponent(t)}&artist_name=${encodeURIComponent(a)}`;
-        const r = await fetch(u, { headers, signal: AbortSignal.timeout(3500) });
-        if (r.ok) {
-          const list = await r.json();
-          if (Array.isArray(list)) candidates.push(...list);
-        }
-      } catch {}
-    }
-  }
-
-  // 2b. General query search (/api/search?q=...) with track and artist combined
-  if (candidates.length === 0) {
-    for (const t of titles.slice(0, 2)) {
-      for (const a of artists.slice(0, 2)) {
-        try {
-          const u = `https://lrclib.net/api/search?q=${encodeURIComponent(`${t} ${a}`)}`;
-          const r = await fetch(u, { headers, signal: AbortSignal.timeout(3500) });
-          if (r.ok) {
-            const list = await r.json();
-            if (Array.isArray(list)) candidates.push(...list);
-          }
-        } catch {}
+      if (t && a && isValidTitle(t) && isValidArtist(a)) {
+        queries.push(`https://lrclib.net/api/search?q=${encodeURIComponent(`${t} ${a}`)}`);
       }
     }
   }
 
-  // 2c. Track name only search with strict artist verification
-  if (candidates.length === 0) {
-    for (const t of titles.slice(0, 2)) {
-      try {
-        const u = `https://lrclib.net/api/search?track_name=${encodeURIComponent(t)}`;
-        const r = await fetch(u, { headers, signal: AbortSignal.timeout(3500) });
-        if (r.ok) {
-          const list = await r.json();
-          if (Array.isArray(list)) candidates.push(...list);
-        }
-      } catch {}
+  // Specific track_name and artist_name searches
+  for (const t of titles.slice(0, 2)) {
+    if (t && isValidTitle(t)) {
+      queries.push(`https://lrclib.net/api/search?track_name=${encodeURIComponent(t)}`);
     }
   }
+  if (primaryT && primaryA) {
+    queries.push(`https://lrclib.net/api/search?track_name=${encodeURIComponent(primaryT)}&artist_name=${encodeURIComponent(primaryA)}`);
+  }
 
-  if (candidates.length === 0) return null;
+  const results = await Promise.allSettled(
+    queries.map((q) =>
+      fetch(q, { headers, signal: AbortSignal.timeout(3000) })
+        .then((r) => (r.ok ? r.json() : []))
+        .catch(() => [])
+    )
+  );
+
+  const candidates = [];
+  for (const res of results) {
+    if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+      candidates.push(...res.value);
+    }
+  }
 
   // Deduplicate candidates
   const seenIds = new Set();
@@ -409,6 +537,8 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
     }
   }
 
+  if (unique.length === 0) return null;
+
   // Score each candidate
   const scored = unique.map((c) => {
     const { score, artistMatchFound } = scoreCandidate(c, {
@@ -416,14 +546,17 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
       targetArtists: artists,
       targetDuration: duration,
       rawTitle: title,
+      isCoverOrIndie,
     });
     return { ...c, matchScore: score, artistMatchFound };
   }).sort((a, b) => b.matchScore - a.matchScore);
 
   const best = scored[0];
-  // Require minimum score threshold (>= 70) AND positive artist match
-  if (best && best.matchScore >= 70 && best.artistMatchFound) {
-    if (best.syncedLyrics) {
+  if (best && best.matchScore >= 40 && best.artistMatchFound) {
+    const durDiff = (duration > 0 && best.duration > 0) ? Math.abs(best.duration - duration) : 0;
+    const canSync = !duration || durDiff <= 15.0;
+
+    if (best.syncedLyrics && canSync) {
       const lines = parseLrc(best.syncedLyrics);
       if (lines.length >= 3) {
         return {
@@ -433,9 +566,11 @@ async function fetchFromLrclib(title, artist, duration, artistsList = []) {
         };
       }
     }
-    if (best.plainLyrics) {
+
+    const plain = best.plainLyrics || (best.syncedLyrics ? best.syncedLyrics.replace(/\[\d{2}:\d{2}(?:\.\d{1,3})?\]/g, '').trim() : '');
+    if (plain) {
       return {
-        plainLyrics: best.plainLyrics,
+        plainLyrics: plain,
         syncedLyrics: null,
         lines: [],
       };
@@ -450,7 +585,7 @@ export async function getLyrics(track) {
   if (cache.has(track.id)) return cache.get(track.id);
 
   const artist = Array.isArray(track.artists) ? track.artists[0]?.name : track.artist || '';
-  const title = track.title || '';
+  const title = track.rawTitle || track.title || '';
   const duration = track.duration || 0;
 
   // 1. Try high-confidence LRCLIB search first to get real-time synced lyrics
@@ -461,7 +596,7 @@ export async function getLyrics(track) {
     return lrc;
   }
 
-  // 2. If no high-confidence synced lyrics in LRCLIB, fetch YouTube Music official lyrics (100% verified for this track)
+  // 2. If no high-confidence synced lyrics in LRCLIB, fetch YouTube Music official lyrics
   const ytm = await fetchFromYouTubeMusic(track.id);
   if (ytm && ytm.plainLyrics) {
     cache.set(track.id, ytm);

@@ -26,6 +26,7 @@ export const api = {
   openExternal: (url) => call('openExternal', url),
   setTitleBarOverlay: (opts) => call('setTitleBarOverlay', opts),
   updateTrayTooltip: (text) => call('updateTrayTooltip', text),
+  updateTrayIcon: (dataUrl) => call('updateTrayIcon', dataUrl),
   onUpdateProgress: (cb) => window.api?.onUpdateProgress?.(cb) || (() => {}),
   onMediaControl: (cb) => window.api?.onMediaControl?.(cb) || (() => {}),
 };

@@ -29,8 +29,16 @@ export function Thumb({ src, round, className = '', size, alt = '' }) {
     if (url?.includes('/hq720.jpg')) setUrl(url.replace('/hq720.jpg', '/mqdefault.jpg'));
     else setFailed(true);
   };
-  // Missing hq720 thumbnails come back as a 120x90 grey placeholder, not an error.
-  const onLoad = (e) => { if (url?.includes('/hq720.jpg') && e.currentTarget.naturalWidth <= 120) fallback(); };
+  // Missing YouTube thumbnails come back as a 120x90 grey placeholder with 3 dots, not a network error.
+  const onLoad = (e) => {
+    if (e.currentTarget.naturalWidth <= 120) {
+      if (url?.includes('/hq720.jpg')) {
+        setUrl(url.replace('/hq720.jpg', '/mqdefault.jpg'));
+      } else {
+        setFailed(true);
+      }
+    }
+  };
   if (!url || failed) {
     return (
       <div className={`thumb placeholder ${round ? 'round' : ''} ${className}`} style={style}>

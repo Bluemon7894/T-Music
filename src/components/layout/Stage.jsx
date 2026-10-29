@@ -5,7 +5,7 @@ import { ChevronDown, Shuffle, SkipBack, SkipForward, Repeat, Repeat1, Mic2 } fr
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { api } from '../../lib/api.js';
-import { Thumb, ArtistLinks, PlayButton, useLyricsSync, SyncControl } from '../common.jsx';
+import { Thumb, ArtistLinks, PlayButton, useLyricsSync } from '../common.jsx';
 import { LikeButton } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
@@ -69,7 +69,6 @@ function StageLyrics({ track }) {
 
   return (
     <div className="stage-lyrics-wrapper">
-      {lines.length > 0 && <SyncControl offset={offset} onAdjust={adjust} onReset={reset} />}
       <div className="stage-lyrics-container" ref={containerRef}>
         {lines.length > 0 ? (
           <div className="stage-lyrics-lines">
@@ -80,7 +79,7 @@ function StageLyrics({ track }) {
                   key={l.time + '-' + i}
                   ref={isActive ? activeLineRef : null}
                   className={`stage-lyrics-line ${isActive ? 'active' : ''}`}
-                  onClick={() => seek(Math.max(0, l.time + offset))}
+                  onClick={() => seek(l.time)}
                 >
                   {l.text || '...'}
                 </div>

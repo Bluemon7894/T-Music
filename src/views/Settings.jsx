@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
-import { Activity, CheckCircle2, XCircle, Link2, Download, Upload, FolderOpen, Gauge, Library, Keyboard, Info, RefreshCw, Sparkles } from 'lucide-react';
+import { Activity, CheckCircle2, XCircle, Download, Upload, FolderOpen, Gauge, Library, Keyboard, Info, RefreshCw, Sparkles, Radio } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useAsync } from '../components/common.jsx';
-import { importPlaylist } from '../components/layout/Sidebar.jsx';
 import { useLibrary } from '../store/library.js';
+import { usePlayer } from '../store/player.js';
 import { useDownloads, openDownloads } from '../store/downloads.js';
 import { useUpdater } from '../store/updater.js';
 import { toast } from '../store/ui.js';
@@ -23,6 +23,8 @@ export default function Settings() {
   const [running, setRunning] = useState(false);
   const lib = useLibrary();
   const dl = useDownloads();
+  const autoplay = usePlayer((s) => s.autoplay);
+  const toggleAutoplay = usePlayer((s) => s.toggleAutoplay);
   const checkingUpdate = useUpdater((s) => s.checking);
   const hasUpdate = useUpdater((s) => s.hasUpdate);
   const latestVersion = useUpdater((s) => s.latestVersion);
@@ -92,6 +94,28 @@ export default function Settings() {
         </section>
 
         <section className="set-card" data-enter>
+          <h2><Radio size={18} /> 재생 설정</h2>
+          <p className="muted">대기열의 등록된 음악이 끝났을 때의 재생 방식을 설정해요.</p>
+          <div
+            onClick={toggleAutoplay}
+            style={{
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '14px 0',
+              borderTop: '1px solid var(--line)',
+            }}
+          >
+            <div>
+              <div style={{ color: '#fff', fontWeight: 600, fontSize: '14px' }}>추천곡 자동 재생</div>
+              <div className="muted small">대기열의 마지막 곡이 끝나면 비슷한 추천곡을 자동으로 이어서 재생합니다.</div>
+            </div>
+            <div className={`switch ${autoplay ? 'on' : ''}`} style={{ flex: 'none', marginLeft: '16px' }} />
+          </div>
+        </section>
+
+        <section className="set-card" data-enter>
           <h2><Library size={18} /> 보관함</h2>
           <p className="muted">좋아요와 플레이리스트는 이 PC에만 저장돼요. 유튜브 계정과는 연결되지 않습니다.</p>
           <div className="set-stats">
@@ -101,7 +125,6 @@ export default function Settings() {
             <div><b>{lib.followed.length}</b><span>아티스트</span></div>
           </div>
           <div className="row-btns">
-            <button className="btn" onClick={importPlaylist}><Link2 size={15} /> 재생목록 가져오기</button>
             <button className="btn" onClick={exportLib}><Download size={15} /> 백업</button>
             <button className="btn" onClick={importLib}><Upload size={15} /> 복원</button>
           </div>

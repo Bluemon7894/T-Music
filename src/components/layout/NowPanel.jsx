@@ -4,7 +4,7 @@ import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useLibrary } from '../../store/library.js';
 import { api } from '../../lib/api.js';
-import { Thumb, ArtistLinks, Equalizer, useLyricsSync, SyncControl } from '../common.jsx';
+import { Thumb, ArtistLinks, Equalizer, useLyricsSync } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
@@ -132,7 +132,6 @@ function LyricsView({ track }) {
         <h3>{track.title}</h3>
         <p>{track.artists?.map((a) => a.name).join(', ')}</p>
       </div>
-      {lines.length > 0 && <SyncControl offset={offset} onAdjust={adjust} onReset={reset} />}
       {lines.length > 0 ? (
         <div className="lyrics-lines">
           {lines.map((l, i) => {
@@ -142,7 +141,7 @@ function LyricsView({ track }) {
                 key={l.time + '-' + i}
                 ref={isActive ? activeLineRef : null}
                 className={`lyrics-line ${isActive ? 'active' : ''}`}
-                onClick={() => seek(Math.max(0, l.time + offset))}
+                onClick={() => seek(l.time)}
               >
                 {l.text || '...'}
               </div>
@@ -204,7 +203,12 @@ export default function NowPanel() {
         )}
       </div>
 
-      <button className={`autoplay ${autoplay ? 'on' : ''}`} onClick={toggleAutoplay}>
+      <button
+        type="button"
+        className={`autoplay ${autoplay ? 'on' : ''}`}
+        onClick={toggleAutoplay}
+        title={autoplay ? '추천곡 자동 재생 끄기' : '추천곡 자동 재생 켜기'}
+      >
         <Radio size={16} />
         <span><b>자동 재생</b><small>대기열이 끝나면 비슷한 곡 이어 듣기</small></span>
         <i className="switch" />

@@ -1,12 +1,11 @@
 import { useRef, useState } from 'react';
-import { Heart, Plus, Link2, Library as LibraryIcon } from 'lucide-react';
+import { Heart, Plus, Library as LibraryIcon } from 'lucide-react';
 import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
 import { useEnter } from '../lib/motion.js';
 import { Grid } from '../components/Cards.jsx';
 import { Empty, PlayButton } from '../components/common.jsx';
-import { importPlaylist } from '../components/layout/Sidebar.jsx';
 
 const TABS = [
   { id: 'all', label: '전체' },
@@ -32,7 +31,6 @@ export default function Library() {
       <div className="page-title" data-enter>
         <h1>보관함</h1>
         <div className="row-btns">
-          <button className="btn" onClick={importPlaylist}><Link2 size={15} /> YouTube 재생목록 가져오기</button>
           <button className="btn grad" onClick={() => go('local', { id: lib.createPlaylist() })}><Plus size={15} /> 새 플레이리스트</button>
         </div>
       </div>

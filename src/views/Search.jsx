@@ -14,7 +14,7 @@ const BROWSE_CATEGORIES = [
   {
     label: 'K-POP', query: 'K-POP 히트곡', c1: '#8b5cf6', c2: '#ec4899',
     tracks: [
-      { id: '11cta61Wi0g', title: 'Hype Boy', artist: 'NewJeans' },
+      { id: '11cta61wi0g', title: 'Hype Boy', artist: 'NewJeans' },
       { id: '6ZUIwj3FgUY', title: 'I AM', artist: 'IVE' },
       { id: 'phuiiNCxRMg', title: 'Supernova', artist: 'aespa' },
       { id: 'gdZLi9oWNZg', title: 'Dynamite', artist: 'BTS' },
@@ -24,43 +24,43 @@ const BROWSE_CATEGORIES = [
     label: '발라드', query: '발라드 명곡', c1: '#6366f1', c2: '#a78bfa',
     tracks: [
       { id: 'BBdC1rl5sKY', title: '사건의 지평선', artist: '윤하' },
-      { id: 'YBzJ0jmgev8', title: '너를 만나', artist: '폴킴' },
-      { id: 'O6vBfUq6KqQ', title: '헤어지자 말해요', artist: '박재정' },
+      { id: 'YBzJ0jmHv-4', title: '너를 만나', artist: '폴킴' },
+      { id: 'yFlxYHjHYAw', title: '헤어지자 말해요', artist: '박재정' },
       { id: '6744glqD6lk', title: '밤편지', artist: '아이유' },
     ],
   },
   {
     label: '힙합', query: '국내 힙합', c1: '#f97316', c2: '#be185d',
     tracks: [
-      { id: 'lOrUUtgOzGs', title: 'METEOR', artist: '창모' },
+      { id: 'lOrU0MH0bMk', title: 'METEOR', artist: '창모' },
       { id: 'fXFNFM80iMI', title: 'Better Than Yesterday', artist: 'MC Sniper' },
-      { id: 'mS_0f3y_1m4', title: '새삥', artist: '지코' },
-      { id: 'wS_gT2_Ue5E', title: 'Smoke', artist: '다이나믹 듀오' },
+      { id: 'azaZt7eccnc', title: '새삥', artist: '지코' },
+      { id: 'FbcUhXIhi1c', title: 'Smoke', artist: '다이나믹 듀오' },
     ],
   },
   {
     label: 'R&B', query: 'R&B 감성', c1: '#a855f7', c2: '#4f46e5',
     tracks: [
-      { id: 'eelfrHtmkEY', title: 'D (Half Moon)', artist: 'DEAN' },
-      { id: '1bVb4kH7r3A', title: 'Rush Hour', artist: '크러쉬' },
-      { id: 'AF3p0_xZ2pA', title: '비도 오고 그래서', artist: '헤이즈' },
+      { id: 'eelfrHtmk68', title: 'D (Half Moon)', artist: 'DEAN' },
+      { id: 'PS0qkO5qty0', title: 'Rush Hour', artist: '크러쉬' },
+      { id: 'aYDs3T-r__4', title: '비도 오고 그래서', artist: '헤이즈' },
       { id: '2yqYAsUpdSc', title: 'Out of Time', artist: 'The Weeknd' },
     ],
   },
   {
     label: '인디', query: '인디 음악', c1: '#14b8a6', c2: '#6366f1',
     tracks: [
-      { id: 'w4ZkcxH76fI', title: '주저하는 연인들을 위해', artist: '잔나비' },
-      { id: '9lJ_5bY8L3E', title: '그라데이션', artist: '10CM' },
-      { id: 'Oskv3E4y89A', title: '그대만 있다면', artist: '너드커넥션' },
+      { id: 'GpQ222I1ULc', title: '주저하는 연인들을 위해', artist: '잔나비' },
+      { id: 'VQZXXciZb_c', title: '그라데이션', artist: '10CM' },
+      { id: 'IMWT6937uUs', title: '그대만 있다면', artist: '너드커넥션' },
       { id: 'BB1v0zPVSdg', title: 'Trying too hard', artist: '치즈' },
     ],
   },
   {
     label: '록', query: '록 밴드 명곡', c1: '#ef4444', c2: '#7c3aed',
     tracks: [
-      { id: 'vnS_6zGheEg', title: '한 페이지가 될 수 있게', artist: 'DAY6' },
-      { id: 'n1hZ8g7bN9Y', title: '가시', artist: '버즈' },
+      { id: 'vnS_jn2uibs', title: '한 페이지가 될 수 있게', artist: 'DAY6' },
+      { id: '2I75ion7CAc', title: '가시', artist: '버즈' },
       { id: 'gsgq3A5i9dc', title: '담배가게 아가씨', artist: 'YB' },
       { id: 'zrtwnrFefwA', title: '사랑앓이', artist: 'FT아일랜드' },
     ],
@@ -80,7 +80,7 @@ const BROWSE_CATEGORIES = [
       { id: 'ZRtdQ81jPUQ', title: 'アイドル (Idol)', artist: 'YOASOBI' },
       { id: 'zuO2fClon98', title: 'Lemon', artist: 'Kenshi Yonezu' },
       { id: 'kffacxfA7G4', title: 'NIGHT DANCER', artist: 'imase' },
-      { id: 'cbqvxbfP_X0', title: '베텔기우스', artist: '유우리' },
+      { id: 'gvwpiKtod40', title: '베텔기우스', artist: '유우리' },
     ],
   },
   {
@@ -88,17 +88,17 @@ const BROWSE_CATEGORIES = [
     tracks: [
       { id: 'O0StKlRHVeE', title: '시작 (이태원 클라쓰)', artist: '가호' },
       { id: 'MBYY_IA_-qU', title: '너였다면', artist: '정승환' },
-      { id: '1k8c-3pA4xM', title: '첫눈처럼 너에게 가겠다', artist: '에일리' },
-      { id: '9k7L_2u8b8E', title: '흔들리는 꽃들 속에서', artist: '장범준' },
+      { id: '6rS7OUGXUik', title: '첫눈처럼 너에게 가겠다', artist: '에일리' },
+      { id: 'qKXMZPH6k18', title: '흔들리는 꽃들 속에서', artist: '장범준' },
     ],
   },
   {
     label: '재즈', query: '재즈 카페', c1: '#d97706', c2: '#7c2d12',
     tracks: [
       { id: 'ZEcqHA7dbwM', title: 'Fly Me To The Moon', artist: 'Frank Sinatra' },
-      { id: 'dH3GSrPpXtA', title: 'Waltz for Debby', artist: 'Bill Evans' },
-      { id: 'b_y3k5qW_x0', title: "Don't Know Why", artist: 'Norah Jones' },
-      { id: 'f8k3y5P_w_M', title: 'Take Five', artist: 'Dave Brubeck' },
+      { id: 'wCINvavqFXk', title: 'Waltz for Debby', artist: 'Bill Evans' },
+      { id: 'tO4dxvguQDk', title: "Don't Know Why", artist: 'Norah Jones' },
+      { id: '-DHuW1h1wHw', title: 'Take Five', artist: 'Dave Brubeck' },
     ],
   },
   {
@@ -107,13 +107,13 @@ const BROWSE_CATEGORIES = [
       { id: 'pyX-lxPkYbE', title: 'G 선상의 아리아', artist: 'J.S. Bach' },
       { id: 'WNcsUNKlAKw', title: '달빛 (Clair de Lune)', artist: 'Debussy' },
       { id: '4Tr0otuiQuU', title: '월광 소나타', artist: 'Beethoven' },
-      { id: 'GUsLNP4ck8U', title: '녹턴 Op.9 No.2', artist: 'Chopin' },
+      { id: 'Nu48Z45ibxQ', title: '녹턴 Op.9 No.2', artist: 'Chopin' },
     ],
   },
   {
     label: '로파이', query: 'lofi hip hop', c1: '#7c3aed', c2: '#0f766e',
     tracks: [
-      { id: 'jfKfPfyJRdk', title: 'lofi hip hop radio', artist: 'Lofi Girl' },
+      { id: 'CFGLoQIhmow', title: 'lofi hip hop radio', artist: 'Lofi Girl' },
       { id: '1WM3MHtEjrM', title: 'Lofi Chill Beats', artist: 'Sad Music' },
       { id: '5qap5aO4i9A', title: 'morning coffee', artist: 'potsu' },
       { id: 'HwIA1t8rmcY', title: 'Rainy Days', artist: 'Lofi Paris' },
@@ -125,16 +125,16 @@ const BROWSE_CATEGORIES = [
       { id: '9HDEHj2yzew', title: 'Physical', artist: 'Dua Lipa' },
       { id: '_Yhyp-_hX2s', title: 'Lose Yourself', artist: 'Eminem' },
       { id: 'btPJPFnesV4', title: 'Eye of the Tiger', artist: 'Survivor' },
-      { id: 'PsO6Zn4V00M', title: 'Stronger', artist: 'Kanye West' },
+      { id: 'PsO6ZnUZI0g', title: 'Stronger', artist: 'Kanye West' },
     ],
   },
   {
     label: '드라이브', query: '드라이브 음악', c1: '#2563eb', c2: '#db2777',
     tracks: [
-      { id: 'RmuL-AglgOR', title: 'Weekend', artist: '태연' },
+      { id: 'RmuL-BPFi2Q', title: 'Weekend', artist: '태연' },
       { id: 'xRbPAVnqtcs', title: '여행', artist: '볼빨간사춘기' },
       { id: 'tQ0yjYUFKAE', title: 'Peaches', artist: 'Justin Bieber' },
-      { id: '7q6b8Vj1y2U', title: 'Celebrity', artist: '아이유' },
+      { id: '0-q1KafFCLU', title: 'Celebrity', artist: '아이유' },
     ],
   },
   {
@@ -142,8 +142,8 @@ const BROWSE_CATEGORIES = [
     tracks: [
       { id: 'zrtwnrFefwA', title: '무릎', artist: '아이유' },
       { id: 'NwI8Qp2txSA', title: '수면 음악 자장가', artist: 'Sweet Dreams' },
-      { id: 'qU7B9_v8A4M', title: '스토커', artist: '10CM' },
-      { id: 'm4k2p8Y_x1M', title: '초록빛', artist: '폴킴' },
+      { id: 'mRIGDXQVU5c', title: '스토커', artist: '10CM' },
+      { id: '62Ztp9A-XO4', title: '초록빛', artist: '폴킴' },
     ],
   },
   {
@@ -152,7 +152,7 @@ const BROWSE_CATEGORIES = [
       { id: '7maJOI3QMu0', title: 'River Flows in You', artist: 'Yiruma' },
       { id: 'l0GN40EL1VU', title: 'Summer', artist: 'Joe Hisaishi' },
       { id: 'HwIA1t8rmcY', title: '시험 공부할 때 듣는 음악', artist: 'Lofi Paris' },
-      { id: '1K8g_8u9p0Y', title: 'Kiss The Rain', artist: 'Yiruma' },
+      { id: 'imGaOIm5HOk', title: 'Kiss The Rain', artist: 'Yiruma' },
     ],
   },
 ];
@@ -267,28 +267,43 @@ function Results({ q }) {
 function BrowseTile({ item }) {
   const go = useNav((s) => s.go);
   const playList = usePlayer((s) => s.playList);
+  const [trackIdx, setTrackIdx] = useState(() => {
+    if (!item.tracks || item.tracks.length === 0) return 0;
+    return Math.floor(Math.random() * item.tracks.length);
+  });
+  const [attempts, setAttempts] = useState(0);
 
-  // Random representative track chosen once when the tile mounts
-  const randomTrack = useMemo(() => {
-    if (!item.tracks || item.tracks.length === 0) return null;
-    const idx = Math.floor(Math.random() * item.tracks.length);
-    const tr = item.tracks[idx];
-    return {
-      ...tr,
-      thumb: `https://i.ytimg.com/vi/${tr.id}/mqdefault.jpg`,
-    };
-  }, [item]);
+  const currentTrack = item.tracks?.[trackIdx];
+  const thumbUrl = currentTrack ? `https://i.ytimg.com/vi/${currentTrack.id}/mqdefault.jpg` : null;
+
+  const onFail = () => {
+    if (attempts + 1 < (item.tracks?.length || 1)) {
+      setAttempts((a) => a + 1);
+      setTrackIdx((idx) => (idx + 1) % item.tracks.length);
+    } else {
+      setAttempts(999);
+    }
+  };
 
   const onPlayTrack = (e) => {
     e.stopPropagation();
-    if (randomTrack) {
+    if (currentTrack) {
       playList(
-        [{ id: randomTrack.id, title: randomTrack.title, thumb: randomTrack.thumb, artists: [{ name: randomTrack.artist }] }],
+        [{ id: currentTrack.id, title: currentTrack.title, thumb: thumbUrl, artists: [{ name: currentTrack.artist }] }],
         0,
         { name: `${item.label} 대표곡` }
       );
     }
   };
+
+  const handleImgLoad = (e) => {
+    // YouTube returns a 120x90 grey placeholder image with 3 dots on 404
+    if (e.target.naturalWidth <= 120) {
+      onFail();
+    }
+  };
+
+  const showArt = currentTrack && attempts < (item.tracks?.length || 1);
 
   return (
     <div
@@ -297,10 +312,10 @@ function BrowseTile({ item }) {
       style={{ '--c1': item.c1, '--c2': item.c2 }}
       onClick={() => go('search', { q: item.query })}
     >
-      {randomTrack && (
+      {showArt && thumbUrl && (
         <div
           className="browse-tile-bg"
-          style={{ backgroundImage: `url(${randomTrack.thumb})` }}
+          style={{ backgroundImage: `url(${thumbUrl})` }}
         />
       )}
 
@@ -308,17 +323,25 @@ function BrowseTile({ item }) {
         <span>{item.label}</span>
       </div>
 
-      {randomTrack && (
-        <div className="browse-tile-sub" title={`${randomTrack.title} - ${randomTrack.artist}`}>
+      {currentTrack && (
+        <div className="browse-tile-sub" title={`${currentTrack.title} - ${currentTrack.artist}`}>
           <Music size={12} />
-          <span>{randomTrack.title} · {randomTrack.artist}</span>
+          <span>{currentTrack.title} · {currentTrack.artist}</span>
         </div>
       )}
 
-      {randomTrack ? (
+      {showArt && thumbUrl ? (
         <div className="browse-tile-art-wrap">
-          <img src={randomTrack.thumb} alt="" className="browse-tile-art" loading="lazy" />
-          <div className="browse-tile-play" onClick={onPlayTrack} title={`${randomTrack.title} 바로 재생`}>
+          <img
+            key={thumbUrl}
+            src={thumbUrl}
+            alt=""
+            className="browse-tile-art"
+            loading="lazy"
+            onLoad={handleImgLoad}
+            onError={onFail}
+          />
+          <div className="browse-tile-play" onClick={onPlayTrack} title={`${currentTrack.title} 바로 재생`}>
             <Play size={18} fill="currentColor" />
           </div>
         </div>

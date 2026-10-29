@@ -44,6 +44,22 @@ const api = {
   installUpdate: () => updater.installUpdate(),
   setGithubToken: (tok) => updater.setGithubToken(tok),
   updateTrayTooltip: (text) => { if (tray) tray.setToolTip(text || 'T-Music'); },
+  updateTrayIcon: (dataUrl) => {
+    if (!tray) return false;
+    try {
+      if (dataUrl) {
+        const img = nativeImage.createFromDataURL(dataUrl);
+        if (!img.isEmpty()) {
+          tray.setImage(img.resize({ width: 32, height: 32 }));
+          return true;
+        }
+      }
+      tray.setImage(getAppNativeImage(32));
+      return true;
+    } catch {
+      return false;
+    }
+  },
   setTitleBarOverlay: (opts) => {
     const [win] = BrowserWindow.getAllWindows();
     if (win && typeof win.setTitleBarOverlay === 'function') {
@@ -64,8 +80,30 @@ ipcMain.handle('api', async (_e, method, ...args) => {
   return fn(...args);
 });
 
+function getAppIconPath() {
+  const candidates = [
+    path.join(__dirname, 'icon.png'),
+    path.join(__dirname, '..', 'build', 'icon.png'),
+    path.join(process.resourcesPath || '', 'build', 'icon.png'),
+    path.join(process.resourcesPath || '', 'app', 'electron', 'icon.png'),
+    path.join(__dirname, '..', 'src', 'assets', 'logo-mark.png'),
+    path.join(__dirname, '..', 'dist', 'assets', 'logo-mark.png'),
+  ];
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
+function getAppNativeImage(size = 32) {
+  const iconPath = getAppIconPath();
+  if (!iconPath) return nativeImage.createEmpty();
+  const img = nativeImage.createFromPath(iconPath);
+  return size ? img.resize({ width: size, height: size }) : img;
+}
+
 function createWindow() {
-  const icon = path.join(__dirname, '..', 'build', 'icon.png');
+  const iconPath = getAppIconPath();
   const win = new BrowserWindow({
     width: 1400,
     height: 880,
@@ -73,7 +111,7 @@ function createWindow() {
     minHeight: 640,
     backgroundColor: BG,
     title: 'T-Music',
-    icon: fs.existsSync(icon) ? icon : undefined,
+    icon: iconPath || undefined,
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: 'rgba(0, 0, 0, 0)', symbolColor: '#c4b5fd', height: 52 },
     show: false,
@@ -105,11 +143,7 @@ function createWindow() {
 
 function createTray(win) {
   if (tray) return;
-  const iconPath = path.join(__dirname, '..', 'build', 'icon.png');
-  const image = fs.existsSync(iconPath)
-    ? nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
-    : nativeImage.createEmpty();
-
+  const image = getAppNativeImage(32);
   tray = new Tray(image);
   tray.setToolTip('T-Music');
 

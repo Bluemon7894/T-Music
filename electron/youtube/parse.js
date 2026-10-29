@@ -100,6 +100,8 @@ function splitRuns(runs = []) {
   return { artists, album, label, extra };
 }
 
+const NON_MUSIC_RE = /에피소드|팟캐스트|Episode|Podcast|오디오북|다큐|뉴스|라디오/i;
+
 // musicResponsiveListItemRenderer: rows in YT Music search results, album tracklists, playlists.
 export function parseResponsive(r, ctx = {}) {
   if (!r) return null;
@@ -124,17 +126,30 @@ export function parseResponsive(r, ctx = {}) {
   }
   if (pageType) return null; // podcasts, episodes, profiles, non-music audio
 
+  // Filter out talk shows, audiobooks, science documentaries, podcasts mistakenly returned without a pageType
+  if (NON_MUSIC_RE.test(title) || NON_MUSIC_RE.test(label || '') || NON_MUSIC_RE.test(extra.join(' '))) {
+    return null;
+  }
+
   const videoId = r.playlistItemData?.videoId || find(r.overlay, 'videoId') || nav?.watchEndpoint?.videoId || find(cols[0], 'videoId');
   if (!videoId) return null;
   const durText = text(r.fixedColumns?.[0]?.musicResponsiveListItemFixedColumnRenderer?.text) || extra.find(isDuration);
+  const durSec = seconds(durText);
+
+  // Filter out non-music long form episodes (> 15 minutes) or very short audio (< 45s) unless part of album
+  if (!album && !ctx.album && (durSec > 900 || (durSec > 0 && durSec < 45))) {
+    return null;
+  }
+
   return {
     kind: 'track',
     id: videoId,
     title,
     artists: artists.length ? artists : ctx.artists || [],
     album: album || ctx.album || null,
-    duration: seconds(durText),
+    duration: durSec,
     thumb: th || ctx.thumb || videoThumb(videoId),
+    score: 8, // YouTube Music native tracks receive solid base score
   };
 }
 
@@ -159,17 +174,60 @@ export function parseTwoRow(r) {
 
 // ---- regular YouTube results ----
 
-const NOISE = /(노래방|karaoke|커버|cover|reaction|리액션|직캠|fancam|1\s*시간|1\s*hour|playlist|플레이리스트|모음|연속\s*듣기|피아노|piano|instrumental|8d\b|sped\s*up|slowed|nightcore|teaser|티저|shorts|behind|비하인드|메이킹|making|교차편집|stage\s*mix|해석|tutorial|lesson|강좌)/i;
+const NOISE = /(노래방|karaoke|커버|cover|reaction|리액션|직캠|fancam|1\s*시간|1\s*hour|playlist|플레이리스트|모음|연속\s*듣기|피아노|piano|instrumental|8d\b|sped\s*up|slowed|nightcore|teaser|티저|shorts|behind|비하인드|메이킹|making|교차편집|stage\s*mix|해석|tutorial|lesson|강좌|mr제거|무대교차|쇼츠)/i;
+const OFFICIAL_CHANNELS = /(?:official|공식|smtown|hybe|jyp|1thek|stone\s*music|yg|starship|music|records|entertainment|vevo|카카오엔터|워너뮤직|genie\s*music|벅스|danmee|danal)/i;
+
+export function parseViews(str) {
+  if (!str) return 0;
+  const s = String(str).replace(/,/g, '').trim();
+  const m억 = s.match(/([\d.]+)\s*억/);
+  if (m억) return Math.round(parseFloat(m억[1]) * 100000000);
+  const m만 = s.match(/([\d.]+)\s*만/);
+  if (m만) return Math.round(parseFloat(m만[1]) * 10000);
+  const mB = s.match(/([\d.]+)\s*B(?:illion)?/i);
+  if (mB) return Math.round(parseFloat(mB[1]) * 1000000000);
+  const mM = s.match(/([\d.]+)\s*M(?:illion)?/i);
+  if (mM) return Math.round(parseFloat(mM[1]) * 1000000);
+  const mK = s.match(/([\d.]+)\s*K/i);
+  if (mK) return Math.round(parseFloat(mK[1]) * 1000);
+  const mNum = s.match(/(\d+)/);
+  if (mNum) return parseInt(mNum[1], 10);
+  return 0;
+}
 
 export function musicScore(t, query = '') {
   let s = 0;
-  if (t.topic) s += 6;
-  if (t.officialArtist) s += 3;
-  if (/official|\bM\/?V\b|뮤직비디오|audio|lyrics?|가사/i.test(t.rawTitle || '')) s += 1;
+  if (t.topic) s += 4;
+  if (t.officialArtist) s += 5;
+  if (t.verified) s += 3;
+  if (/official|\bM\/?V\b|뮤직비디오|audio/i.test(t.rawTitle || '')) s += 2;
+  const artistName = t.artists?.[0]?.name || '';
+  if (OFFICIAL_CHANNELS.test(artistName)) s += 4;
+
+  // View count popularity bonus / low-view penalty
+  const v = t.views || 0;
+  if (v >= 50000000) s += 8;
+  else if (v >= 10000000) s += 6;
+  else if (v >= 1000000) s += 5;
+  else if (v >= 200000) s += 3;
+  else if (v >= 30000) s += 1;
+  else if (v > 0 && v < 200) s -= 12; // Harsh penalty for random 1-200 view bedroom distrokid uploads
+  else if (v > 0 && v < 1000 && !t.officialArtist && !t.verified) s -= 8;
+
+  // Match relevance to query
+  if (query && query.trim()) {
+    const qClean = query.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    const tClean = (t.title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    const aClean = artistName.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    if (tClean === qClean) s += 6;
+    else if (tClean.startsWith(qClean) || tClean.includes(qClean)) s += 3;
+    if (aClean.includes(qClean)) s += 3;
+  }
+
   const noise = (t.rawTitle || '').match(NOISE);
-  if (noise && !new RegExp(noise[0], 'i').test(query)) s -= 6;
-  if (/live|라이브|콘서트|concert|@/i.test(t.rawTitle || '') && !/live|라이브/i.test(query)) s -= 2;
-  if (t.duration > 600 || t.duration < 60) s -= 6;
+  if (noise && !new RegExp(noise[0], 'i').test(query)) s -= 10;
+  if (/live|라이브|콘서트|concert|@/i.test(t.rawTitle || '') && !/live|라이브/i.test(query)) s -= 3;
+  if (t.duration > 600 || t.duration < 55) s -= 8;
   return s;
 }
 
@@ -204,19 +262,24 @@ export function parseVideo(v, query = '') {
   const owner = ownerInfo(v);
   const topic = / - Topic$/.test(owner.name);
   const badges = (v.ownerBadges || []).map((b) => b.metadataBadgeRenderer?.style || '');
+  const verifiedArtist = badges.includes('BADGE_STYLE_TYPE_VERIFIED_ARTIST');
+  const verified = verifiedArtist || badges.includes('BADGE_STYLE_TYPE_VERIFIED');
   const artistName = owner.name.replace(/ - Topic$/, '');
   const rawTitle = text(v.title);
+  const views = parseViews(text(v.viewCountText) || text(v.shortViewCountText));
   const t = {
     kind: 'track',
     id: v.videoId,
     title: cleanTitle(rawTitle, artistName),
     rawTitle,
-    artists: [{ id: topic || badges.includes('BADGE_STYLE_TYPE_VERIFIED_ARTIST') ? owner.id : null, name: artistName }],
+    artists: [{ id: topic || verified ? owner.id : null, name: artistName }],
     album: null,
     duration,
     thumb: videoThumb(v.videoId),
     topic,
-    officialArtist: badges.includes('BADGE_STYLE_TYPE_VERIFIED_ARTIST'),
+    officialArtist: verifiedArtist,
+    verified,
+    views,
   };
   t.score = musicScore(t, query);
   return t;
@@ -235,6 +298,8 @@ export function parseLockup(l, query = '') {
   if (!rawTitle || !duration) return null;
   const topic = / - Topic$/.test(ownerName);
   const artistName = ownerName.replace(/ - Topic$/, '');
+  const viewsText = text(rows[1]?.metadataParts?.[0]?.text) || '';
+  const views = parseViews(viewsText);
   const t = {
     kind: 'track',
     id: l.contentId,
@@ -246,6 +311,8 @@ export function parseLockup(l, query = '') {
     thumb: videoThumb(l.contentId),
     topic,
     officialArtist: false,
+    verified: false,
+    views,
   };
   t.score = musicScore(t, query);
   return t;
@@ -261,6 +328,7 @@ export function parsePlaylistVideo(v) {
     kind: 'track',
     id: v.videoId,
     title: cleanTitle(rawTitle, artistName),
+    rawTitle,
     artists: [{ id: / - Topic$/.test(owner.name) ? owner.id : null, name: artistName }],
     album: null,
     duration: seconds(text(v.lengthText)) || Number(v.lengthSeconds) || 0,
@@ -270,6 +338,6 @@ export function parsePlaylistVideo(v) {
 
 export function strip(t) {
   if (!t) return t;
-  const { rawTitle, score, topic, officialArtist, ...rest } = t;
+  const { score, topic, officialArtist, verified, views, rawTitle, ...rest } = t;
   return rest;
 }

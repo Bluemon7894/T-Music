@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Home, Search, Library, ArrowDownToLine, Plus, Heart, ListMusic, Link2, Trash2, Pencil, Disc3 } from 'lucide-react';
+import { Home, Search, Library, ArrowDownToLine, Plus, Heart, ListMusic, Trash2, Pencil, Disc3 } from 'lucide-react';
 import { useLibrary } from '../../store/library.js';
 import { useNav, useRoute } from '../../store/nav.js';
 import { useUI, toast } from '../../store/ui.js';
@@ -17,36 +17,7 @@ const NAV = [
   { id: 'downloads', label: '다운로드', icon: ArrowDownToLine },
 ];
 
-// Accepts a full YouTube / YT Music URL or a bare playlist id.
-function playlistIdFrom(input) {
-  const s = input.trim();
-  try {
-    return new URL(s).searchParams.get('list');
-  } catch {
-    return /^[\w-]{10,}$/.test(s) ? s : null;
-  }
-}
 
-export function importPlaylist() {
-  useUI.getState().prompt({
-    title: 'YouTube 재생목록 가져오기',
-    placeholder: 'music.youtube.com 또는 youtube.com 재생목록 링크',
-    submitLabel: '가져오기',
-    async onSubmit(value) {
-      const id = playlistIdFrom(value);
-      if (!id) return toast('재생목록 링크를 인식하지 못했습니다');
-      toast('재생목록을 불러오는 중…');
-      try {
-        const pl = await api.playlist(id);
-        const newId = useLibrary.getState().createPlaylist(pl.title, pl.tracks, { source: id, thumb: pl.thumb });
-        toast(`'${pl.title}' ${pl.tracks.length}곡을 가져왔습니다`);
-        useNav.getState().go('local', { id: newId });
-      } catch (e) {
-        toast(errorText(e));
-      }
-    },
-  });
-}
 
 function NavList() {
   const route = useRoute();
@@ -122,7 +93,6 @@ export default function Sidebar() {
           <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>저장됨</button>
         </div>
         <div className="lib-actions">
-          <button className="icon-btn circle" title="YouTube 재생목록 가져오기" onClick={importPlaylist}><Link2 size={16} /></button>
           <button className="icon-btn circle accent" title="새 플레이리스트" onClick={newPlaylist}><Plus size={17} /></button>
         </div>
       </div>
@@ -139,7 +109,6 @@ export default function Sidebar() {
               <div className="lib-cta">
                 <p>나만의 플레이리스트를 만들어 보세요</p>
                 <button className="btn sm grad" onClick={newPlaylist}><Plus size={14} /> 새로 만들기</button>
-                <button className="btn sm" onClick={importPlaylist}><Link2 size={14} /> YouTube에서 가져오기</button>
               </div>
             )}
           </>
