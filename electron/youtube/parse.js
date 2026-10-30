@@ -336,6 +336,29 @@ export function parsePlaylistVideo(v) {
   };
 }
 
+// playlistPanelVideoRenderer (YouTube Music / YouTube Automix radio panels)
+export function parsePlaylistPanel(r) {
+  if (!r?.videoId) return null;
+  const byline = r.shortBylineText || r.longBylineText;
+  const artists = byline?.runs?.map((x) => ({
+    name: x.text,
+    id: x.navigationEndpoint?.browseEndpoint?.browseId || null,
+  })) || [];
+  const rawTitle = text(r.title);
+  const durSec = seconds(text(r.lengthText));
+  const th = thumb(r.thumbnail, 544) || videoThumb(r.videoId);
+  return {
+    kind: 'track',
+    id: r.videoId,
+    title: cleanTitle(rawTitle, artists[0]?.name),
+    rawTitle,
+    artists,
+    album: null,
+    duration: durSec,
+    thumb: th,
+  };
+}
+
 export function strip(t) {
   if (!t) return t;
   const { score, topic, officialArtist, verified, views, rawTitle, ...rest } = t;

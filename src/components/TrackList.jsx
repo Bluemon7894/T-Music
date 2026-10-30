@@ -14,7 +14,9 @@ import DownloadButton from './DownloadButton.jsx';
 export async function startRadio(track) {
   try {
     const more = await api.related(track.id);
+    const count = more.length;
     usePlayer.getState().playList([track, ...more], 0, { name: `${track.title} 라디오` });
+    toast(count > 0 ? `'${track.title}' 기반 라디오 시작 (+${count}곡 편성)` : `'${track.title}' 라디오를 시작했습니다`);
   } catch {
     toast('라디오를 시작할 수 없습니다');
   }

@@ -263,15 +263,32 @@ export function playlist(id) {
   });
 }
 
-// "Radio" for a track: YouTube's related videos, filtered to song-like results.
+// "Radio" for a track: YouTube Music Automix / Radio playlist + related videos fallback.
 export function related(videoId) {
   return cached('related:' + videoId, 30 * MIN, async () => {
-    const d = await call('/next', { client: 'WEB', videoId });
-    const list = [
-      ...P.findAll(d, 'lockupViewModel').map((l) => P.parseLockup(l)),
-      ...P.findAll(d, 'compactVideoRenderer').map((v) => P.parseVideo(v)),
-    ].filter((t) => t && t.id !== videoId && t.score > -3);
-    return uniqueBy(rank(list)).map(P.strip);
+    let list = [];
+    try {
+      const d = await call('/next', { client: 'WEB', playlistId: 'RDAMVM' + videoId });
+      const panels = P.findAll(d, 'playlistPanelVideoRenderer');
+      list = panels.map(P.parsePlaylistPanel).filter((t) => t && t.id !== videoId);
+    } catch {
+      // fall back below
+    }
+
+    if (!list.length) {
+      try {
+        const d = await call('/next', { client: 'WEB', videoId });
+        list = [
+          ...P.findAll(d, 'lockupViewModel').map((l) => P.parseLockup(l)),
+          ...P.findAll(d, 'compactVideoRenderer').map((v) => P.parseVideo(v)),
+        ].filter((t) => t && t.id !== videoId && t.score > -3);
+        list = rank(list);
+      } catch {
+        // ignore
+      }
+    }
+
+    return uniqueBy(list).map(P.strip);
   });
 }
 

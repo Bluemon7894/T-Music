@@ -533,7 +533,7 @@ async function fetchFromNaver(title, artist, artistsList = []) {
 async function fetchFromLrclib(title, artist, duration, artistsList = []) {
   const { titles, artists } = extractVariants(title, artist, artistsList);
   const isKorean = isKoreanTrack(titles, artists);
-  const headers = { 'User-Agent': 'T-Music/0.3.27 (https://github.com/Bluemon7894/T-Music)' };
+  const headers = { 'User-Agent': 'T-Music/0.3.28 (https://github.com/Bluemon7894/T-Music)' };
 
   const getPairs = [];
   for (const t of titles.slice(0, 2)) {
@@ -693,7 +693,7 @@ export async function getCandidates(track, customQuery) {
   const title = track.rawTitle || track.title || '';
   const artist = Array.isArray(track.artists) ? track.artists[0]?.name : track.artist || '';
   const duration = track.duration || 0;
-  const headers = { 'User-Agent': 'T-Music/0.3.27 (https://github.com/Bluemon7894/T-Music)' };
+  const headers = { 'User-Agent': 'T-Music/0.3.28 (https://github.com/Bluemon7894/T-Music)' };
 
   const candidates = [];
   const seenTexts = new Set();
