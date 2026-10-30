@@ -35,8 +35,25 @@ export function trackMenuItems(track, extra = []) {
     {
       label: '플레이리스트에 추가', icon: Plus,
       submenu: [
-        { label: '새 플레이리스트', icon: Plus, onClick: () => { lib.createPlaylist(track.title, [track]); toast('새 플레이리스트를 만들었습니다'); } },
-        ...lib.playlists.map((pl) => ({ label: pl.name, onClick: () => { lib.addToPlaylist(pl.id, track); toast(`'${pl.name}'에 추가했습니다`); } })),
+        {
+          label: '새 플레이리스트',
+          icon: Plus,
+          onClick: () => {
+            lib.createPlaylist(track.title, [track]);
+            toast('새 플레이리스트를 만들었습니다');
+          },
+        },
+        ...lib.playlists.map((pl) => ({
+          label: pl.name,
+          onClick: () => {
+            const added = lib.addToPlaylist(pl.id, track);
+            if (added > 0) {
+              toast(`'${pl.name}'에 추가했습니다`);
+            } else {
+              toast(`'${pl.name}'에 이미 있는 곡입니다`);
+            }
+          },
+        })),
       ],
     },
     { label: liked ? '좋아요 취소' : '좋아요', icon: Heart, onClick: () => lib.toggleLike(track) },
@@ -131,12 +148,16 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
             key={t.id + ':' + i}
             data-enter={animate && i < 30 ? '' : undefined}
             className={`tl-row ${isCur ? 'current' : ''} ${onReorder ? 'reorderable' : ''} ${dragOverIdx === i ? 'drag-over' : ''}`}
-            draggable={!!onReorder}
+            draggable={true}
             onDragStart={(e) => {
-              if (onReorder) {
-                e.dataTransfer.setData('text/plain', String(i));
-                e.dataTransfer.effectAllowed = 'move';
-              }
+              try {
+                e.dataTransfer.setData('application/json', JSON.stringify(t));
+                e.dataTransfer.setData('text/plain', t.id);
+                e.dataTransfer.effectAllowed = onReorder ? 'copyMove' : 'copy';
+                if (onReorder) {
+                  e.dataTransfer.setData('text/reorder-from', String(i));
+                }
+              } catch {}
             }}
             onDragOver={(e) => {
               if (onReorder) {
@@ -152,7 +173,8 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
               if (onReorder) {
                 e.preventDefault();
                 setDragOverIdx(null);
-                const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                const reorderFrom = e.dataTransfer.getData('text/reorder-from') || e.dataTransfer.getData('text/plain');
+                const from = parseInt(reorderFrom, 10);
                 if (!isNaN(from) && from !== i) onReorder(from, i);
               }
             }}

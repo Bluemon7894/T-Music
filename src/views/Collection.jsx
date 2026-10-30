@@ -175,16 +175,48 @@ export function Liked() {
 
 export function LocalPlaylist({ id }) {
   const pl = useLibrary((s) => s.playlists.find((p) => p.id === id));
-  const { removeFromPlaylist, renamePlaylist, deletePlaylist, reorderPlaylist } = useLibrary.getState();
+  const { addToPlaylist, removeFromPlaylist, renamePlaylist, deletePlaylist, reorderPlaylist } = useLibrary.getState();
   const prompt = useUI((s) => s.prompt);
   const go = useNav((s) => s.go);
   const ref = usePage([id]);
+  const [dragOver, setDragOver] = useState(false);
   if (!pl) return <ErrorMsg error="플레이리스트를 찾을 수 없습니다." />;
   const context = { name: pl.name };
   const rename = () => prompt({ title: '플레이리스트 이름 바꾸기', value: pl.name, submitLabel: '저장', onSubmit: (v) => v.trim() && renamePlaylist(pl.id, v.trim()) });
   const cover = pl.thumb || pl.tracks[0]?.thumb;
   return (
-    <div className="page collection" ref={ref}>
+    <div
+      className={`page collection ${dragOver ? 'playlist-drag-over' : ''}`}
+      ref={ref}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('application/json')) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          if (!dragOver) setDragOver(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false);
+      }}
+      onDrop={(e) => {
+        setDragOver(false);
+        try {
+          if (e.dataTransfer.getData('text/reorder-from')) return;
+          const raw = e.dataTransfer.getData('application/json');
+          if (raw) {
+            const track = JSON.parse(raw);
+            if (track?.id) {
+              const added = addToPlaylist(pl.id, track);
+              if (added > 0) {
+                toast(`'${pl.name}'에 '${track.title}'을(를) 추가했습니다`);
+              } else {
+                toast(`'${pl.name}'에 이미 있는 곡입니다`);
+              }
+            }
+          }
+        } catch {}
+      }}
+    >
       <Header
         kind="내 플레이리스트"
         title={pl.name}

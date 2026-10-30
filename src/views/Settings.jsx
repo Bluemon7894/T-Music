@@ -281,9 +281,10 @@ export default function Settings() {
           <h2><Keyboard size={18} /> 단축키</h2>
           <div className="shortcuts">
             <span><kbd>Space</kbd> 재생 / 일시정지</span>
+            <span><kbd>↑</kbd> <kbd>↓</kbd> 음량 조절</span>
+            <span><kbd>←</kbd> <kbd>→</kbd> 10초 탐색 (길게 누르면 고속 탐색)</span>
             <span><kbd>Ctrl</kbd> <kbd>→</kbd> 다음 곡</span>
             <span><kbd>Ctrl</kbd> <kbd>←</kbd> 이전 곡</span>
-            <span><kbd>Ctrl</kbd> <kbd>↑</kbd> <kbd>↓</kbd> 볼륨 조절</span>
             <span><kbd>Ctrl</kbd> <kbd>K</kbd> 검색창 열기</span>
             <span><kbd>Alt</kbd> <kbd>←</kbd> <kbd>→</kbd> 뒤로 / 앞으로 이동</span>
             <span><kbd>Esc</kbd> 전체 화면 닫기</span>

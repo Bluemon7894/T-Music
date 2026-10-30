@@ -38,25 +38,101 @@ function View({ route }) {
 
 function useShortcuts() {
   useEffect(() => {
-    const onKey = (e) => {
-      const typing = /INPUT|TEXTAREA/.test(document.activeElement?.tagName);
-      const p = usePlayer.getState();
-      if (e.code === 'Space' && !typing) { e.preventDefault(); p.toggle(); }
-      else if (e.ctrlKey && e.key === 'ArrowRight') { e.preventDefault(); p.next(); }
-      else if (e.ctrlKey && e.key === 'ArrowLeft') { e.preventDefault(); p.prev(); }
-      else if (e.ctrlKey && e.key === 'ArrowUp') { e.preventDefault(); p.setVolume(Math.min(1, p.volume + 0.1)); }
-      else if (e.ctrlKey && e.key === 'ArrowDown') { e.preventDefault(); p.setVolume(Math.max(0, p.volume - 0.1)); }
-      else if (e.altKey && e.key === 'ArrowLeft') useNav.getState().back();
-      else if (e.altKey && e.key === 'ArrowRight') useNav.getState().forward();
+    let holdStartTime = 0;
+    let heldKey = null;
+
+    const stopHold = () => {
+      heldKey = null;
+      holdStartTime = 0;
     };
+
+    const onKey = (e) => {
+      const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+      if (typing) return;
+      const p = usePlayer.getState();
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        p.toggle();
+        return;
+      }
+      if (e.ctrlKey && e.key === 'ArrowRight') {
+        e.preventDefault();
+        p.next();
+        return;
+      }
+      if (e.ctrlKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        p.prev();
+        return;
+      }
+      if (e.altKey && e.key === 'ArrowLeft') {
+        useNav.getState().back();
+        return;
+      }
+      if (e.altKey && e.key === 'ArrowRight') {
+        useNav.getState().forward();
+        return;
+      }
+
+      // ArrowUp: Volume up (5%)
+      if (e.key === 'ArrowUp' && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        const next = Math.min(1, Math.round((p.volume + 0.05) * 100) / 100);
+        p.setVolume(next);
+        return;
+      }
+
+      // ArrowDown: Volume down (5%)
+      if (e.key === 'ArrowDown' && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        const next = Math.max(0, Math.round((p.volume - 0.05) * 100) / 100);
+        p.setVolume(next);
+        return;
+      }
+
+      // ArrowLeft / ArrowRight: Seek 10s on tap, and accelerating fast seek when held down
+      if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        const dir = e.key === 'ArrowRight' ? 1 : -1;
+        const curTime = typeof p.getPreciseTime === 'function' ? p.getPreciseTime() : p.time;
+
+        if (!e.repeat) {
+          heldKey = e.key;
+          holdStartTime = performance.now();
+          p.seek(curTime + dir * 10);
+        } else {
+          const elapsed = performance.now() - (holdStartTime || performance.now());
+          const step = elapsed > 2000 ? 8 : elapsed > 800 ? 4 : 2;
+          p.seek(curTime + dir * step);
+        }
+        return;
+      }
+    };
+
+    const onKeyUp = (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        stopHold();
+      }
+    };
+
     // Mouse back/forward buttons.
     const onMouse = (e) => {
       if (e.button === 3) useNav.getState().back();
       if (e.button === 4) useNav.getState().forward();
     };
+
     window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', stopHold);
     window.addEventListener('mouseup', onMouse);
-    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('mouseup', onMouse); };
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', stopHold);
+      window.removeEventListener('mouseup', onMouse);
+      stopHold();
+    };
   }, []);
 }
 

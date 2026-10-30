@@ -58,13 +58,17 @@ export const useLibrary = create(
       },
       addToPlaylist(id, tracks) {
         const list = Array.isArray(tracks) ? tracks : [tracks];
+        let addedCount = 0;
         set({
           playlists: get().playlists.map((p) => {
             if (p.id !== id) return p;
             const have = new Set(p.tracks.map((t) => t.id));
-            return { ...p, tracks: [...p.tracks, ...list.filter((t) => !have.has(t.id)).map(slim)] };
+            const newTracks = list.filter((t) => !have.has(t.id)).map(slim);
+            addedCount = newTracks.length;
+            return { ...p, tracks: [...p.tracks, ...newTracks] };
           }),
         });
+        return addedCount;
       },
       removeFromPlaylist(id, index) {
         set({ playlists: get().playlists.map((p) => (p.id === id ? { ...p, tracks: p.tracks.filter((_, i) => i !== index) } : p)) });

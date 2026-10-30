@@ -59,6 +59,7 @@ export default function Sidebar() {
   const ctxName = usePlayer((s) => s.context?.name);
   const playing = usePlayer((s) => s.playing);
   const [tab, setTab] = useState('playlists');
+  const [dragOverId, setDragOverId] = useState(null);
 
   const isActive = (name, id) => route.name === name && (id == null || route.params.id === id);
   const newPlaylist = () => go('local', { id: lib.createPlaylist() });
@@ -68,8 +69,15 @@ export default function Sidebar() {
     { label: '삭제', icon: Trash2, onClick: () => { lib.deletePlaylist(p.id); if (isActive('local', p.id)) go('home'); toast('플레이리스트를 삭제했습니다'); } },
   ]);
 
-  const Row = ({ active, onClick, onContextMenu, art, name, sub }) => (
-    <div className={`lib-row ${active ? 'active' : ''}`} onClick={onClick} onContextMenu={onContextMenu}>
+  const Row = ({ active, onClick, onContextMenu, art, name, sub, isDragOver, onDragOver, onDragLeave, onDrop }) => (
+    <div
+      className={`lib-row ${active ? 'active' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       {art}
       <div className="lib-text">
         <div className={`lib-name ${ctxName === name ? 'playing' : ''}`}>{name}</div>
@@ -93,17 +101,115 @@ export default function Sidebar() {
           <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>저장됨</button>
         </div>
         <div className="lib-actions">
-          <button className="icon-btn circle accent" title="새 플레이리스트" onClick={newPlaylist}><Plus size={17} /></button>
+          <button
+            className={`icon-btn circle accent ${dragOverId === 'new-pl' ? 'drag-over' : ''}`}
+            title="새 플레이리스트"
+            onClick={newPlaylist}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'copy';
+              if (dragOverId !== 'new-pl') setDragOverId('new-pl');
+            }}
+            onDragLeave={() => {
+              if (dragOverId === 'new-pl') setDragOverId(null);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOverId(null);
+              try {
+                const raw = e.dataTransfer.getData('application/json');
+                if (raw) {
+                  const track = JSON.parse(raw);
+                  if (track?.id) {
+                    const id = lib.createPlaylist(track.title, [track]);
+                    go('local', { id });
+                    toast(`새 플레이리스트에 '${track.title}'을(를) 추가했습니다`);
+                  }
+                }
+              } catch {}
+            }}
+          >
+            <Plus size={17} />
+          </button>
         </div>
       </div>
 
       <div className="lib-list">
         {tab === 'playlists' ? (
           <>
-            <Row active={isActive('liked')} onClick={() => go('liked')} name="좋아요 표시한 곡" sub={`${lib.liked.length}곡`} art={<div className="lib-art liked-art"><Heart size={18} fill="#fff" /></div>} />
+            <Row
+              active={isActive('liked')}
+              onClick={() => go('liked')}
+              name="좋아요 표시한 곡"
+              sub={`${lib.liked.length}곡`}
+              art={<div className="lib-art liked-art"><Heart size={18} fill="#fff" /></div>}
+              isDragOver={dragOverId === 'liked'}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                if (dragOverId !== 'liked') setDragOverId('liked');
+              }}
+              onDragLeave={() => {
+                if (dragOverId === 'liked') setDragOverId(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverId(null);
+                try {
+                  const raw = e.dataTransfer.getData('application/json');
+                  if (raw) {
+                    const track = JSON.parse(raw);
+                    if (track?.id) {
+                      if (!lib.isLiked(track.id)) {
+                        lib.toggleLike(track);
+                        toast(`'좋아요 표시한 곡'에 '${track.title}'을(를) 추가했습니다`);
+                      } else {
+                        toast(`'좋아요 표시한 곡'에 이미 있는 곡입니다`);
+                      }
+                    }
+                  }
+                } catch {}
+              }}
+            />
             {lib.playlists.map((p) => (
-              <Row key={p.id} active={isActive('local', p.id)} onClick={() => go('local', { id: p.id })} onContextMenu={(e) => playlistMenu(e, p)} name={p.name} sub={`플레이리스트 · ${p.tracks.length}곡`}
-                art={p.thumb || p.tracks[0]?.thumb ? <Thumb src={p.thumb || p.tracks[0]?.thumb} className="lib-art" /> : <div className="lib-art"><ListMusic size={18} /></div>} />
+              <Row
+                key={p.id}
+                active={isActive('local', p.id)}
+                onClick={() => go('local', { id: p.id })}
+                onContextMenu={(e) => playlistMenu(e, p)}
+                name={p.name}
+                sub={`플레이리스트 · ${p.tracks.length}곡`}
+                art={p.thumb || p.tracks[0]?.thumb ? <Thumb src={p.thumb || p.tracks[0]?.thumb} className="lib-art" /> : <div className="lib-art"><ListMusic size={18} /></div>}
+                isDragOver={dragOverId === p.id}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                  if (dragOverId !== p.id) setDragOverId(p.id);
+                }}
+                onDragLeave={() => {
+                  if (dragOverId === p.id) setDragOverId(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverId(null);
+                  try {
+                    const raw = e.dataTransfer.getData('application/json');
+                    if (raw) {
+                      const track = JSON.parse(raw);
+                      if (track?.id) {
+                        const added = lib.addToPlaylist(p.id, track);
+                        if (added > 0) {
+                          toast(`'${p.name}'에 '${track.title}'을(를) 추가했습니다`);
+                        } else {
+                          toast(`'${p.name}'에 이미 있는 곡입니다`);
+                        }
+                      }
+                    }
+                  } catch (err) {
+                    console.error('Drop error', err);
+                  }
+                }}
+              />
             ))}
             {!lib.playlists.length && (
               <div className="lib-cta">
