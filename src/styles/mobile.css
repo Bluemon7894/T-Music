@@ -145,6 +145,9 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .m-tab-icon { position: relative; display: inline-flex; }
 .m-tab-badge { position: absolute; top: -4px; right: -9px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--grad-hot); color: #fff; font-size: 9.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 
+/* The keyboard needs the room more than these do. */
+.kb-open .m-tabs, .kb-open .m-mini { display: none; }
+
 /* ---------- bottom sheet ---------- */
 .m-sheet-back { position: fixed; inset: 0; z-index: 340; display: flex; align-items: flex-end; background: rgba(6, 3, 14, 0.6); animation: fade-in 0.15s; }
 .m-sheet {

@@ -117,10 +117,10 @@ final class WebHost {
         });
     }
 
-    void setInsets(float top, float bottom) {
+    void setInsets(float top, float bottom, boolean keyboard) {
         insetTop = top;
         insetBottom = bottom;
-        bridge.emit("insets", "top", top, "bottom", bottom);
+        bridge.emit("insets", "top", top, "bottom", bottom, "keyboard", keyboard);
     }
 
     float insetTop() {

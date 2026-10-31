@@ -19,7 +19,10 @@ const setInsets = (top, bottom) => {
   document.documentElement.style.setProperty('--safe-bottom', `${bottom || 0}px`);
 };
 setInsets(info.insetTop, info.insetBottom);
-onNative('insets', ({ top, bottom }) => setInsets(top, bottom));
+onNative('insets', ({ top, bottom, keyboard }) => {
+  setInsets(top, bottom);
+  document.documentElement.classList.toggle('kb-open', keyboard);
+});
 
 // ---- <audio> asks the phone for /stream/ID, and the phone asks here which URL that is ----
 window.__tm.resolveStream = async (id, request) => {

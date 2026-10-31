@@ -108,10 +108,13 @@ public class MainActivity extends Activity {
             top = insets.getSystemWindowInsetTop();
             bottom = insets.getSystemWindowInsetBottom();
             // Below Android 11 the keyboard is counted in the bottom inset and already resizes the window.
-            if (bottom > 200 * density) bottom = 0;
+            if (bottom > 200 * density) {
+                keyboard = -1;
+                bottom = 0;
+            }
         }
-        root.setPadding(0, 0, 0, keyboard);
-        if (started) WebHost.get(this).setInsets(top / density, bottom / density);
+        root.setPadding(0, 0, 0, Math.max(0, keyboard));
+        if (started) WebHost.get(this).setInsets(top / density, bottom / density, keyboard != 0);
         return Build.VERSION.SDK_INT >= 30 ? WindowInsets.CONSUMED : insets.consumeSystemWindowInsets();
     }
 

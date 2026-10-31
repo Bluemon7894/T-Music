@@ -9,8 +9,8 @@ const PACKAGE = 'com.bluemon7894.tmusic';
 const APK = 'release/T-Music-Android-debug.apk';
 const OUT = 'android/test/out';
 const CDP_PORT = 9222;
-// A freely licensed test sound, for when YouTube refuses this machine's IP address.
-const SAMPLE_AUDIO = 'https://upload.wikimedia.org/wikipedia/commons/2/21/Speakertest.ogg';
+// A generated tone from this repository, for when YouTube refuses this machine's IP address.
+const SAMPLE_AUDIO = `https://raw.githubusercontent.com/Bluemon7894/T-Music/${process.env.GITHUB_SHA || 'main'}/android/test/sample.wav`;
 
 fs.mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -164,8 +164,9 @@ async function main() {
   await tap('.searchbox input');
   await sleep(1500);
   shot('04-keyboard');
-  const box = await js(`(() => { const r = document.querySelector('.m-tabs')?.getBoundingClientRect(); return { tabsBottom: r?.bottom, height: innerHeight }; })()`);
+  const box = await js(`(() => { const r = document.querySelector('.m-tabs')?.getBoundingClientRect(); return { tabsHeight: r?.height, height: innerHeight, open: document.documentElement.classList.contains('kb-open') }; })()`);
   note(`with keyboard: ${JSON.stringify(box)}`);
+  check('the tab bar steps aside for the keyboard', box.open && !box.tabsHeight, JSON.stringify(box));
   await js(`(() => { const i = document.querySelector('.searchbox input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i, '아이유 라일락'); i.dispatchEvent(new Event('input',{bubbles:true})); i.closest('form').requestSubmit(); i.blur(); })()`);
   await waitFor(() => has('.search-songs .tl-row'), 30000);
   await sleep(1200);
@@ -250,10 +251,8 @@ async function main() {
   check('media play button', await waitFor(async () => !(await pos()).paused, 6000));
   const firstId = (await pos()).id;
   shell('cmd', 'media_session', 'dispatch', 'next');
-  if (!usedSample) {
-    check('media next button changes the track', await waitFor(async () => { const p = await pos(); return p.id && p.id !== firstId; }, 12000));
-    shell('cmd', 'media_session', 'dispatch', 'previous');
-  }
+  check('media next button changes the track', await waitFor(async () => { const p = await pos(); return p.id && p.id !== firstId; }, 12000));
+  shell('cmd', 'media_session', 'dispatch', 'previous');
   await sleep(1000);
 
   // ---- back button at the top level leaves the app running ----
@@ -281,7 +280,7 @@ async function main() {
   check('sign-in listener opens', port > 0, port);
   const heard = js(`new Promise((resolve) => { const old = window.__tm.onNative; window.__tm.onNative = (e) => { old(e); if (e.type === 'auth') resolve(e.code); }; setTimeout(() => resolve(null), 8000); })`);
   await sleep(300);
-  shell('sh', '-c', `printf 'GET /callback?state=state123&code=abc123 HTTP/1.1\\r\\nHost: x\\r\\n\\r\\n' | toybox nc -w 2 127.0.0.1 ${port}`);
+  shell(`printf 'GET /callback?state=state123&code=abc123 HTTP/1.1\\r\\nHost: x\\r\\n\\r\\n' | toybox nc -w 2 127.0.0.1 ${port}`);
   check('sign-in answer reaches the page', (await heard) === 'abc123');
 
   // ---- downloads ----
