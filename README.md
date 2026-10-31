@@ -85,6 +85,8 @@ gh workflow run android-release-check.yml -f tag=android-vX.Y.Z   # 올린 APK�
 gh release edit android-vX.Y.Z --draft=false --latest=false
 ```
 
+v1.1.0 이전에 설치된 앱은 GitHub 목록의 첫 번째 Android 릴리즈를 최신으로 봅니다. 이 목록은 태그의 글자 순서라서 `1.0.10`은 `1.0.8`보다 뒤에 옵니다. 그래서 그 뒤의 버전 번호는 각 자리가 한 자리 수를 넘지 않게 올립니다 (`1.1.9` 다음은 `1.2.0`).
+
 ## 구조
 
 ```

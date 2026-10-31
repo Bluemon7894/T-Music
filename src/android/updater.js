@@ -3,7 +3,7 @@
 import { Native, onNative } from './native.js';
 import { tr } from '../lib/i18n.js';
 
-const RELEASES = 'https://api.github.com/repos/Bluemon7894/T-Music/releases?per_page=50';
+const RELEASES = 'https://api.github.com/repos/Bluemon7894/T-Music/releases?per_page=100';
 const TAG = /^android-v(\d+(\.\d+)*)$/;
 
 const listeners = new Set();
@@ -26,9 +26,13 @@ export async function checkUpdate() {
   const res = await fetch(RELEASES, { headers: { Accept: 'application/vnd.github.v3+json', 'User-Agent': 'T-Music-App' } });
   if (!res.ok) throw new Error(tr('GitHub 응답 오류 ({0})', res.status));
   const releases = await res.json();
-  const release = releases.find((r) => !r.draft && TAG.test(r.tag_name) && r.assets?.some((a) => a.name.endsWith('.apk')));
+  // GitHub sorts these by tag as text, so 1.0.10 comes after 1.0.8. The highest number is the newest.
+  const versionOf = (r) => TAG.exec(r.tag_name)[1];
+  const release = releases
+    .filter((r) => !r.draft && TAG.test(r.tag_name) && r.assets?.some((a) => a.name.endsWith('.apk')))
+    .reduce((best, r) => (!best || isNewer(versionOf(r), versionOf(best)) ? r : best), null);
   if (!release) return { hasUpdate: false, currentVersion: current };
-  const latestVersion = TAG.exec(release.tag_name)[1];
+  const latestVersion = versionOf(release);
   const apk = release.assets.find((a) => a.name.endsWith('.apk'));
   downloadUrl = apk.browser_download_url;
   return {
