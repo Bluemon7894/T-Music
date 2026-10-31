@@ -1,7 +1,7 @@
 {
   "name": "t-music",
   "productName": "T-Music",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "광고 없는 개인용 음악 플레이어 (YouTube 기반)",
   "author": "Bluemon7894",
   "main": "electron/main.js",
