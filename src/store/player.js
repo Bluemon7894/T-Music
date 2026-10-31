@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api, streamUrl } from '../lib/api.js';
 import { attach, setMusicFade, startAudioOnsetDetection } from '../lib/audio.js';
-import { cancelSound, commitEnd, endLead, hasStarted, isEndCommitted, isEnding, isStarting, isWaitingForMusic, playEndSound, playStartSound, setDeckLevel, setStarted, startLength, useDeck } from './deck.js';
+import { pressDeckKey, cancelSound, commitEnd, endLead, hasStarted, isEndCommitted, isEnding, isStarting, isWaitingForMusic, playEndSound, playStartSound, setDeckLevel, setStarted, startLength, useDeck } from './deck.js';
 import { useLibrary } from './library.js';
 import { usePrefs } from './prefs.js';
 import { toast } from './ui.js';
@@ -378,6 +378,7 @@ export const usePlayer = create((set, get) => ({
 
   async next(auto = false) {
     if (room && !(auto ? room.allowAuto() : room.allowTrackChange())) return;
+    if (!auto) pressDeckKey('next');
     const { index, repeat, autoplay } = get();
     let { queue } = get();
     if (auto && repeat === 'one') {
@@ -480,6 +481,7 @@ export const usePlayer = create((set, get) => ({
 
   prev() {
     if (room && !room.allowTrackChange()) return;
+    pressDeckKey('prev');
     commitListen();
     const a = active();
     if (a.currentTime > 3 || get().index <= 0) {

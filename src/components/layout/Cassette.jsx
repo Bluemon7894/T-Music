@@ -1,7 +1,7 @@
 // The stage's tape deck. Tape runs at a steady speed, so each reel turns slower as it fills and faster as
 // it empties, and the wound tape moves across from left to right with the song. The tape seats itself
 // and the play key goes down in time with the clicks of the start sound.
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { ChevronsLeft, ChevronsRight, Pause, Play } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { DECKS, useDeck } from '../../store/deck.js';
@@ -36,6 +36,7 @@ const BASS_BINS = 6;
 const SEAT_LIFT = 3.5; // percent of the tape's height
 const SEAT_UP_UNTIL = 0.3;
 const SEAT_DOWN_UNTIL = 0.72;
+const KEY_PRESS_MS = 240;
 
 const markPosition = (db) => 10 ** ((db - 3) / 20);
 
@@ -63,15 +64,34 @@ function seatOffset(t) {
   return -SEAT_LIFT * (1 - falling * falling);
 }
 
-function useCassetteMotion(parts) {
+// Skipping a track pushes its key in and lets it spring back.
+function useKeyPresses(parts) {
   useEffect(() => {
+    const timers = new Map();
+    const onKey = (e) => {
+      const key = e.detail === 'prev' ? parts.prevKey.current : parts.nextKey.current;
+      if (!key) return;
+      clearTimeout(timers.get(key));
+      key.classList.add('down');
+      timers.set(key, setTimeout(() => key.classList.remove('down'), KEY_PRESS_MS));
+    };
+    window.addEventListener('t-music:deck-key', onKey);
+    return () => {
+      window.removeEventListener('t-music:deck-key', onKey);
+      for (const t of timers.values()) clearTimeout(t);
+    };
+  }, [parts]);
+}
+
+function useCassetteMotion(parts) {
+  useLayoutEffect(() => {
     let raf = 0;
     let last = performance.now();
     let speed = 0;
     let left = 0;
     let right = 0;
     let wound = 0;
-    let shown = 0;
+    let shown = null;
     let needle = 0;
     let peakUntil = 0;
     let bass = 0;
@@ -82,7 +102,8 @@ function useCassetteMotion(parts) {
 
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
-      const dt = Math.min(0.1, (now - last) / 1000);
+      // The first frame's timestamp can be slightly older than the moment this loop started.
+      const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
       const p = usePlayer.getState();
       const { phase, at } = useDeck.getState();
@@ -98,7 +119,8 @@ function useCassetteMotion(parts) {
       // The stopped player goes back to zero at the very end: the tape stays full until the sound is over.
       const duration = p.duration || p.queue[p.index]?.duration || 0;
       if (phase !== 'ending' || p.playing) wound = duration > 0 ? Math.min(1, p.getPreciseTime() / duration) : 0;
-      shown += (wound - shown) * Math.min(1, dt * 4);
+      // Opening in the middle of a song, the tape is already where it should be.
+      shown = shown === null ? wound : shown + (wound - shown) * Math.min(1, dt * 4);
       const span = PACK_MAX * PACK_MAX - PACK_MIN * PACK_MIN;
       const radiusLeft = Math.sqrt(PACK_MAX * PACK_MAX - span * shown);
       const radiusRight = Math.sqrt(PACK_MIN * PACK_MIN + span * shown);
@@ -144,7 +166,7 @@ function useCassetteMotion(parts) {
         parts.counter.current.textContent = counter;
       }
     };
-    raf = requestAnimationFrame(frame);
+    frame(last); // before the first paint, so the reels never show the wrong amount of tape
     return () => cancelAnimationFrame(raf);
   }, [parts]);
 }
@@ -241,6 +263,8 @@ export default function Cassette({ track, playing }) {
     peak: { current: null },
     glow: { current: null },
     counter: { current: null },
+    prevKey: { current: null },
+    nextKey: { current: null },
     playKey: { current: null },
     pauseKey: { current: null },
   }).current;
@@ -248,6 +272,7 @@ export default function Cassette({ track, playing }) {
 
   useTilt(tilt, { max: 8, scale: 1 });
   useCassetteMotion(parts);
+  useKeyPresses(parts);
 
   return (
     <div className="stage-disc-wrap" ref={tilt}>
@@ -286,10 +311,10 @@ export default function Cassette({ track, playing }) {
               <div className={`tt-led ${playing ? 'on' : ''}`}><i />STEREO</div>
             </div>
             <div className="cs-keys" aria-hidden="true">
-              <span className="cs-key"><ChevronsLeft /></span>
+              <span className="cs-key" ref={parts.prevKey}><ChevronsLeft /></span>
               <span className="cs-key" ref={parts.playKey}><Play fill="currentColor" /></span>
               <span className="cs-key" ref={parts.pauseKey}><Pause fill="currentColor" /></span>
-              <span className="cs-key"><ChevronsRight /></span>
+              <span className="cs-key" ref={parts.nextKey}><ChevronsRight /></span>
             </div>
           </div>
         </div>

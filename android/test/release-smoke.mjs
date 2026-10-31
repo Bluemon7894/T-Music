@@ -85,4 +85,4 @@ try {
 fs.writeFileSync(path.join(OUT, 'logcat.txt'), adb('logcat', '-d', '-t', '6000'));
 fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 1));
 console.log(`\n${results.filter((r) => r.ok).length} passed, ${results.filter((r) => !r.ok).length} failed`);
-process.exit(0);
+process.exit(results.every((r) => r.ok) ? 0 : 1);

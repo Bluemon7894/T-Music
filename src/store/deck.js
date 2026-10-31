@@ -125,6 +125,9 @@ let started = false;
 let committed = false;
 let waitingForMusic = false;
 
+// Someone skipped a track by hand, so the deck can press its key.
+export const pressDeckKey = (key) => window.dispatchEvent(new CustomEvent('t-music:deck-key', { detail: key }));
+
 export const hasStarted = () => started;
 export const setStarted = (value) => { started = value; };
 export const isStarting = () => useDeck.getState().phase === 'starting';

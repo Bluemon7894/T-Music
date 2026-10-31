@@ -34,7 +34,7 @@ function useDeckMotion({ platter, arm, glow }) {
 
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
-      const dt = Math.min(0.1, (now - last) / 1000);
+      const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
       const p = usePlayer.getState();
       const { phase, at } = useDeck.getState();
