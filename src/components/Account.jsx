@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { CloudCheck, CloudOff, LogIn, LogOut, RefreshCw, Trash2, UserRound } from 'lucide-react';
 import { useAccount } from '../store/account.js';
+import { useFriends } from '../store/friends.js';
 import { toast, useUI } from '../store/ui.js';
 import { useSync } from '../lib/librarySync.js';
 import { GoogleMark } from '../views/Login.jsx';
 
-function Avatar({ user, size = 34 }) {
+export function Avatar({ user, size = 34 }) {
   const [failed, setFailed] = useState(false);
   if (user?.photo && !failed) {
     return <img className="avatar" style={{ width: size, height: size }} src={user.photo} alt="" referrerPolicy="no-referrer" draggable={false} onError={() => setFailed(true)} />;
@@ -77,6 +78,33 @@ export function AccountButton() {
     <button className="account-btn" onClick={(e) => openMenu(e, items)} title={user?.name || '로그인'} aria-label="계정">
       <Avatar user={user} size={34} />
     </button>
+  );
+}
+
+export function FriendPrivacyCard() {
+  const user = useAccount((s) => s.user);
+  const sharing = useFriends((s) => s.sharing);
+  const setSharing = useFriends((s) => s.setSharing);
+  if (!user) return null;
+  return (
+    <section className="set-card" data-enter>
+      <h2><UserRound size={18} /> 친구에게 보이는 내 정보</h2>
+      <p className="muted">친구에게만 보여요. 친구가 아닌 사람은 볼 수 없어요.</p>
+      <div className="set-item" onClick={() => setSharing({ online: !sharing.online })}>
+        <div className="set-item-text">
+          <span className="set-item-title">온라인 상태 표시</span>
+          <span className="muted small">끄면 친구에게 오프라인으로 보이고, 듣는 곡도 보이지 않아요.</span>
+        </div>
+        <div className={`switch ${sharing.online ? 'on' : ''}`} />
+      </div>
+      <div className={`set-item ${sharing.online ? '' : 'disabled'}`} onClick={() => sharing.online && setSharing({ track: !sharing.track })}>
+        <div className="set-item-text">
+          <span className="set-item-title">듣고 있는 곡 표시</span>
+          <span className="muted small">끄면 온라인으로만 보이고 무슨 곡을 듣는지는 보이지 않아요.</span>
+        </div>
+        <div className={`switch ${sharing.online && sharing.track ? 'on' : ''}`} />
+      </div>
+    </section>
   );
 }
 

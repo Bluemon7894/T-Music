@@ -1,26 +1,40 @@
-// Turns a video id into a direct audio URL using InnerTube visionOS.
+// Turns a video id into a direct audio URL. visionOS is the only client that currently serves whole
+// tracks. The others stay listed so playback moves to them by itself if YouTube blocks it and they
+// work again. They answer normally today but refuse anything past the first megabyte, so every
+// fallback has to prove it can serve the middle of the file before it's used.
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { getClient } from './client.js';
+import { getClient, resetClient } from './client.js';
+
+const CLIENTS = ['VISIONOS', 'IOS', 'ANDROID_VR'];
+const TIMEOUT_MS = 12000;
+const COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const FAILS_BEFORE_COOLDOWN = 3;
+
+// This video can't be played. That says nothing about the client that was asked.
+class UnplayableError extends Error {}
 
 async function innertube(id, clientName) {
   const yt = await getClient();
-  const info = await yt.getBasicInfo(id, { client: clientName });
+  const info = await yt.getBasicInfo(id, { client: clientName }).catch((e) => {
+    // The library throws for deleted and private videos instead of reporting their status.
+    throw /unavailable|private|removed/i.test(e.message) ? new UnplayableError(e.message) : e;
+  });
   const ps = info.playability_status;
-  if (ps?.status !== 'OK') throw new Error(ps?.reason || ps?.status || 'unplayable');
+  if (ps?.status !== 'OK') throw new UnplayableError(ps?.reason || ps?.status || 'unplayable');
   const fmt = info.chooseFormat({ type: 'audio', quality: 'best' });
   const url = await fmt.decipher(yt.session.player);
   if (!url) throw new Error('no url');
-  return { url, headers: {}, mime: fmt.mime_type, bitrate: fmt.bitrate };
+  return { url, headers: {}, mime: fmt.mime_type, bitrate: fmt.bitrate, size: Number(fmt.content_length) || 0 };
 }
 
-// Dedicated playback engine: InnerTube visionOS
-const METHODS = {
-  VISIONOS: (id) => innertube(id, 'VISIONOS'),
-};
-const DEFAULT_ORDER = ['VISIONOS'];
-const TIMEOUT_MS = 12000;
+async function servesWholeFile(r) {
+  const middle = Math.floor(r.size / 2);
+  const res = await fetch(r.url, { headers: { ...r.headers, Range: `bytes=${middle}-${middle + 1023}` } });
+  res.body?.cancel();
+  return res.status === 206 || res.status === 200;
+}
 
 const statsFile = () => path.join(app.getPath('userData'), 'stream-stats.json');
 let stats = null;
@@ -52,6 +66,35 @@ function expiryOf(url) {
   return exp ? exp * 1000 - 10 * 60 * 1000 : Date.now() + 60 * 60 * 1000;
 }
 
+function coolingDown(name) {
+  const s = loadStats()[name];
+  return Boolean(s && (s.streak || 0) >= FAILS_BEFORE_COOLDOWN && Date.now() - s.lastFail < COOLDOWN_MS);
+}
+
+// Clients that have been failing go last rather than being dropped: one may have recovered.
+const clientOrder = () => [...CLIENTS.filter((c) => !coolingDown(c)), ...CLIENTS.filter(coolingDown)];
+
+async function tryClients(id) {
+  let unplayable = null;
+  let lastError = null;
+  for (const name of clientOrder()) {
+    try {
+      const r = await withTimeout(innertube(id, name), TIMEOUT_MS);
+      if (name !== CLIENTS[0] && !(await withTimeout(servesWholeFile(r), TIMEOUT_MS))) throw new Error('only serves the start of the file');
+      mark(name, true);
+      return { ...r, method: name };
+    } catch (e) {
+      if (e instanceof UnplayableError) {
+        unplayable ??= e;
+      } else {
+        mark(name, false, e.message);
+        lastError = e;
+      }
+    }
+  }
+  throw unplayable || lastError || new Error('no client available');
+}
+
 const cache = new Map();
 const inflight = new Map();
 
@@ -62,13 +105,19 @@ export async function resolve(id) {
 
   const job = (async () => {
     try {
-      const r = await withTimeout(METHODS.VISIONOS(id), TIMEOUT_MS);
-      const entry = { ...r, id, method: 'VISIONOS', expires: r.expires || expiryOf(r.url) };
+      let r;
+      try {
+        r = await tryClients(id);
+      } catch (e) {
+        if (e instanceof UnplayableError) throw e;
+        // Every client failing usually means the session itself went stale.
+        resetClient();
+        r = await tryClients(id);
+      }
+      const entry = { ...r, id, expires: r.expires || expiryOf(r.url) };
       cache.set(id, entry);
-      mark('VISIONOS', true);
       return { ...entry, fresh: true };
     } catch (e) {
-      mark('VISIONOS', false, e.message);
       throw new Error('재생할 수 없는 곡입니다: ' + e.message);
     }
   })().finally(() => inflight.delete(id));
@@ -80,26 +129,29 @@ export async function resolve(id) {
 // Called when a URL we handed out stopped working.
 export function invalidate(id, method, blame) {
   cache.delete(id);
-  if (blame) mark('VISIONOS', false, 'stream request rejected');
+  if (blame && method) mark(method, false, 'stream request rejected');
 }
 
 export function prefetch(id) {
   resolve(id).catch(() => {});
 }
 
-// Reports visionOS playback engine diagnosis.
 export async function diagnose(id = 'OIHlzvEKncQ') {
-  const t = Date.now();
-  try {
-    const r = await withTimeout(METHODS.VISIONOS(id), TIMEOUT_MS);
-    const res = await fetch(r.url, { headers: { ...r.headers, Range: 'bytes=0-1023' } });
-    return [{ name: 'VISIONOS', ok: res.status === 206 || res.status === 200, ms: Date.now() - t, http: res.status, mime: r.mime }];
-  } catch (e) {
-    return [{ name: 'VISIONOS', ok: false, ms: Date.now() - t, error: e.message.slice(0, 160) }];
+  const results = [];
+  for (const name of CLIENTS) {
+    const t = Date.now();
+    try {
+      const r = await withTimeout(innertube(id, name), TIMEOUT_MS);
+      const whole = await withTimeout(servesWholeFile(r), TIMEOUT_MS);
+      results.push({ name, ok: whole, ms: Date.now() - t, mime: r.mime });
+    } catch (e) {
+      results.push({ name, ok: false, ms: Date.now() - t, error: e.message.slice(0, 160) });
+    }
   }
+  return results;
 }
 
 export function status() {
   const st = loadStats();
-  return [{ name: 'VISIONOS', ...(st.VISIONOS || { ok: 0, fail: 0 }) }];
+  return CLIENTS.map((name) => ({ name, ...(st[name] || { ok: 0, fail: 0 }) }));
 }

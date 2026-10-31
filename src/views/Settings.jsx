@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useAsync } from '../components/common.jsx';
-import { AccountCard } from '../components/Account.jsx';
+import { AccountCard, FriendPrivacyCard } from '../components/Account.jsx';
 import { useLibrary } from '../store/library.js';
 import { usePlayer, applyOutputDevice } from '../store/player.js';
 import { useDownloads, openDownloads } from '../store/downloads.js';
@@ -164,6 +164,7 @@ export default function Settings() {
 
       <div className="settings-grid">
         <AccountCard />
+        <FriendPrivacyCard />
 
         <section className="set-card" data-enter>
           <h2><Radio size={18} /> 재생 및 음질 설정</h2>

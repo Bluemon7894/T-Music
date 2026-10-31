@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
-import { Heart, Plus, Library as LibraryIcon } from 'lucide-react';
+import { Heart, Link2, Plus, Library as LibraryIcon } from 'lucide-react';
 import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
 import { useEnter } from '../lib/motion.js';
+import { openSharedPlaylist } from '../lib/sharedPlaylists.js';
+import { toast, useUI } from '../store/ui.js';
 import { Grid } from '../components/Cards.jsx';
 import { Empty, PlayButton } from '../components/common.jsx';
 
@@ -21,6 +23,17 @@ export default function Library() {
   const ref = useRef(null);
   useEnter(ref, [tab]);
 
+  const openLink = () => useUI.getState().prompt({
+    title: '공유 플레이리스트 열기',
+    placeholder: 'tmusic://playlist/... 링크를 붙여넣으세요',
+    submitLabel: '열기',
+    onSubmit: async (text) => {
+      const id = await openSharedPlaylist(text).catch(() => null);
+      if (id) go('local', { id });
+      else toast('공유 플레이리스트를 찾을 수 없습니다');
+    },
+  });
+
   const playlists = lib.playlists.map((p) => ({ kind: 'local', id: p.id, title: p.name, subtitle: `${p.tracks.length}곡`, thumb: p.thumb || p.tracks[0]?.thumb }));
   const albums = lib.savedAlbums.map((a) => ({ ...a, kind: 'album' }));
   const artists = lib.followed.map((a) => ({ ...a, kind: 'artist' }));
@@ -31,6 +44,7 @@ export default function Library() {
       <div className="page-title" data-enter>
         <h1>보관함</h1>
         <div className="row-btns">
+          <button className="btn" onClick={openLink}><Link2 size={15} /> 공유 링크 열기</button>
           <button className="btn grad" onClick={() => go('local', { id: lib.createPlaylist() })}><Plus size={15} /> 새 플레이리스트</button>
         </div>
       </div>

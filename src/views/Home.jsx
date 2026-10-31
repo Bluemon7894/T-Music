@@ -6,6 +6,7 @@ import { useDownloads } from '../store/downloads.js';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
 import { dailyOrder, greeting, fmtBytes } from '../lib/util.js';
+import { artistsOfTheDay, hasTaste, mixSeeds, rankMix, recentlyPlayedIds, tasteProfile } from '../lib/taste.js';
 import { useEnter, animate, stagger, ease } from '../lib/motion.js';
 import { splitText } from 'animejs';
 import { useAsync, Thumb, PlayButton, SkeletonCards } from '../components/common.jsx';
@@ -105,6 +106,26 @@ export default function Home() {
   const recentIds = lib.recent.slice(0, RECOMMEND_SEEDS).map((t) => t.id).join();
   const seed = useMemo(() => dailyOrder(lib.recent.slice(0, RECOMMEND_SEEDS), 'seed')[0], [recentIds]);
   const home = useAsync(() => api.home(), []);
+  const taste = useMemo(() => tasteProfile(lib.listens, lib.liked), [lib.listens, lib.liked]);
+  const seeds = useMemo(() => (hasTaste(taste) ? mixSeeds(taste) : []), [taste]);
+  const seedKey = seeds.map((s) => s.id).join();
+  const excluded = () => new Set([...recentlyPlayedIds(lib.listens), ...lib.liked.map((t) => t.id)]);
+  const mix = useAsync(async () => {
+    if (!seeds.length) return [];
+    const lists = await Promise.allSettled(seeds.map((s) => api.related(s.id)));
+    return rankMix(lists.filter((r) => r.status === 'fulfilled').map((r) => r.value), taste, excluded());
+  }, [seedKey]);
+  const favoriteArtists = useMemo(() => (hasTaste(taste) ? artistsOfTheDay(taste).filter((a) => a.name) : []), [taste]);
+  const artistKey = favoriteArtists.map((a) => a.name).join();
+  const byArtist = useAsync(async () => {
+    const skip = excluded();
+    const found = await Promise.allSettled(favoriteArtists.map(async (a) => {
+      const { songs } = await api.search(a.name);
+      const items = songs.filter((t) => t.artists?.some((x) => x.name === a.name) && !skip.has(t.id));
+      return { name: a.name, items: items.slice(0, SHELF_ITEMS) };
+    }));
+    return found.filter((r) => r.status === 'fulfilled' && r.value.items.length >= MIN_FRESH_PICKS).map((r) => r.value);
+  }, [artistKey]);
   const forYou = useAsync(async () => {
     if (!seed) return [];
     const heard = new Set(lib.recent.map((t) => t.id));
@@ -121,6 +142,7 @@ export default function Home() {
 
   const quick = useMemo(() => {
     const items = [{ kind: 'liked', title: '좋아요 표시한 곡', icon: <Heart size={20} fill="#fff" /> }];
+    if (mix.data?.length) items.push({ kind: 'mix', title: '오늘의 믹스', thumb: mix.data[0].thumb });
     for (const p of lib.playlists.slice(0, 3)) items.push({ kind: 'local', id: p.id, title: p.name, thumb: p.thumb || p.tracks[0]?.thumb, tracks: p.tracks });
     for (const a of lib.savedAlbums.slice(0, 2)) items.push({ kind: 'album', ...a });
     for (const t of lib.recent) {
@@ -132,9 +154,10 @@ export default function Home() {
       if (!items.some((x) => x.id === it.id)) items.push(it);
     }
     return items.slice(0, 8);
-  }, [lib.playlists, lib.savedAlbums, lib.recent, featured]);
+  }, [lib.playlists, lib.savedAlbums, lib.recent, featured, mix.data]);
 
   const playQuick = (it) => {
+    if (it.kind === 'mix') return playList(mix.data, 0, { name: '오늘의 믹스' });
     if (it.kind === 'liked') return lib.liked.length ? playList(lib.liked, 0, { name: '좋아요 표시한 곡' }) : go('liked');
     if (it.kind === 'local') return playList(it.tracks, 0, { name: it.title });
     return playItem(it);
@@ -181,7 +204,9 @@ export default function Home() {
       <StatsRow />
 
       {lib.recent.length > 0 && <Shelf title="최근 재생한 곡" items={lib.recent.slice(0, 20).map((t) => ({ ...t, kind: 'track', isRecent: true }))} />}
-      {forYou.data?.length > 0 && <Shelf title="취향 저격 추천" subtitle={`'${seed?.title}'를 좋아한다면`} items={forYou.data.map((t) => ({ ...t, kind: 'track' }))} />}
+      {mix.data?.length > 0 && <Shelf title="오늘의 믹스" subtitle={`자주 듣는 ${taste.artists.slice(0, 2).map((a) => a.name).filter(Boolean).join(', ')} 취향으로 골랐어요`} items={mix.data.map((t) => ({ ...t, kind: 'track' }))} />}
+      {byArtist.data?.map((a) => <Shelf key={a.name} title={`자주 듣는 ${a.name}`} subtitle="아직 안 들어본 곡" items={a.items.map((t) => ({ ...t, kind: 'track' }))} />)}
+      {!mix.data?.length && forYou.data?.length > 0 && <Shelf title="취향 저격 추천" subtitle={`'${seed?.title}'를 좋아한다면`} items={forYou.data.map((t) => ({ ...t, kind: 'track' }))} />}
       {lib.followed.length > 0 && <Shelf title="팔로우한 아티스트" items={lib.followed.map((a) => ({ ...a, kind: 'artist' }))} />}
 
       {home.loading && !home.data && <><div className="sk-shelf-title sk" /><SkeletonCards /><div className="sk-shelf-title sk" /><SkeletonCards /></>}

@@ -3,12 +3,15 @@ import { Radio, X, Maximize2, ListMusic, Sparkles, Mic2 } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useLibrary } from '../../store/library.js';
+import { useRoom } from '../../store/room.js';
+import { safeTrack } from '../../lib/safeTrack.js';
 import { Thumb, ArtistLinks, Equalizer } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
 import LyricsView from './LyricsView.jsx';
 import { fmtTime } from '../../lib/util.js';
+import { auth } from '../../lib/firebase.js';
 import { useTilt, animate, ease } from '../../lib/motion.js';
 import logo from '../../assets/logo-mark.png';
 
@@ -74,12 +77,33 @@ function Idle() {
   );
 }
 
+// While following a room, what plays next comes from the room's shared queue.
+function RoomQueueSection() {
+  const queue = useRoom((s) => s.queue);
+  const uid = auth.currentUser?.uid;
+  const isHost = useRoom((s) => s.meta?.hostUid === uid);
+  const removeFromQueue = useRoom((s) => s.removeFromQueue);
+  return (
+    <>
+      <div className="np-section"><span>같이듣기 대기열</span><small>{queue.length}곡</small></div>
+      {queue.map((item, i) => {
+        const track = safeTrack(item.track);
+        if (!track) return null;
+        const extra = isHost || item.by === uid ? [{ divider: true }, { label: '대기열에서 삭제', icon: X, onClick: () => removeFromQueue(item.key) }] : [];
+        return <QueueRow key={item.key} index={i + 1} track={track} menu={trackMenuItems(track, extra)} />;
+      })}
+      {!queue.length && <p className="np-hint">곡을 우클릭해서 대기열에 추가하면 멤버 모두의 다음 곡이 돼요.</p>}
+    </>
+  );
+}
+
 export default function NowPanel() {
   const queue = usePlayer((s) => s.queue);
   const index = usePlayer((s) => s.index);
   const autoplay = usePlayer((s) => s.autoplay);
   const contextName = usePlayer((s) => s.context?.name);
   const { jumpTo, removeAt, toggleAutoplay } = usePlayer.getState();
+  const inRoom = useRoom((s) => s.attached);
   const panelTab = useUI((s) => s.panelTab);
   const setPanelTab = useUI((s) => s.setPanelTab);
   const togglePanel = useUI((s) => s.togglePanel);
@@ -105,6 +129,7 @@ export default function NowPanel() {
         {cur && panelTab === 'next' && (
           <>
             <NowCard track={cur} />
+            {inRoom && <RoomQueueSection />}
             {manualUpcoming.length > 0 && (
               <>
                 <div className="np-section">
@@ -130,7 +155,7 @@ export default function NowPanel() {
               </>
             )}
             {upcoming.length > 6 && <button className="text-btn block" onClick={() => setPanelTab('queue')}>대기열 전체 보기 ({upcoming.length}곡)</button>}
-            {!upcoming.length && <p className="np-hint">{autoplay ? '이 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 마지막 곡입니다. (자동 재생 꺼짐)'}</p>}
+            {!inRoom && !upcoming.length && <p className="np-hint">{autoplay ? '이 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 마지막 곡입니다. (자동 재생 꺼짐)'}</p>}
             {manualUpcoming.length > 0 && !autoUpcoming.length && (
               <p className="np-hint" style={{ fontSize: '11.5px', marginTop: 8 }}>
                 {autoplay ? '대기열의 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 곡이 끝나면 재생이 정지됩니다.'}
@@ -142,6 +167,7 @@ export default function NowPanel() {
           <>
             <div className="np-section"><span>지금 재생 중</span></div>
             <QueueRow track={cur} current index={1} menu={trackMenuItems(cur)} />
+            {inRoom && <RoomQueueSection />}
             {manualUpcoming.length > 0 && (
               <>
                 <div className="np-section"><span>다음 곡</span><small>{manualUpcoming.length}곡</small></div>
@@ -163,7 +189,7 @@ export default function NowPanel() {
                 ))}
               </>
             )}
-            {!upcoming.length && <p className="np-hint">{autoplay ? '이 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 마지막 곡입니다. (자동 재생 꺼짐)'}</p>}
+            {!inRoom && !upcoming.length && <p className="np-hint">{autoplay ? '이 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 마지막 곡입니다. (자동 재생 꺼짐)'}</p>}
             {manualUpcoming.length > 0 && !autoUpcoming.length && (
               <p className="np-hint" style={{ fontSize: '11.5px', marginTop: 8 }}>
                 {autoplay ? '대기열의 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 곡이 끝나면 재생이 정지됩니다.'}

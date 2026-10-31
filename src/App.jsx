@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import { api } from './lib/api.js';
 import { useRoute, useNav } from './store/nav.js';
 import { usePlayer } from './store/player.js';
-import { useUI } from './store/ui.js';
+import { toast, useUI } from './store/ui.js';
+import { openSharedPlaylist } from './lib/sharedPlaylists.js';
 import { initDownloads } from './store/downloads.js';
 import { useUpdater } from './store/updater.js';
 import { useAccount } from './store/account.js';
@@ -12,6 +13,7 @@ import TopBar from './components/layout/TopBar.jsx';
 import PlayerDock from './components/layout/PlayerDock.jsx';
 import NowPanel from './components/layout/NowPanel.jsx';
 import Stage from './components/layout/Stage.jsx';
+import MiniPlayer from './components/layout/MiniPlayer.jsx';
 import UpdateModal from './components/UpdateModal.jsx';
 import { ContextMenu, Toast, Dialog } from './components/Overlays.jsx';
 import Login, { Splash } from './views/Login.jsx';
@@ -22,6 +24,8 @@ import Library from './views/Library.jsx';
 import Downloads from './views/Downloads.jsx';
 import Settings from './views/Settings.jsx';
 import Room from './views/Room.jsx';
+import Friends from './views/Friends.jsx';
+import InvitePrompt from './components/InvitePrompt.jsx';
 import { Album, Playlist, Liked, LocalPlaylist } from './views/Collection.jsx';
 
 function View({ route }) {
@@ -37,6 +41,7 @@ function View({ route }) {
     case 'downloads': return <Downloads />;
     case 'settings': return <Settings />;
     case 'room': return <Room />;
+    case 'friends': return <Friends />;
     default: return <Home />;
   }
 }
@@ -145,6 +150,7 @@ function MainApp() {
   const route = useRoute();
   const panelOpen = useUI((s) => s.panelOpen);
   const stage = useUI((s) => s.stage);
+  const mini = useUI((s) => s.mini);
   const mainRef = useRef(null);
   const index = useNav((s) => s.index);
   const currentTrack = usePlayer((s) => s.queue[s.index]);
@@ -159,10 +165,17 @@ function MainApp() {
   // Invite links: tmusic://join/CODE, possibly opened before the app was running or signed in.
   useEffect(() => {
     const openInvite = () => {
-      api.takeInvite().then((code) => {
-        if (!code) return;
-        useNav.getState().go('room', {});
-        useRoom.getState().join(code);
+      api.takeInvite().then(async (invite) => {
+        if (!invite) return;
+        useUI.getState().setMini(false);
+        if (invite.kind === 'room') {
+          useNav.getState().go('room', {});
+          useRoom.getState().join(invite.code);
+          return;
+        }
+        const id = await openSharedPlaylist(invite.code).catch(() => null);
+        if (id) useNav.getState().go('local', { id });
+        else toast('공유 플레이리스트를 찾을 수 없습니다');
       }).catch(() => {});
     };
     openInvite();
@@ -217,6 +230,8 @@ function MainApp() {
 
   useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [index]);
 
+  if (mini) return <><MiniPlayer /><Toast /></>;
+
   return (
     <div className={`app ${panelOpen ? 'with-panel' : ''}`}>
       <div className="aurora"><i className="a1" /><i className="a2" /><i className="a3" /></div>
@@ -231,6 +246,7 @@ function MainApp() {
       <ContextMenu />
       <Dialog />
       <Toast />
+      <InvitePrompt />
       <UpdateModal />
     </div>
   );

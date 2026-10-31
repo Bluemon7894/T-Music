@@ -33,6 +33,9 @@ export const useUI = create((set, get) => ({
 
   stage: false, // fullscreen now-playing
   setStage(stage) { set({ stage }); },
+
+  mini: false, // the window shrunk to a small always-on-top player
+  setMini(mini) { set({ mini, ...(mini ? { stage: false } : {}) }); },
 }));
 
 export const toast = (text) => useUI.getState().showToast(text);

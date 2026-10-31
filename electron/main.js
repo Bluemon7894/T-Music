@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ipcMain, shell, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, screen, shell, Tray, Menu, nativeImage } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -18,11 +18,43 @@ const BG = '#0a0712';
 let tray = null;
 let isQuitting = false;
 let pendingInvite = null;
+let sizeBeforeMini = null;
+
+const MINI_SIZE = { width: 400, height: 136 };
+const MINI_MARGIN = 16;
+const NORMAL_MIN_SIZE = [1024, 640];
 
 function rememberInvite(argv) {
-  const match = argv.map((arg) => /^tmusic:\/\/join\/([A-Za-z0-9]{6})/.exec(arg)).find(Boolean);
-  if (match) pendingInvite = match[1].toUpperCase();
-  return Boolean(match);
+  for (const arg of argv) {
+    const room = /^tmusic:\/\/join\/([A-Za-z0-9]{6})/.exec(arg);
+    const playlist = /^tmusic:\/\/playlist\/([A-Za-z0-9]{22})/.exec(arg);
+    if (room) pendingInvite = { kind: 'room', code: room[1].toUpperCase() };
+    if (playlist) pendingInvite = { kind: 'playlist', code: playlist[1] };
+    if (room || playlist) return true;
+  }
+  return false;
+}
+
+function setMiniMode(on) {
+  const [win] = BrowserWindow.getAllWindows();
+  if (!win || on === Boolean(sizeBeforeMini)) return;
+  if (on) {
+    sizeBeforeMini = { bounds: win.getNormalBounds(), maximized: win.isMaximized() };
+    if (win.isMaximized()) win.unmaximize();
+    const { workArea } = screen.getDisplayMatching(win.getBounds());
+    win.setMinimumSize(MINI_SIZE.width, MINI_SIZE.height);
+    win.setBounds({ ...MINI_SIZE, x: workArea.x + workArea.width - MINI_SIZE.width - MINI_MARGIN, y: workArea.y + workArea.height - MINI_SIZE.height - MINI_MARGIN });
+    win.setResizable(false);
+    win.setAlwaysOnTop(true, 'floating');
+  } else {
+    const { bounds, maximized } = sizeBeforeMini;
+    sizeBeforeMini = null;
+    win.setAlwaysOnTop(false);
+    win.setResizable(true);
+    win.setMinimumSize(...NORMAL_MIN_SIZE);
+    win.setBounds(bounds);
+    if (maximized) win.maximize();
+  }
 }
 
 registerScheme();
@@ -123,10 +155,18 @@ const api = {
   googleSignIn: () => auth.googleSignIn(),
   cancelGoogleSignIn: () => auth.cancelGoogleSignIn(),
   copyText: (text) => clipboard.writeText(String(text)),
+  setMiniMode: (on) => setMiniMode(Boolean(on)),
+  showWindow: () => {
+    const [win] = BrowserWindow.getAllWindows();
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  },
   takeInvite: () => {
-    const code = pendingInvite;
+    const invite = pendingInvite;
     pendingInvite = null;
-    return code;
+    return invite;
   },
 };
 

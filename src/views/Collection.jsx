@@ -1,4 +1,7 @@
 // Album, YouTube playlist, liked songs and local playlist pages share one layout.
+import SharePanel from '../components/SharePanel.jsx';
+import { auth } from '../lib/firebase.js';
+import { canEditPlaylist } from '../lib/sharedPlaylists.js';
 import { useRef, useState } from 'react';
 import { Heart, ListMusic, Shuffle, PlusCircle, CheckCircle2, Pencil, Trash2, Search as SearchIcon, Radio } from 'lucide-react';
 import { api } from '../lib/api.js';
@@ -173,6 +176,8 @@ export function Liked() {
   );
 }
 
+const isOwnShare = (p) => p.share?.ownerUid === auth.currentUser?.uid;
+
 export function LocalPlaylist({ id }) {
   const pl = useLibrary((s) => s.playlists.find((p) => p.id === id));
   const { addToPlaylist, removeFromPlaylist, renamePlaylist, deletePlaylist, reorderPlaylist } = useLibrary.getState();
@@ -182,6 +187,7 @@ export function LocalPlaylist({ id }) {
   const [dragOver, setDragOver] = useState(false);
   if (!pl) return <ErrorMsg error="플레이리스트를 찾을 수 없습니다." />;
   const context = { name: pl.name };
+  const editable = canEditPlaylist(pl);
   const rename = () => prompt({ title: '플레이리스트 이름 바꾸기', value: pl.name, submitLabel: '저장', onSubmit: (v) => v.trim() && renamePlaylist(pl.id, v.trim()) });
   const cover = pl.thumb || pl.tracks[0]?.thumb;
   return (
@@ -189,7 +195,7 @@ export function LocalPlaylist({ id }) {
       className={`page collection ${dragOver ? 'playlist-drag-over' : ''}`}
       ref={ref}
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes('application/json')) {
+        if (editable && e.dataTransfer.types.includes('application/json')) {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
           if (!dragOver) setDragOver(true);
@@ -218,26 +224,27 @@ export function LocalPlaylist({ id }) {
       }}
     >
       <Header
-        kind="내 플레이리스트"
+        kind={pl.share ? '공유 플레이리스트' : '내 플레이리스트'}
         title={pl.name}
         thumb={cover}
         color={colorFor(pl.id)}
-        art={cover ? undefined : <div className="ph-art empty-art" onClick={rename}><ListMusic size={64} /></div>}
+        art={cover ? undefined : <div className="ph-art empty-art" onClick={editable ? rename : undefined}><ListMusic size={64} /></div>}
         meta={<span>{pl.tracks.length}곡{pl.tracks.length ? `, ${totalTime(pl.tracks)}` : ''}</span>}
       />
       <div className="page-body">
         <ActionBar tracks={pl.tracks} context={context}>
-          <button className="icon-btn big" title="이름 바꾸기" onClick={rename}><Pencil size={21} /></button>
-          <button className="icon-btn big" title="삭제" onClick={() => { deletePlaylist(pl.id); go('home'); toast('플레이리스트를 삭제했습니다'); }}><Trash2 size={21} /></button>
+          {editable && <button className="icon-btn big" title="이름 바꾸기" onClick={rename}><Pencil size={21} /></button>}
+          <button className="icon-btn big" title={pl.share && !isOwnShare(pl) ? '내 보관함에서 빼기' : '삭제'} onClick={() => { deletePlaylist(pl.id); go('home'); toast('플레이리스트를 삭제했습니다'); }}><Trash2 size={21} /></button>
         </ActionBar>
+        <SharePanel playlist={pl} />
         {pl.tracks.length ? (
           <Filterable tracks={pl.tracks}>
             {(shown, filtered) => (
               <TrackList
                 tracks={shown}
                 context={context}
-                onRemove={filtered ? undefined : (i) => removeFromPlaylist(pl.id, i)}
-                onReorder={filtered ? undefined : (from, to) => reorderPlaylist(pl.id, from, to)}
+                onRemove={filtered || !editable ? undefined : (i) => removeFromPlaylist(pl.id, i)}
+                onReorder={filtered || !editable ? undefined : (from, to) => reorderPlaylist(pl.id, from, to)}
               />
             )}
           </Filterable>

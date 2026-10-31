@@ -7,44 +7,190 @@
         ".read": "auth != null && $code.length === 6",
         ".write": "auth != null && !newData.exists() && !data.child('members').exists()",
         "meta": {
-          ".write": "auth != null && (!data.exists() || data.child('hostUid').val() === auth.uid || data.child('expiresAt').val() < now || !root.child('rooms').child($code).child('members').child(data.child('hostUid').val()).exists())",
-          ".validate": "newData.hasChildren(['hostUid', 'name', 'controlMode', 'createdAt', 'expiresAt'])",
-          "hostUid": { ".validate": "newData.isString()" },
-          "name": { ".validate": "newData.isString() && newData.val().length <= 40" },
-          "controlMode": { ".validate": "newData.val() === 'host' || newData.val() === 'everyone'" },
-          "createdAt": { ".validate": "newData.isNumber()" },
-          "expiresAt": { ".validate": "newData.isNumber() && newData.val() <= now + 90000000" },
-          "$other": { ".validate": false }
+          ".write": "auth != null && (!data.exists() || data.child('hostUid').val() === auth.uid || data.child('ownerUid').val() === auth.uid || (root.child('rooms').child($code).child('members').child(auth.uid).exists() && root.child('rooms').child($code).child('members').child(data.child('hostUid').val()).child('listening').val() !== true))",
+          ".validate": "newData.hasChildren(['hostUid', 'name', 'controlMode', 'createdAt'])",
+          "hostUid": {
+            ".validate": "newData.isString()"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "controlMode": {
+            ".validate": "newData.val() === 'host' || newData.val() === 'everyone'"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "ownerUid": {
+            ".validate": "newData.isString()"
+          },
+          "expiresAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
         },
         "members": {
           ".write": "auth != null && root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid",
           "$uid": {
             ".write": "auth != null && auth.uid === $uid && root.child('rooms').child($code).child('meta').exists()",
             ".validate": "newData.hasChildren(['name', 'joinedAt'])",
-            "name": { ".validate": "newData.isString() && newData.val().length <= 40" },
-            "photo": { ".validate": "newData.isString() && newData.val().length <= 500" },
-            "joinedAt": { ".validate": "newData.val() === now" },
-            "$other": { ".validate": false }
+            "name": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "photo": {
+              ".validate": "newData.isString() && newData.val().length <= 500"
+            },
+            "joinedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "listening": {
+              ".validate": "newData.isBoolean()"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         },
         "playback": {
           ".write": "auth != null && (root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid || (root.child('rooms').child($code).child('meta/controlMode').val() === 'everyone' && root.child('rooms').child($code).child('members').child(auth.uid).exists()))",
           ".validate": "newData.hasChildren(['track', 'positionMs', 'playing', 'updatedAt', 'rev', 'by'])",
-          "track": { "id": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{11}$/)" } },
-          "positionMs": { ".validate": "newData.isNumber()" },
-          "playing": { ".validate": "newData.isBoolean()" },
-          "updatedAt": { ".validate": "newData.val() === now" },
-          "rev": { ".validate": "newData.isNumber()" },
-          "by": { ".validate": "newData.val() === auth.uid" }
+          "track": {
+            "id": {
+              ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{11}$/)"
+            }
+          },
+          "positionMs": {
+            ".validate": "newData.isNumber()"
+          },
+          "playing": {
+            ".validate": "newData.isBoolean()"
+          },
+          "updatedAt": {
+            ".validate": "newData.val() === now"
+          },
+          "rev": {
+            ".validate": "newData.isNumber()"
+          },
+          "by": {
+            ".validate": "newData.val() === auth.uid"
+          }
         },
         "queue": {
           ".write": "auth != null && root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid",
           "$key": {
             ".write": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && (!data.exists() || data.child('by').val() === auth.uid || root.child('rooms').child($code).child('meta/controlMode').val() === 'everyone')",
             ".validate": "newData.hasChildren(['track', 'by', 'byName'])",
-            "track": { "id": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{11}$/)" } },
-            "by": { ".validate": "newData.val() === auth.uid" },
-            "byName": { ".validate": "newData.isString() && newData.val().length <= 40" }
+            "track": {
+              "id": {
+                ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{11}$/)"
+              }
+            },
+            "by": {
+              ".validate": "newData.val() === auth.uid"
+            },
+            "byName": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            }
+          }
+        }
+      }
+    },
+    "profiles": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "photo": {
+          ".validate": "newData.isString() && newData.val().length <= 500"
+        },
+        "friendCode": {
+          ".validate": "newData.isString() && root.child('friendCodes').child(newData.val()).val() === auth.uid"
+        },
+        "sharing": {
+          "online": {
+            ".validate": "newData.isBoolean()"
+          },
+          "track": {
+            ".validate": "newData.isBoolean()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "friendCodes": {
+      "$code": {
+        ".read": "auth != null && $code.length === 8",
+        ".write": "auth != null && ((!data.exists() && newData.val() === auth.uid) || (data.val() === auth.uid && !newData.exists()))"
+      }
+    },
+    "friendRequests": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        ".write": "auth != null && auth.uid === $to && !newData.exists()",
+        "$from": {
+          ".write": "auth != null && (auth.uid === $from || (auth.uid === $to && !newData.exists()))",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "photo": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "friends": {
+      "$owner": {
+        ".read": "auth != null && auth.uid === $owner",
+        "$other": {
+          ".write": "auth != null && ((!newData.exists() && (auth.uid === $owner || auth.uid === $other)) || (newData.exists() && auth.uid === $owner && root.child('friendRequests').child($owner).child($other).exists()) || (newData.exists() && auth.uid === $other && root.child('friendRequests').child($other).child($owner).exists()))"
+        }
+      }
+    },
+    "presence": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('friends').child(auth.uid).child($uid).exists())",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "invites": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        ".write": "auth != null && auth.uid === $to && !newData.exists()",
+        "$id": {
+          ".write": "auth != null && ((newData.exists() && root.child('friends').child($to).child(auth.uid).exists()) || (!newData.exists() && (auth.uid === $to || data.child('from').val() === auth.uid)))",
+          ".validate": "newData.hasChildren(['from', 'code', 'at'])",
+          "from": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "fromName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "fromPhoto": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "code": {
+            ".validate": "newData.isString() && newData.val().length === 6"
+          },
+          "roomName": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "at": {
+            ".validate": "newData.val() === now"
+          },
+          "$other": {
+            ".validate": false
           }
         }
       }

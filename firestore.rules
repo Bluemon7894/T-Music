@@ -5,5 +5,23 @@ service cloud.firestore {
     match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Shared playlists: the long random id is the link. Whoever has it can read, nobody can list
+    // them, and others can edit only the contents and only while the owner allows it.
+    match /sharedPlaylists/{id} {
+      function validSize() {
+        return request.resource.data.tracks is list
+          && request.resource.data.tracks.size() <= 2000
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 100;
+      }
+      allow get: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid && validSize();
+      allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null && validSize() && (
+        (resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == request.auth.uid)
+        || (resource.data.editable == true && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tracks', 'updatedAt']))
+      );
+    }
   }
 }

@@ -1,9 +1,13 @@
 import { useRef, useState } from 'react';
-import { Copy, Crown, Link2, ListMusic, LogOut, Plus, Radio, Users, Wifi, WifiOff, X } from 'lucide-react';
+import { Copy, Crown, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { Empty, ArtistLinks, Thumb } from '../components/common.jsx';
+import LyricsView from '../components/layout/LyricsView.jsx';
+import { safeTrack } from '../lib/safeTrack.js';
+import { useFriends } from '../store/friends.js';
+import { usePlayer } from '../store/player.js';
 import { useAccount } from '../store/account.js';
 import { inviteLink, normalizeCode, useRoom } from '../store/room.js';
-import { toast } from '../store/ui.js';
+import { toast, useUI } from '../store/ui.js';
 import { api } from '../lib/api.js';
 import { useEnter } from '../lib/motion.js';
 
@@ -38,7 +42,32 @@ function Lobby() {
   );
 }
 
-function syncLabel(driftMs, connected) {
+function FriendInvites({ members }) {
+  const friends = useFriends((s) => s.friends);
+  const inviteFriend = useFriends((s) => s.inviteFriend);
+  const list = Object.entries(friends).filter(([uid]) => !members[uid]).sort(([, a], [, b]) => Number(b.online) - Number(a.online));
+  return (
+    <section className="room-card room-friends" data-enter>
+      <h3><Send size={16} /> 친구 초대</h3>
+      {list.length ? (
+        <ul>
+          {list.map(([uid, f]) => (
+            <li key={uid}>
+              <i className={`room-dot ${f.online ? 'on' : ''}`} />
+              <span className="room-member-name">{f.name || '...'}</span>
+              <button className="text-btn" onClick={() => inviteFriend(uid)}>초대</button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">초대할 친구가 없어요. 친구 메뉴에서 친구를 추가하거나, 위의 코드를 보내 주세요.</p>
+      )}
+    </section>
+  );
+}
+
+function syncLabel(driftMs, connected, attached) {
+  if (!attached) return '듣고 있지 않음';
   if (!connected) return '연결 중...';
   if (driftMs === null) return '대기 중';
   if (driftMs === 0) return '기준 재생';
@@ -54,14 +83,24 @@ function InRoom() {
   const queue = useRoom((s) => s.queue);
   const connected = useRoom((s) => s.connected);
   const driftMs = useRoom((s) => s.driftMs);
+  const attached = useRoom((s) => s.attached);
   const uid = useAccount((s) => s.user?.uid);
-  const { leave, setControlMode, makeHost, removeFromQueue } = useRoom.getState();
+  const playerTrackId = usePlayer((s) => s.queue[s.index]?.id);
+  const { leave, follow, pause, setControlMode, makeHost, removeFromQueue } = useRoom.getState();
 
   const isHost = meta?.hostUid === uid;
   const everyone = meta?.controlMode === 'everyone';
-  const list = Object.entries(members).sort((a, b) => (a[1].joinedAt || 0) - (b[1].joinedAt || 0));
-  const hostOnline = Boolean(members[meta?.hostUid]);
-  const track = playback?.track;
+  const list = Object.entries(members).sort((a, b) => Number(Boolean(b[1].listening)) - Number(Boolean(a[1].listening)) || (a[1].joinedAt || 0) - (b[1].joinedAt || 0));
+  const listening = list.filter(([, m]) => m.listening).length;
+  const hostListening = Boolean(members[meta?.hostUid]?.listening);
+  const track = safeTrack(playback?.track);
+
+  const confirmLeave = () => useUI.getState().prompt({
+    title: '방에서 나갈까요?',
+    message: list.length > 1 ? '다시 들어오려면 초대 코드가 필요해요. 잠시 혼자 듣고 싶다면 혼자 듣기를 눌러 주세요.' : '마지막 멤버라서 나가면 방이 삭제됩니다.',
+    submitLabel: '나가기',
+    onSubmit: leave,
+  });
 
   const copy = async (text, done) => {
     await api.copyText(text);
@@ -74,18 +113,24 @@ function InRoom() {
         <div className="room-hero-top">
           <div className="room-title">
             <small className={connected ? 'room-live on' : 'room-live'}>
-              {connected ? <Wifi size={13} /> : <WifiOff size={13} />} {syncLabel(driftMs, connected)}
+              {connected ? <Wifi size={13} /> : <WifiOff size={13} />} {syncLabel(driftMs, connected, attached)}
             </small>
             <h2 title={meta?.name}>{meta?.name || '같이 듣기'}</h2>
           </div>
-          <button className="btn room-leave" onClick={leave}><LogOut size={15} /> 나가기</button>
+          <div className="row-actions room-hero-actions">
+            {attached
+              ? <button className="btn" onClick={pause}><HeadphoneOff size={15} /> 혼자 듣기</button>
+              : <button className="btn-primary room-follow" onClick={follow}><Headphones size={15} /> 같이 듣기 시작</button>}
+            <button className="btn room-leave" onClick={confirmLeave}><LogOut size={15} /> 나가기</button>
+          </div>
         </div>
         <div className="room-code-row">
           <div className="room-code" aria-label="초대 코드">{code}</div>
           <button className="btn" onClick={() => copy(code, '초대 코드를 복사했습니다')}><Copy size={15} /> 코드 복사</button>
           <button className="btn" onClick={() => copy(inviteLink(code), '초대 링크를 복사했습니다')}><Link2 size={15} /> 링크 복사</button>
         </div>
-        {!hostOnline && <p className="room-note">방장의 연결이 끊겼어요. 30초 안에 돌아오지 않으면 가장 오래 있던 멤버가 방장이 돼요.</p>}
+        {!attached && <p className="room-note">이 방에 계속 들어와 있어요. 시작을 누르면 지금 방의 곡을 같이 들어요.</p>}
+        {attached && !hostListening && listening > 1 && <p className="room-note">방장이 자리를 비웠어요. 30초 안에 돌아오지 않으면 가장 오래 있던 멤버가 대신 방장이 돼요.</p>}
       </section>
 
       <section className="room-card room-now" data-enter>
@@ -117,13 +162,14 @@ function InRoom() {
       </section>
 
       <section className="room-card room-members" data-enter>
-        <h3><Users size={16} /> 멤버 <small>{list.length}명</small></h3>
+        <h3><Users size={16} /> 멤버 <small>{list.length}명 · {listening}명 듣는 중</small></h3>
         <ul>
           {list.map(([memberUid, m]) => (
             <li key={memberUid}>
               {m.photo
                 ? <img className="avatar" src={m.photo} alt="" referrerPolicy="no-referrer" draggable={false} />
                 : <span className="avatar fallback"><Users size={15} /></span>}
+              <i className={`room-dot ${m.listening ? 'on' : ''}`} title={m.listening ? '듣는 중' : '자리 비움'} />
               <span className="room-member-name">{m.name}{memberUid === uid && <small> (나)</small>}</span>
               {memberUid === meta?.hostUid
                 ? <span className="room-badge"><Crown size={12} /> 방장</span>
@@ -154,6 +200,15 @@ function InRoom() {
           <p className="muted">곡을 우클릭해서 대기열에 추가하면 다음 곡으로 재생돼요. 누구나 추가할 수 있어요.</p>
         )}
       </section>
+
+      <FriendInvites members={members} />
+
+      {attached && track && playerTrackId === track.id && (
+        <section className="room-card room-lyrics" data-enter>
+          <h3><Mic2 size={16} /> 가사</h3>
+          <LyricsView key={track.id} track={track} variant="panel" />
+        </section>
+      )}
     </div>
   );
 }

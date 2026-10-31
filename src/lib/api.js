@@ -42,6 +42,8 @@ export const api = {
   googleSignIn: () => call('googleSignIn'),
   cancelGoogleSignIn: () => call('cancelGoogleSignIn'),
   copyText: (text) => call('copyText', text),
+  setMiniMode: (on) => call('setMiniMode', on),
+  showWindow: () => call('showWindow'),
   takeInvite: () => call('takeInvite'),
   onInvite: (cb) => window.api?.onInvite?.(cb) || (() => {}),
   onUpdateProgress: (cb) => window.api?.onUpdateProgress?.(cb) || (() => {}),

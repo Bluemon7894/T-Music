@@ -1,10 +1,11 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Home, Search, Library, ArrowDownToLine, Users, Plus, Heart, ListMusic, Trash2, Pencil, Disc3 } from 'lucide-react';
+import { Home, Search, Library, ArrowDownToLine, Users, UserRoundPlus, Plus, Heart, ListMusic, Trash2, Pencil, Disc3 } from 'lucide-react';
 import { useLibrary } from '../../store/library.js';
 import { useNav, useRoute } from '../../store/nav.js';
 import { useUI, toast } from '../../store/ui.js';
 import { usePlayer } from '../../store/player.js';
 import { useDownloads } from '../../store/downloads.js';
+import { useFriends } from '../../store/friends.js';
 import { useRoom } from '../../store/room.js';
 import { animate, ease } from '../../lib/motion.js';
 import { Thumb, Equalizer } from '../common.jsx';
@@ -16,13 +17,15 @@ const NAV = [
   { id: 'library', label: '보관함', icon: Library },
   { id: 'downloads', label: '다운로드', icon: ArrowDownToLine },
   { id: 'room', label: '같이 듣기', icon: Users },
+  { id: 'friends', label: '친구', icon: UserRoundPlus },
 ];
 
 function NavList() {
   const route = useRoute();
   const go = useNav((s) => s.go);
   const jobs = useDownloads((s) => s.jobs.filter((j) => j.status !== 'error').length);
-  const listeners = useRoom((s) => (s.code ? Object.keys(s.members).length : 0));
+  const friendRequests = useFriends((s) => s.requests.length);
+  const listeners = useRoom((s) => Object.values(s.members).filter((m) => m.listening).length);
   const list = useRef(null);
   const pill = useRef(null);
   const active = NAV.findIndex((n) => n.id === route.name || (n.id === 'library' && ['liked', 'local'].includes(route.name)));
@@ -45,6 +48,7 @@ function NavList() {
           <span>{n.label}</span>
           {n.id === 'downloads' && jobs > 0 && <b className="nav-badge">{jobs}</b>}
           {n.id === 'room' && listeners > 0 && <b className="nav-badge">{listeners}</b>}
+          {n.id === 'friends' && friendRequests > 0 && <b className="nav-badge">{friendRequests}</b>}
         </button>
       ))}
     </nav>

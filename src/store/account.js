@@ -12,6 +12,8 @@ import {
 import { auth, firebaseConfig } from '../lib/firebase.js';
 import { api, errorText } from '../lib/api.js';
 import { deleteCloudData, startLibrarySync, stopLibrarySync } from '../lib/librarySync.js';
+import { deleteOwnedShares, startSharedPlaylists, stopSharedPlaylists } from '../lib/sharedPlaylists.js';
+import { useFriends } from './friends.js';
 import { forgetLibrary, libraryData, setLibraryOwner } from './library.js';
 import { resetPlayer } from './player.js';
 import { useRoom } from './room.js';
@@ -64,12 +66,21 @@ export const useAccount = create((set, get) => {
     const user = auth.currentUser;
     const uid = user?.uid ?? null;
     if (uid !== owner) {
+      stopSharedPlaylists();
       stopLibrarySync();
       setLibraryOwner(uid, carriedOver);
       carriedOver = null;
       owner = uid;
-      if (uid) startLibrarySync(uid);
+      if (uid) {
+        startLibrarySync(uid);
+        startSharedPlaylists();
+        useRoom.getState().resume();
+        useFriends.getState().start();
+      } else {
+        useFriends.getState().stop();
+      }
     }
+    if (uid) useFriends.getState().syncProfile();
     set({ status: user ? 'signedIn' : 'signedOut', user: toAccount(user), offline: user ? false : get().offline });
   };
 
@@ -93,6 +104,9 @@ export const useAccount = create((set, get) => {
     const guest = auth.currentUser;
     const guestToken = await guest.getIdToken();
     const data = libraryData();
+    useRoom.getState().disconnect();
+    await useFriends.getState().deleteEverything();
+    stopSharedPlaylists();
     stopLibrarySync();
     await deleteCloudData(guest.uid).catch(() => {});
     carriedOver = data;
@@ -101,15 +115,24 @@ export const useAccount = create((set, get) => {
     } catch (e) {
       carriedOver = null;
       startLibrarySync(guest.uid);
+      startSharedPlaylists();
+      useFriends.getState().start();
       throw e;
     }
     forgetLibrary(guest.uid);
     deleteAccountByToken(guestToken);
   };
 
-  const leaveEverything = async () => {
-    await useRoom.getState().leave();
+  // A guest or a deleted account is gone for good, so it really leaves its room and ends its
+  // shares. A Google account signing out stays in its room and comes back to it next time.
+  const leaveEverything = async ({ forGood }) => {
+    const room = useRoom.getState();
+    if (forGood) await room.leave();
+    else room.disconnect();
     resetPlayer();
+    await (forGood ? useFriends.getState().deleteEverything() : useFriends.getState().goOffline());
+    if (forGood) await deleteOwnedShares();
+    stopSharedPlaylists();
     stopLibrarySync();
   };
 
@@ -153,7 +176,7 @@ export const useAccount = create((set, get) => {
     async signOut() {
       const user = auth.currentUser;
       set({ status: 'loading' }); // removing a guest's data takes a few seconds
-      await leaveEverything();
+      await leaveEverything({ forGood: Boolean(user?.isAnonymous) });
       if (user?.isAnonymous) {
         await deleteCloudData(user.uid).catch(() => {});
         forgetLibrary(user.uid);
@@ -174,7 +197,7 @@ export const useAccount = create((set, get) => {
         await reauthenticateWithCredential(user, credential);
       }
       set({ status: 'loading' });
-      await leaveEverything();
+      await leaveEverything({ forGood: true });
       await deleteCloudData(user.uid);
       forgetLibrary(user.uid, { everything: !user.isAnonymous });
       await deleteUser(user);

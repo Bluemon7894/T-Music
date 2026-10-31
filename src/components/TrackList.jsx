@@ -6,6 +6,7 @@ import { useNav } from '../store/nav.js';
 import { useUI, toast } from '../store/ui.js';
 import { useDownloads, download, removeDownload } from '../store/downloads.js';
 import { api } from '../lib/api.js';
+import { canEditPlaylist } from '../lib/sharedPlaylists.js';
 import { fmtTime } from '../lib/util.js';
 import { burst, useEnter } from '../lib/motion.js';
 import { Thumb, ArtistLinks, Equalizer } from './common.jsx';
@@ -45,7 +46,7 @@ export function trackMenuItems(track, extra = []) {
             toast('새 플레이리스트를 만들었습니다');
           },
         },
-        ...lib.playlists.map((pl) => ({
+        ...lib.playlists.filter(canEditPlaylist).map((pl) => ({
           label: pl.name,
           onClick: () => {
             const added = lib.addToPlaylist(pl.id, track);
