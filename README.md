@@ -75,7 +75,9 @@ Android 릴리즈 서명 키는 처음 빌드할 때 `android/release.keystore`�
 Android 릴리즈는 `android-vX.Y.Z` 태그에 `--latest=false`로 올립니다. Windows 앱은 저장소의 최신 릴리즈를 보고 업데이트하기 때문에, 최신으로 표시되면 Windows 앱 업데이트가 깨집니다.
 
 ```bash
-gh release create android-vX.Y.Z release/T-Music-Android-X.Y.Z.apk --latest=false --target main
+gh release create android-vX.Y.Z release/T-Music-Android-X.Y.Z.apk --latest=false --target main --draft
+gh workflow run android-release-check.yml -f tag=android-vX.Y.Z   # 올린 APK를 실제 Android에서 열어 봄
+gh release edit android-vX.Y.Z --draft=false --latest=false
 ```
 
 ## 구조

@@ -1,6 +1,7 @@
 name: Android release check
 
-# Opens an already published APK on Android. Runs by hand and never publishes anything.
+# Opens a release's APK on Android, before or after it's made public. Runs by hand and never publishes
+# anything. It needs write permission only because a draft release is hidden from read-only tokens.
 on:
   workflow_dispatch:
     inputs:
@@ -9,7 +10,7 @@ on:
         required: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   check:

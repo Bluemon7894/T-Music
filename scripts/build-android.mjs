@@ -53,6 +53,26 @@ function copyDir(from, to) {
   }
 }
 
+// aapt2 on Windows stores the assets it collects as assets/www\\index.html, and Android looks for
+// assets/www/index.html. The two names are the same length, so they can be corrected in place.
+function useForwardSlashes(apk) {
+  const zip = fs.readFileSync(apk);
+  let end = zip.length - 22;
+  while (end >= 0 && zip.readUInt32LE(end) !== 0x06054b50) end--;
+  const names = [];
+  let at = zip.readUInt32LE(end + 16);
+  for (let i = zip.readUInt16LE(end + 10); i > 0; i--) {
+    const nameLength = zip.readUInt16LE(at + 28);
+    for (const start of [at + 46, zip.readUInt32LE(at + 42) + 30]) {
+      for (let j = start; j < start + nameLength; j++) if (zip[j] === 0x5c) zip[j] = 0x2f;
+    }
+    names.push(zip.toString('utf8', at + 46, at + 46 + nameLength));
+    at += 46 + nameLength + zip.readUInt16LE(at + 30) + zip.readUInt16LE(at + 32);
+  }
+  if (!names.includes('assets/www/index.html')) throw new Error('the APK has no assets/www/index.html');
+  fs.writeFileSync(apk, zip);
+}
+
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'res-flat'), { recursive: true });
 fs.mkdirSync(path.join(out, 'gen'), { recursive: true });
@@ -98,6 +118,8 @@ const jar = path.join(out, 'classes.jar');
 run(jdk('jar'), ['cf', jar, '-C', path.join(out, 'classes'), '.']);
 run(tool('d8'), [...(DEBUG ? ['--debug'] : ['--release']), '--min-api', MIN_SDK, '--lib', androidJar, '--output', path.join(out, 'dex'), jar]);
 run(tool('aapt'), ['add', path.relative(path.join(out, 'dex'), unsigned), 'classes.dex'], { cwd: path.join(out, 'dex') });
+
+useForwardSlashes(unsigned);
 
 console.log('signing');
 const aligned = path.join(out, 'aligned.apk');
