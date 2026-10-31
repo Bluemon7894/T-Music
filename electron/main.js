@@ -70,6 +70,7 @@ const api = {
   related: (id) => catalog.related(id),
   home: () => catalog.home(),
   lyrics: (track) => lyrics.getLyrics(track),
+  refreshLyrics: (track) => lyrics.refreshLyrics(track),
   lyricsCandidates: (track, query) => lyrics.getCandidates(track, query),
   cleanLyricsQuery: (track) => lyrics.getCleanSearchTerm(track),
   setCustomLyrics: (trackId, lyricsData) => lyrics.setCustom(trackId, lyricsData),

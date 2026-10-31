@@ -1,37 +1,42 @@
 // Synced lyrics, shared by the side panel and the fullscreen stage.
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
-import { ListMusic, Mic2, Minus, Plus, Search } from 'lucide-react';
+import { ListMusic, Mic2, RefreshCw, Search } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
-import { api } from '../../lib/api.js';
-import { getAudioOnset } from '../../lib/audio.js';
+import { toast } from '../../store/ui.js';
+import { api, streamUrl } from '../../lib/api.js';
+import { getAudioOnset, getOutputLatency } from '../../lib/audio.js';
+import { MIN_CONFIDENCE, measureLyricOffset } from '../../lib/lyricAlign.js';
 import LyricsPickerModal from './LyricsPickerModal.jsx';
 
-const NUDGE_KEY = 't-music-lyric-nudge';
-const NUDGE_STEP = 0.5;
-const MAX_SAVED_NUDGES = 300;
+const ALIGN_KEY = 't-music-lyric-align';
+const MAX_SAVED_ALIGNMENTS = 300;
+const ALREADY_ALIGNED_SEC = 0.1;
 // A manual scroll keeps the view where the user put it for this long.
 const MANUAL_SCROLL_HOLD_MS = 4000;
 // Captions come from the video itself, so they already line up with its audio.
 const SOURCE_TIMED_TO_VIDEO = 'YouTube 자막';
 
-function loadNudges() {
+function loadAlignments() {
   try {
-    return JSON.parse(localStorage.getItem(NUDGE_KEY)) || {};
+    return JSON.parse(localStorage.getItem(ALIGN_KEY)) || {};
   } catch {
     return {};
   }
 }
 
-const useNudges = create(() => ({ map: loadNudges() }));
+const useAlignments = create(() => ({ map: loadAlignments() }));
 
-function saveNudge(id, value) {
-  const map = { ...useNudges.getState().map };
+// An alignment only holds for the lyrics it was measured with.
+const lyricsKey = (data) => `${data?.source || ''}:${data?.lines?.length || 0}:${data?.lines?.[0]?.time ?? ''}`;
+
+function saveAlignment(id, data, offset) {
+  const map = { ...useAlignments.getState().map };
   delete map[id];
-  if (value) map[id] = value;
-  for (const old of Object.keys(map).slice(0, -MAX_SAVED_NUDGES)) delete map[old];
-  useNudges.setState({ map });
-  try { localStorage.setItem(NUDGE_KEY, JSON.stringify(map)); } catch { /* the nudge still applies this session */ }
+  if (offset !== null) map[id] = { offset, lyrics: lyricsKey(data) };
+  for (const old of Object.keys(map).slice(0, -MAX_SAVED_ALIGNMENTS)) delete map[old];
+  useAlignments.setState({ map });
+  try { localStorage.setItem(ALIGN_KEY, JSON.stringify(map)); } catch { /* it still applies this session */ }
 }
 
 function useTrackLyrics(track) {
@@ -57,11 +62,10 @@ function useTrackLyrics(track) {
   return state;
 }
 
-// Database timestamps count from the song's first second. Only when the audio runs longer than the
-// lyrics were timed for (a video with an intro) can they start late, and the silence we measured
-// tells us by how much. Anything else the listener can correct with the nudge.
+// A resync's measurement wins. Until there is one, the only known difference is a video running
+// longer than the lyrics were timed for, where the silence we measured says how late they start.
 function useLyricsOffset(track, data) {
-  const nudge = useNudges((s) => s.map[track.id] || 0);
+  const saved = useAlignments((s) => s.map[track.id]);
   const playerDuration = usePlayer((s) => s.duration);
   const [onset, setOnset] = useState(() => getAudioOnset(track.id));
 
@@ -72,17 +76,13 @@ function useLyricsOffset(track, data) {
     return () => window.removeEventListener('audio-onset-detected', onDetected);
   }, [track.id]);
 
-  let lead = 0;
+  if (saved && saved.lyrics === lyricsKey(data)) return saved.offset;
+
   if (data?.lyricsDuration && data.source !== SOURCE_TIMED_TO_VIDEO && onset >= 0.4) {
     const extra = (playerDuration || track.duration || 0) - data.lyricsDuration;
-    if (extra >= 1.5) lead = Math.min(onset, extra);
+    if (extra >= 1.5) return Math.min(onset, extra);
   }
-
-  return {
-    offset: lead + nudge,
-    nudge,
-    setNudge: (value) => saveNudge(track.id, value),
-  };
+  return 0;
 }
 
 function useActiveLine(lines, offset) {
@@ -95,7 +95,8 @@ function useActiveLine(lines, offset) {
       return undefined;
     }
     const update = () => {
-      const t = usePlayer.getState().getPreciseTime();
+      // What's playing now reaches the ears a little later, by a lot on Bluetooth.
+      const t = usePlayer.getState().getPreciseTime() - getOutputLatency();
       let best = -1;
       for (let i = 0; i < lines.length && lines[i].time + offset <= t + 0.05; i++) best = i;
       setActive(best);
@@ -125,21 +126,31 @@ function LyricsSkeleton() {
   );
 }
 
-function SyncNudge({ value, onChange }) {
-  const label = value ? `${value > 0 ? '+' : ''}${value.toFixed(1)}초` : '싱크';
-  return (
-    <div className="lyr-nudge">
-      <button onClick={() => onChange(value - NUDGE_STEP)} title="가사를 0.5초 빠르게" aria-label="가사를 0.5초 빠르게"><Minus size={12} /></button>
-      <button className="lyr-nudge-value" onClick={() => onChange(0)} disabled={!value} title={value ? '싱크 조정 초기화' : '가사가 어긋나면 양옆 버튼으로 맞춰 보세요'}>{label}</button>
-      <button onClick={() => onChange(value + NUDGE_STEP)} title="가사를 0.5초 느리게" aria-label="가사를 0.5초 느리게"><Plus size={12} /></button>
-    </div>
-  );
+// Looks for the lyrics again, then lines them up with this recording.
+async function resyncLyrics(track) {
+  const data = await api.refreshLyrics(track);
+  if (data) window.dispatchEvent(new CustomEvent('t-music:lyrics-changed', { detail: { trackId: track.id, lyrics: data } }));
+  if (!data?.lines?.length) {
+    toast(data?.plainLyrics ? '싱크 가사를 찾지 못했어요. 일반 가사로 보여드려요.' : '가사를 찾지 못했어요.');
+    return;
+  }
+  const measured = await measureLyricOffset(streamUrl(track.id), data.lines);
+  if (!measured || measured.confidence < MIN_CONFIDENCE) {
+    saveAlignment(track.id, data, null);
+    toast('이 곡은 자동으로 맞추기 어려워요. 가사 직접 찾기로 다른 가사를 골라 보세요.');
+    return;
+  }
+  saveAlignment(track.id, data, measured.offset);
+  const size = Math.abs(measured.offset);
+  if (size < ALREADY_ALIGNED_SEC) toast('가사 싱크가 이미 잘 맞아요');
+  else toast(`가사를 ${size.toFixed(1)}초 ${measured.offset > 0 ? '늦춰서' : '앞당겨서'} 맞췄어요`);
 }
 
 export default function LyricsView({ track, variant = 'panel' }) {
   const { data, loading } = useTrackLyrics(track);
-  const { offset, nudge, setNudge } = useLyricsOffset(track, data);
+  const offset = useLyricsOffset(track, data);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
   const seek = usePlayer((s) => s.seek);
   const lines = data?.lines || [];
   const active = useActiveLine(lines, offset);
@@ -157,8 +168,24 @@ export default function LyricsView({ track, variant = 'panel' }) {
 
   const holdScroll = () => { holdUntil.current = performance.now() + MANUAL_SCROLL_HOLD_MS; };
   const openPicker = () => setPickerOpen(true);
+  const resync = async () => {
+    setResyncing(true);
+    try {
+      await resyncLyrics(track);
+    } catch (e) {
+      console.warn('[lyrics]', e);
+      toast('재싱크하지 못했어요. 인터넷 연결을 확인해 주세요.');
+    } finally {
+      setResyncing(false);
+    }
+  };
   const hasSynced = lines.length > 0;
   const hasPlain = Boolean(data?.plainLyrics);
+  const resyncButton = (className) => (
+    <button className={className} onClick={resync} disabled={resyncing} title="가사를 다시 찾아 음원에 맞춥니다">
+      <RefreshCw size={12} className={resyncing ? 'spin' : ''} /> {resyncing ? '맞추는 중...' : '재싱크'}
+    </button>
+  );
 
   return (
     <div className={`lyr lyr-${variant}`}>
@@ -168,7 +195,10 @@ export default function LyricsView({ track, variant = 'panel' }) {
         <div className="lyr-empty">
           <Mic2 size={34} opacity={0.35} />
           <p>가사를 찾을 수 없습니다</p>
-          <button className="lyr-search" onClick={openPicker}><Search size={14} /> 가사 직접 찾기</button>
+          <div className="lyr-empty-actions">
+            <button className="lyr-search" onClick={openPicker}><Search size={14} /> 가사 직접 찾기</button>
+            {resyncButton('lyr-search')}
+          </div>
         </div>
       )}
 
@@ -177,7 +207,7 @@ export default function LyricsView({ track, variant = 'panel' }) {
           <div className="lyr-bar">
             {!hasSynced && <span className="lyr-pill"><Mic2 size={12} /> 싱크 미지원</span>}
             <button className="lyr-pill action" onClick={openPicker}><ListMusic size={12} /> 가사 직접 찾기</button>
-            {hasSynced && <SyncNudge value={nudge} onChange={setNudge} />}
+            {resyncButton('lyr-pill action')}
           </div>
           <div className="lyr-scroll" ref={scroller} onWheel={holdScroll} onPointerDown={holdScroll}>
             {hasSynced ? (

@@ -78,6 +78,11 @@ export function attach(el) {
   }
 }
 
+// How long sound takes from here to the speakers. Bluetooth makes this large enough to hear.
+export function getOutputLatency() {
+  return ctx ? (ctx.outputLatency || 0) + (ctx.baseLatency || 0) : 0;
+}
+
 export function getAnalyser() {
   return analyser;
 }

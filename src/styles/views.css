@@ -620,21 +620,9 @@
   white-space: nowrap;
 }
 .lyr-pill.action { color: var(--v-200); cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s; }
-.lyr-pill.action:hover { background: rgba(139, 92, 246, 0.28); border-color: rgba(167, 139, 250, 0.55); color: #fff; }
-.lyr-nudge {
-  display: inline-flex;
-  align-items: center;
-  height: 26px;
-  box-sizing: border-box;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  overflow: hidden;
-}
-.lyr-nudge button { display: inline-flex; align-items: center; justify-content: center; height: 100%; min-width: 26px; color: var(--v-200); cursor: pointer; transition: background 0.2s, color 0.2s; }
-.lyr-nudge button:hover:not(:disabled) { background: rgba(139, 92, 246, 0.28); color: #fff; }
-.lyr-nudge-value { padding: 0 4px; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.lyr-nudge-value:disabled { color: var(--dim); cursor: default; }
+.lyr-pill.action:hover:not(:disabled) { background: rgba(139, 92, 246, 0.28); border-color: rgba(167, 139, 250, 0.55); color: #fff; }
+.lyr-pill.action:disabled { opacity: 0.7; cursor: default; }
+.lyr-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .lyr-scroll {
   position: relative;
   flex: 1 1 0;

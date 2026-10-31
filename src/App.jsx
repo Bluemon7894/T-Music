@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Component, useEffect, useRef } from 'react';
 import { api } from './lib/api.js';
 import { useRoute, useNav } from './store/nav.js';
 import { usePlayer } from './store/player.js';
@@ -252,10 +252,43 @@ function MainApp() {
   );
 }
 
-export default function App() {
+// Without this, an error while drawing any part of the app leaves the whole window blank.
+class CrashScreen extends Component {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error) {
+    console.error('[app]', error);
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="login">
+        <div className="login-drag" />
+        <main className="login-card">
+          <h1>문제가 생겼어요</h1>
+          <p className="login-lead">화면을 그리다 오류가 났어요. 보관함과 계정은 그대로예요.</p>
+          <div className="login-actions">
+            <button className="login-btn google" onClick={() => window.location.reload()}>다시 시작</button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+}
+
+function Root() {
   const status = useAccount((s) => s.status);
   const offline = useAccount((s) => s.offline);
   if (status === 'loading') return <Splash />;
   if (status === 'signedOut' && !offline) return <Login />;
   return <MainApp />;
+}
+
+export default function App() {
+  return <CrashScreen><Root /></CrashScreen>;
 }

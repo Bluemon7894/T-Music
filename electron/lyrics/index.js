@@ -213,6 +213,24 @@ export async function getLyrics(track) {
   return job;
 }
 
+// The listener asked to look again. Lyrics they chose by hand stay, and a worse result (or none,
+// on a network hiccup) doesn't replace what's already here.
+export async function refreshLyrics(track) {
+  const id = track?.id;
+  if (!id) return NOTHING();
+  let custom = false;
+  try { custom = JSON.parse(fs.readFileSync(fileOf(id), 'utf8')).custom === true; } catch { /* nothing saved yet */ }
+  const current = memory.get(id) || readDisk(id);
+  if (custom && current) return current;
+  const { result } = await search(track);
+  const better = result.lines.length || (result.plainLyrics && !current?.lines?.length);
+  if (!better) return current || result;
+  memory.set(id, result);
+  emptyUntil.delete(id);
+  writeDisk(id, result);
+  return result;
+}
+
 // A lyric the user chose by hand survives restarts and is never replaced automatically.
 export function setCustom(trackId, lyricsData) {
   if (!trackId || !lyricsData) return { ok: false };

@@ -9,6 +9,7 @@ export const api = {
   related: (id) => call('related', id),
   home: () => call('home'),
   lyrics: (track) => call('lyrics', track),
+  refreshLyrics: (track) => call('refreshLyrics', track),
   lyricsCandidates: (track, query) => call('lyricsCandidates', track, query),
   cleanLyricsQuery: (track) => call('cleanLyricsQuery', track),
   setCustomLyrics: (trackId, lyricsData) => call('setCustomLyrics', trackId, lyricsData),
