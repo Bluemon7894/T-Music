@@ -1,43 +1,20 @@
 // Synced lyrics, shared by the side panel and the fullscreen stage.
 import { useEffect, useRef, useState } from 'react';
-import { create } from 'zustand';
 import { ListMusic, Mic2, RefreshCw, Search } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
+import { useRoom } from '../../store/room.js';
+import { lyricsKey, saveAlignment, useAlignments } from '../../store/lyricAlignments.js';
 import { toast } from '../../store/ui.js';
 import { api, streamUrl } from '../../lib/api.js';
 import { getAudioOnset, getOutputLatency } from '../../lib/audio.js';
 import { MIN_CONFIDENCE, measureLyricOffset } from '../../lib/lyricAlign.js';
 import LyricsPickerModal from './LyricsPickerModal.jsx';
 
-const ALIGN_KEY = 't-music-lyric-align';
-const MAX_SAVED_ALIGNMENTS = 300;
 const ALREADY_ALIGNED_SEC = 0.1;
 // A manual scroll keeps the view where the user put it for this long.
 const MANUAL_SCROLL_HOLD_MS = 4000;
 // Captions come from the video itself, so they already line up with its audio.
 const SOURCE_TIMED_TO_VIDEO = 'YouTube 자막';
-
-function loadAlignments() {
-  try {
-    return JSON.parse(localStorage.getItem(ALIGN_KEY)) || {};
-  } catch {
-    return {};
-  }
-}
-
-const useAlignments = create(() => ({ map: loadAlignments() }));
-
-// An alignment only holds for the lyrics it was measured with.
-const lyricsKey = (data) => `${data?.source || ''}:${data?.lines?.length || 0}:${data?.lines?.[0]?.time ?? ''}`;
-
-function saveAlignment(id, data, offset) {
-  const map = { ...useAlignments.getState().map };
-  delete map[id];
-  if (offset !== null) map[id] = { offset, lyrics: lyricsKey(data) };
-  for (const old of Object.keys(map).slice(0, -MAX_SAVED_ALIGNMENTS)) delete map[old];
-  useAlignments.setState({ map });
-  try { localStorage.setItem(ALIGN_KEY, JSON.stringify(map)); } catch { /* it still applies this session */ }
-}
 
 function useTrackLyrics(track) {
   const [state, setState] = useState({ data: null, loading: true });
@@ -126,7 +103,7 @@ function LyricsSkeleton() {
   );
 }
 
-// Looks for the lyrics again, then lines them up with this recording.
+// Looks for the lyrics again, then lines them up with this recording. In a room, everyone gets the result.
 async function resyncLyrics(track) {
   const data = await api.refreshLyrics(track);
   if (data) window.dispatchEvent(new CustomEvent('t-music:lyrics-changed', { detail: { trackId: track.id, lyrics: data } }));
@@ -137,10 +114,12 @@ async function resyncLyrics(track) {
   const measured = await measureLyricOffset(streamUrl(track.id), data.lines);
   if (!measured || measured.confidence < MIN_CONFIDENCE) {
     saveAlignment(track.id, data, null);
+    useRoom.getState().shareLyrics(track.id, data, null);
     toast('이 곡은 자동으로 맞추기 어려워요. 가사 직접 찾기로 다른 가사를 골라 보세요.');
     return;
   }
   saveAlignment(track.id, data, measured.offset);
+  useRoom.getState().shareLyrics(track.id, data, measured.offset);
   const size = Math.abs(measured.offset);
   if (size < ALREADY_ALIGNED_SEC) toast('가사 싱크가 이미 잘 맞아요');
   else toast(`가사를 ${size.toFixed(1)}초 ${measured.offset > 0 ? '늦춰서' : '앞당겨서'} 맞췄어요`);

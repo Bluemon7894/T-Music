@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Copy, Crown, GripVertical, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Share2, Users, Wifi, WifiOff, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Copy, Crown, GripVertical, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Share2, UserPlus, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { Empty, ArtistLinks, Thumb } from '../components/common.jsx';
 import LyricsView from '../components/layout/LyricsView.jsx';
 import { safePhoto, safeTrack } from '../lib/safeTrack.js';
@@ -87,7 +87,11 @@ function InRoom() {
   const attached = useRoom((s) => s.attached);
   const uid = useAccount((s) => s.user?.uid);
   const playerTrackId = usePlayer((s) => s.queue[s.index]?.id);
-  const { leave, follow, pause, setControlMode, makeHost, removeFromQueue, moveInQueue } = useRoom.getState();
+  const friends = useFriends((s) => s.friends);
+  const friendRequests = useFriends((s) => s.requests);
+  const sentRequests = useFriends((s) => s.sentRequests);
+  const requestFriend = useFriends((s) => s.requestFriend);
+  const { leave, follow, pause, setControlMode, makeHost, kick, removeFromQueue, moveInQueue } = useRoom.getState();
   const [dropAt, setDropAt] = useState(null);
 
   const isHost = meta?.hostUid === uid;
@@ -103,6 +107,13 @@ function InRoom() {
     message: list.length > 1 ? '다시 들어오려면 초대 코드가 필요해요. 잠시 혼자 듣고 싶다면 혼자 듣기를 눌러 주세요.' : '마지막 멤버라서 나가면 방이 삭제됩니다.',
     submitLabel: '나가기',
     onSubmit: leave,
+  });
+
+  const confirmKick = (memberUid, name) => useUI.getState().prompt({
+    title: `${name}님을 내보낼까요?`,
+    message: '방에서 바로 나가게 되고, 방장이 다시 초대하기 전에는 코드로도 들어올 수 없어요.',
+    submitLabel: '내보내기',
+    onSubmit: () => kick(memberUid),
   });
 
   const copy = async (text, done) => {
@@ -154,7 +165,8 @@ function InRoom() {
         <div className="room-setting">
           <div>
             <b>조작 권한</b>
-            <small>{everyone ? '모든 멤버가 재생을 조작할 수 있어요' : '방장만 재생을 조작할 수 있어요'}</small>
+            <small>{everyone ? '모든 멤버가 곡을 추가하고 재생을 조작할 수 있어요' : '방장만 곡을 추가하고 재생을 조작할 수 있어요'}</small>
+            <small>시작·끝 효과음: {meta?.sounds ? '켜짐' : '꺼짐'} (방장 설정)</small>
           </div>
           {isHost && (
             <div className="seg">
@@ -175,9 +187,23 @@ function InRoom() {
                 : <span className="avatar fallback"><Users size={15} /></span>}
               <i className={`room-dot ${m.listening ? 'on' : ''}`} title={m.listening ? '듣는 중' : '자리 비움'} />
               <span className="room-member-name">{m.name}{memberUid === uid && <small> (나)</small>}</span>
-              {memberUid === meta?.hostUid
-                ? <span className="room-badge"><Crown size={12} /> 방장</span>
-                : isHost && <button className="text-btn" onClick={() => makeHost(memberUid)}>방장 넘기기</button>}
+              <span className="room-member-actions">
+                {memberUid !== uid && !friends[memberUid] && (
+                  sentRequests[memberUid]
+                    ? <span className="room-member-sent"><Check size={13} /> 요청함</span>
+                    : (
+                      <button className="text-btn" onClick={() => requestFriend(memberUid)}>
+                        <UserPlus size={13} /> {friendRequests.some((r) => r.uid === memberUid) ? '요청 수락' : '친구 추가'}
+                      </button>
+                    )
+                )}
+                {memberUid === meta?.hostUid
+                  ? <span className="room-badge"><Crown size={12} /> 방장</span>
+                  : isHost && <button className="text-btn" onClick={() => makeHost(memberUid)}>방장 넘기기</button>}
+                {isHost && memberUid !== uid && memberUid !== meta?.ownerUid && (
+                  <button className="text-btn room-kick" onClick={() => confirmKick(memberUid, m.name)}>내보내기</button>
+                )}
+              </span>
             </li>
           ))}
         </ul>
@@ -223,14 +249,14 @@ function InRoom() {
                     <button className="icon-btn" disabled={i === queue.length - 1} onClick={() => moveInQueue(i, i + 1)} aria-label="아래로"><ChevronDown size={15} /></button>
                   </span>
                 )}
-                {(isHost || item.by === uid) && (
+                {canReorder && (
                   <button className="icon-btn" onClick={() => removeFromQueue(item.key)} aria-label="대기열에서 삭제"><X size={15} /></button>
                 )}
               </li>
             ))}
           </ul>
         ) : (
-          <p className="muted">{IS_ANDROID ? '곡의 ⋯ 버튼으로 대기열에 추가하면' : '곡을 우클릭해서 대기열에 추가하면'} 다음 곡으로 재생돼요. 누구나 추가할 수 있어요.</p>
+          <p className="muted">{IS_ANDROID ? '곡의 ⋯ 버튼으로 대기열에 추가하면' : '곡을 우클릭해서 대기열에 추가하면'} 다음 곡으로 재생돼요. {everyone ? '누구나 추가할 수 있어요.' : '지금은 방장만 추가할 수 있어요.'}</p>
         )}
       </section>
 

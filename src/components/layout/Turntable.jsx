@@ -1,8 +1,10 @@
 // The stage's record player. Platter speed, tonearm travel and the glow all run from one animation
-// loop: the platter eases up and down like a real motor, the arm tracks inward with song progress,
-// and the light under the platter breathes with the bass.
+// loop: the platter eases up and down like a real motor, the needle lands in the record's outermost
+// groove and tracks inward to the label over the song, and the light under the platter breathes with
+// the bass. The start and end sounds set when the needle lands and lifts.
 import { useEffect, useRef } from 'react';
 import { usePlayer } from '../../store/player.js';
+import { DECKS, useDeck } from '../../store/deck.js';
 import { getAnalyser } from '../../lib/audio.js';
 import { Thumb } from '../common.jsx';
 import Visualizer from '../Visualizer.jsx';
@@ -10,9 +12,12 @@ import { useTilt } from '../../lib/motion.js';
 import logo from '../../assets/logo-mark.png';
 
 const DEGREES_PER_SECOND = 120; // one turn every 3 seconds
+// Tonearm angles with the stylus (-1.4, 48.8 from the pivot) off the platter, on the outermost groove
+// (35 from the platter's center) and on the innermost one, just outside the label (15).
 const ARM_REST = -7;
-const ARM_OUTER_GROOVE = 12;
-const ARM_INNER_GROOVE = 32;
+const ARM_OUTER_GROOVE = 7;
+const ARM_INNER_GROOVE = 30;
+const ARM_SWING_LEAD_S = 0.15;
 const BASS_BINS = 6;
 
 function useDeckMotion({ platter, arm, glow }) {
@@ -22,6 +27,8 @@ function useDeckMotion({ platter, arm, glow }) {
     let angle = 0;
     let speed = 0;
     let armAngle = ARM_REST;
+    let groove = ARM_OUTER_GROOVE;
+    let lifted = true;
     let bass = 0;
     let bins = null;
 
@@ -30,16 +37,34 @@ function useDeckMotion({ platter, arm, glow }) {
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       const p = usePlayer.getState();
+      const { phase, at } = useDeck.getState();
+      const t = (now - at) / 1000;
+      const { start, end } = DECKS.turntable;
+      const beforeDrop = phase === 'starting' && t < start.cue;
+      const ending = phase === 'ending';
+      const afterLift = ending && t >= end.stop;
+      const running = beforeDrop ? t >= 0 : ending ? !afterLift : p.playing;
 
-      speed += ((p.playing ? 1 : 0) - speed) * Math.min(1, dt * (p.playing ? 2.4 : 1.1));
+      speed += ((running ? 1 : 0) - speed) * Math.min(1, dt * (running ? 2.4 : 1.1));
       angle = (angle + speed * DEGREES_PER_SECOND * dt) % 360;
       platter.current.style.transform = `rotate(${angle}deg)`;
 
       const duration = p.duration || p.queue[p.index]?.duration || 0;
       const progress = duration > 0 ? Math.min(1, p.getPreciseTime() / duration) : 0;
-      const armTarget = p.playing ? ARM_OUTER_GROOVE + (ARM_INNER_GROOVE - ARM_OUTER_GROOVE) * progress : ARM_REST;
-      armAngle += (armTarget - armAngle) * Math.min(1, dt * 3);
+      // The stopped player goes back to zero at the very end: the needle stays where it got to.
+      if (!ending || p.playing) groove = ARM_OUTER_GROOVE + (ARM_INNER_GROOVE - ARM_OUTER_GROOVE) * progress;
+      if (beforeDrop) {
+        const swing = Math.max(0, Math.min(1, t / (start.cue - ARM_SWING_LEAD_S)));
+        armAngle = ARM_REST + (groove - ARM_REST) * swing * swing * (3 - 2 * swing);
+      } else {
+        const armTarget = running ? groove : ARM_REST;
+        armAngle += (armTarget - armAngle) * Math.min(1, dt * 3);
+      }
       arm.current.setAttribute('transform', `rotate(${armAngle.toFixed(2)} 88 14)`);
+      if (lifted !== (!running || beforeDrop)) {
+        lifted = !lifted;
+        arm.current.classList.toggle('lifted', lifted);
+      }
 
       let level = 0;
       const analyser = getAnalyser();
@@ -65,10 +90,11 @@ export default function Turntable({ track, playing }) {
 
   useTilt(tilt, { max: 8, scale: 1 });
   useDeckMotion({ platter, arm, glow });
+  const phase = useDeck((s) => s.phase);
 
   return (
     <div className="stage-disc-wrap" ref={tilt}>
-      <div className="tt-deck">
+      <div className="tt-deck" data-phase={phase}>
         <img className="tt-logo" src={logo} alt="" draggable={false} />
         <Visualizer variant="ring" bars={96} innerRatio={0.405} spanRatio={0.07} className="tt-ring" />
         <div className="tt-glow" ref={glow} />

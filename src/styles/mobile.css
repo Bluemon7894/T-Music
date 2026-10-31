@@ -364,6 +364,11 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .room-queue-grip { display: none; }
 .room-queue-move .icon-btn, .room-queue li > .icon-btn { width: 32px; height: 38px; }
 .room-track .thumb { width: 60px; height: 60px; }
+/* The name keeps its width; when the actions don't fit beside it they take the next line. */
+.room-members li { flex-wrap: wrap; row-gap: 0; }
+.room-members .room-member-name { flex: 1 1 auto; }
+.room-member-actions { margin-left: auto; }
+.room-member-actions .text-btn { min-height: 34px; }
 .room-members .text-btn { flex: none; }
 
 /* ---------- friends ---------- */
@@ -413,6 +418,11 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .m-stage-body.tab-now { align-items: center; justify-content: center; gap: 8px; }
 .m-stage .stage-disc-wrap { flex: none; width: min(84vw, 46dvh); align-self: center; justify-self: auto; }
 .m-stage .now-viz { flex: none; width: min(84vw, 46dvh); height: 28px; margin-top: 2px; }
+.m-stage .stage-upnext { flex: none; width: min(84vw, 46dvh); max-width: none; padding: 5px 10px 5px 5px; }
+.m-stage .stage-upnext .thumb { width: 32px; height: 32px; }
+@media (max-height: 640px) {
+  .m-stage .now-viz { display: none; }
+}
 .m-stage-body.tab-lyrics { padding: 0 12px; }
 .m-stage-body.tab-queue { padding: 0 8px; }
 .m-stage .np-body { flex: 1; min-height: 0; padding: 0 4px; }

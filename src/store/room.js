@@ -19,6 +19,9 @@ import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, rtdb } from '../lib/firebase.js';
 import { OFFLINE_MESSAGE, waitForConnection } from '../lib/online.js';
 import { safeTrack } from '../lib/safeTrack.js';
+import { api } from '../lib/api.js';
+import { useDeck } from './deck.js';
+import { saveAlignment } from './lyricAlignments.js';
 import { bindRoom, roomPlayer, usePlayer } from './player.js';
 import { toast } from './ui.js';
 
@@ -26,6 +29,10 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 6;
 const MAX_MEMBERS = 20;
 const START_LEAD_MS = 1500; // everyone gets this long to buffer before a new track starts
+const SOUND_LEAD_MS = 2500; // and a little longer when the deck's start sound comes first
+const MARK_ENDING_S = 6; // ahead of the end of the last track, members are told nothing follows it
+const MAX_SHARED_LYRICS = 200000;
+const TRACK_ID = /^[A-Za-z0-9_-]{11}$/;
 const SYNC_TICK_MS = 1000;
 const MAX_ADD_AT_ONCE = 200;
 const HOST_GRACE_MS = 30000;
@@ -58,9 +65,32 @@ function myProfile() {
   return { name: name.slice(0, 40), ...(photo ? { photo: photo.slice(0, 500) } : {}) };
 }
 
+// A lost connection can write `listening` over a member the host just removed, leaving no name behind.
+const realMembers = (members) => Object.fromEntries(Object.entries(members || {}).filter(([, m]) => m?.name));
+
+// Lyrics someone else chose are only ever shown as text; take the parts that are.
+function safeLyrics(json) {
+  let data = null;
+  try { data = JSON.parse(json); } catch { return null; }
+  if (!data || typeof data !== 'object') return null;
+  const lines = (Array.isArray(data.lines) ? data.lines : [])
+    .filter((l) => Number.isFinite(l?.time) && typeof l?.text === 'string')
+    .map((l) => ({ time: l.time, text: l.text }));
+  const plainLyrics = typeof data.plainLyrics === 'string' ? data.plainLyrics : '';
+  if (!lines.length && !plainLyrics) return null;
+  return {
+    lines,
+    plainLyrics,
+    ...(typeof data.source === 'string' ? { source: data.source } : {}),
+    ...(typeof data.footer === 'string' ? { footer: data.footer } : {}),
+    ...(Number.isFinite(data.lyricsDuration) ? { lyricsDuration: data.lyricsDuration } : {}),
+  };
+}
+
 const oldestFirst = (a, b) => (a[1].joinedAt || 0) - (b[1].joinedAt || 0) || (a[0] < b[0] ? -1 : 1);
 
 export const useRoom = create((set, get) => {
+  useDeck.subscribe((s, prev) => { if (s.sounds !== prev.sounds) syncSounds(); });
   let stopListening = [];
   let stopListeningPresence = null;
   let tick = null;
@@ -69,6 +99,8 @@ export const useRoom = create((set, get) => {
   let serverOffset = 0;
   let correcting = false;
   let pausedAlone = false; // came back to a room nobody is listening in
+  let seenLyrics = new Map();
+  let lyricsLoaded = false;
 
   const serverNow = () => Date.now() + serverOffset;
   const isHost = () => get().meta?.hostUid === myUid();
@@ -76,7 +108,14 @@ export const useRoom = create((set, get) => {
   const positionOf = (pb) => (pb.positionMs + (pb.playing ? serverNow() - pb.updatedAt : 0)) / 1000;
   const othersListening = () => Object.entries(get().members).some(([uid, m]) => uid !== myUid() && m.listening);
 
-  const refuse = () => { toast('방장만 조작할 수 있어요. 곡은 대기열에 추가해 보세요.'); return false; };
+  const refuse = () => { toast('방장만 곡을 추가하고 재생을 조작할 수 있어요.'); return false; };
+
+  // The host's choice is what the whole room goes by.
+  const syncSounds = () => {
+    const { code, meta, attached } = get();
+    const sounds = useDeck.getState().sounds;
+    if (code && attached && meta && isHost() && meta.sounds !== sounds) update(dbRef(code, 'meta'), { sounds }).catch(() => {});
+  };
 
   const publish = (patch) => {
     const pb = get().playback;
@@ -90,6 +129,7 @@ export const useRoom = create((set, get) => {
       updatedAt: serverTimestamp(),
       rev: (pb?.rev || 0) + 1,
       by: myUid(),
+      ...(patch.ending ? { ending: true } : {}),
     }).catch(() => toast('같이듣기 상태를 보내지 못했습니다'));
   };
 
@@ -115,10 +155,11 @@ export const useRoom = create((set, get) => {
       roomPlayer.pause();
       roomPlayer.setRate(1);
       roomPlayer.seekTo(Math.max(0, position));
+      if (pb.ending) roomPlayer.finished();
       return;
     }
     if (position < 0) {
-      roomPlayer.pause();
+      roomPlayer.hold(-position);
       roomPlayer.seekTo(0);
       startTimer = setTimeout(() => roomPlayer.play(), -position * 1000);
       return;
@@ -185,6 +226,18 @@ export const useRoom = create((set, get) => {
 
   const hooks = {
     following: () => !canControl(),
+    soundsOn: () => get().meta?.sounds === true,
+    hasQueued: () => get().queue.length > 0,
+    // Only the host knows nothing follows this track, since the next one would come from its queue.
+    endingSoon(left, stopsHere) {
+      const pb = get().playback;
+      if (isHost() && !pausedAlone && pb?.playing) {
+        const marked = pb.ending === true;
+        if (stopsHere && left <= MARK_ENDING_S && !marked) publish({ positionMs: roomPlayer.time() * 1000, ending: true });
+        else if (!stopsHere && marked) publish({ positionMs: roomPlayer.time() * 1000 });
+      }
+      return Boolean(pb?.playing && pb.ending === true);
+    },
     allowAuto: () => isHost(),
     allowTrackChange: () => canControl() || refuse(),
     togglePlay() {
@@ -204,10 +257,11 @@ export const useRoom = create((set, get) => {
     },
     onLoad(track) {
       pausedAlone = false;
-      publish({ track, positionMs: -START_LEAD_MS, playing: true });
+      const firstSound = hooks.soundsOn() && !get().playback?.playing;
+      publish({ track, positionMs: -(firstSound ? SOUND_LEAD_MS : START_LEAD_MS), playing: true });
     },
     onStopped() {
-      publish({ playing: false, positionMs: roomPlayer.time() * 1000 });
+      publish({ playing: false, positionMs: roomPlayer.time() * 1000, ending: true });
     },
     takeQueued() {
       const { code, queue } = get();
@@ -219,6 +273,7 @@ export const useRoom = create((set, get) => {
     },
     // Written together so a long album arrives in one piece and in order.
     enqueue(tracks, { next = false } = {}) {
+      if (!canControl()) { refuse(); return; }
       const { code, queue } = get();
       const { name } = myProfile();
       const safe = tracks.map(safeTrack).filter(Boolean);
@@ -268,6 +323,7 @@ export const useRoom = create((set, get) => {
     correcting = false;
     pausedAlone = false;
     bindRoom(null);
+    roomPlayer.release();
     roomPlayer.setRate(1);
     set({ attached: false, connected: false, driftMs: null });
   };
@@ -279,8 +335,22 @@ export const useRoom = create((set, get) => {
     set({ code: null, meta: null, members: {}, playback: null, queue: [] });
   };
 
+  // Someone in the room resynced the lyrics or picked different ones.
+  const applySharedLyrics = async (trackId, entry, announce) => {
+    const lyrics = TRACK_ID.test(trackId) && typeof entry.data === 'string' ? safeLyrics(entry.data) : null;
+    if (!lyrics) return;
+    await api.setCustomLyrics(trackId, lyrics);
+    saveAlignment(trackId, lyrics, Number.isFinite(entry.offset) ? entry.offset : null);
+    window.dispatchEvent(new CustomEvent('t-music:lyrics-changed', { detail: { trackId, lyrics } }));
+    if (announce && usePlayer.getState().current()?.id === trackId) {
+      toast(`${get().members[entry.by]?.name || '멤버'}님이 가사를 다시 맞췄어요`);
+    }
+  };
+
   const watchRoom = (code) => {
     set({ code });
+    seenLyrics = new Map();
+    lyricsLoaded = false;
     stopListening = [
       onValue(ref(rtdb, '.info/serverTimeOffset'), (snap) => { serverOffset = snap.val() || 0; }),
       onValue(dbRef(code, 'meta'), (snap) => {
@@ -292,6 +362,7 @@ export const useRoom = create((set, get) => {
         }
         set({ meta: snap.val() });
         watchHost();
+        syncSounds();
         // We came back to a silent room and have now become its host: stop its clock.
         if (pausedAlone && isHost() && get().playback?.playing) {
           publish({ playing: false, positionMs: restingPosition(get().playback) * 1000 });
@@ -299,8 +370,24 @@ export const useRoom = create((set, get) => {
         }
       }),
       onValue(dbRef(code, 'members'), (snap) => {
-        set({ members: snap.val() || {} });
+        set({ members: realMembers(snap.val()) });
         watchHost();
+      }),
+      onValue(dbRef(code, 'kicked', myUid()), (snap) => {
+        if (snap.val() !== true) return;
+        onDisconnect(dbRef(code, 'members', myUid())).cancel().catch(() => {});
+        toast('방장이 이 방에서 내보냈어요');
+        stopRoom();
+        deleteDoc(myRoomDoc()).catch(() => {});
+      }),
+      onValue(dbRef(code, 'lyrics'), (snap) => {
+        const announce = lyricsLoaded;
+        lyricsLoaded = true;
+        for (const [trackId, entry] of Object.entries(snap.val() || {})) {
+          if (seenLyrics.get(trackId) === entry.at) continue;
+          seenLyrics.set(trackId, entry.at);
+          if (entry.by !== myUid()) applySharedLyrics(trackId, entry, announce).catch((e) => console.warn('[room]', e));
+        }
       }),
       onValue(dbRef(code, 'playback'), (snap) => {
         const playback = snap.val();
@@ -335,12 +422,13 @@ export const useRoom = create((set, get) => {
       return;
     }
     if (get().code !== code || get().attached) return;
-    set({ meta: freshMeta.val(), members: freshMembers.val() || {}, playback: freshPlayback.val(), attached: true });
+    set({ meta: freshMeta.val(), members: realMembers(freshMembers.val()), playback: freshPlayback.val(), attached: true });
     bindRoom(hooks);
     startPresence(code);
     tick = setInterval(followTick, SYNC_TICK_MS);
     const { meta, playback } = get();
     if (meta?.ownerUid === myUid() && meta.hostUid !== myUid()) update(dbRef(code, 'meta'), { hostUid: myUid() }).catch(() => {});
+    syncSounds();
     if (playback?.playing && !othersListening()) {
       pausedAlone = true;
       if (isHost() || meta?.ownerUid === myUid()) {
@@ -373,7 +461,7 @@ export const useRoom = create((set, get) => {
         const uid = myUid();
         for (let attempt = 0; attempt < 5; attempt++) {
           const code = randomCode();
-          const meta = { hostUid: uid, ownerUid: uid, name: String(name || '').slice(0, 40) || `${myProfile().name}의 방`, controlMode: 'host', createdAt: Date.now() };
+          const meta = { hostUid: uid, ownerUid: uid, name: String(name || '').slice(0, 40) || `${myProfile().name}의 방`, controlMode: 'everyone', sounds: useDeck.getState().sounds, createdAt: Date.now() };
           const { committed } = await runTransaction(dbRef(code, 'meta'), (current) => (current ? undefined : meta));
           if (!committed) continue;
           const player = usePlayer.getState();
@@ -422,6 +510,10 @@ export const useRoom = create((set, get) => {
           set({ error: '방을 찾을 수 없습니다. 코드를 확인해 주세요.' });
           return;
         }
+        if (room.kicked?.[myUid()]) {
+          set({ error: '방장이 내보낸 방이에요. 방장이 다시 초대하면 들어올 수 있어요.' });
+          return;
+        }
         if (!room.members[myUid()] && Object.keys(room.members).length >= MAX_MEMBERS) {
           set({ error: '방이 가득 찼습니다.' });
           return;
@@ -446,7 +538,7 @@ export const useRoom = create((set, get) => {
         const code = saved.data()?.code;
         if (!code || get().code) return;
         const member = await dbGet(dbRef(code, 'members', myUid()));
-        if (!member.exists()) {
+        if (!member.val()?.name) {
           await deleteDoc(myRoomDoc()).catch(() => {});
           return;
         }
@@ -486,7 +578,7 @@ export const useRoom = create((set, get) => {
       stopRoom();
       try {
         await onDisconnect(memberRef).cancel();
-        const everyone = (await dbGet(dbRef(code, 'members'))).val() || {};
+        const everyone = realMembers((await dbGet(dbRef(code, 'members'))).val());
         const others = Object.entries(everyone).filter(([id]) => id !== uid).sort(oldestFirst);
         if (others.length) {
           const next = (others.find(([, m]) => m.listening) || others[0])[0];
@@ -510,6 +602,28 @@ export const useRoom = create((set, get) => {
     makeHost(uid) {
       if (isHost()) update(dbRef(get().code, 'meta'), { hostUid: uid, ownerUid: uid }).catch(() => toast('변경하지 못했습니다'));
     },
+    kick(uid) {
+      const { code, meta } = get();
+      if (!isHost() || uid === myUid() || uid === meta?.ownerUid) return;
+      update(dbRef(code), { [`members/${uid}`]: null, [`kicked/${uid}`]: true }).catch(() => toast('내보내지 못했습니다'));
+    },
+    // Inviting someone back is how the host takes it back.
+    pardon(uid) {
+      if (get().code && isHost()) remove(dbRef(get().code, 'kicked', uid)).catch(() => {});
+    },
+    // Goes to everyone who may control the room's playback; anyone else keeps it to themselves.
+    shareLyrics(trackId, lyrics, offset = null) {
+      const { code, attached } = get();
+      if (!code || !attached || !canControl() || !lyrics || !TRACK_ID.test(trackId)) return;
+      const data = JSON.stringify(lyrics);
+      if (data.length > MAX_SHARED_LYRICS) return;
+      dbSet(dbRef(code, 'lyrics', trackId), {
+        data,
+        ...(Number.isFinite(offset) ? { offset } : {}),
+        by: myUid(),
+        at: serverTimestamp(),
+      }).catch(() => toast('가사를 방에 공유하지 못했습니다'));
+    },
     moveInQueue(from, to) {
       const { code, queue } = get();
       if (!canControl()) { refuse(); return; }
@@ -523,6 +637,7 @@ export const useRoom = create((set, get) => {
       update(dbRef(code, 'queue'), orders).catch(() => toast('순서를 바꾸지 못했습니다'));
     },
     removeFromQueue(key) {
+      if (!canControl()) { refuse(); return; }
       remove(dbRef(get().code, 'queue', key)).catch(() => toast('삭제하지 못했습니다'));
     },
     clearError() { set({ error: null }); },

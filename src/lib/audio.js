@@ -1,10 +1,12 @@
 // Web Audio graph for the visualizers and dynamic volume normalization.
-// Each <audio> element is routed through one shared analyser and compressor.
+// Each <audio> element is routed through one shared fade, analyser and compressor.
 
 let ctx = null;
 let analyser = null;
 let compressor = null;
+let musicFade = null;
 const sources = new WeakMap();
+const FADE_CURVE_POINTS = 48;
 
 let normalizeEnabled = (() => {
   try {
@@ -29,6 +31,10 @@ function setupGraph() {
     analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
     analyser.smoothingTimeConstant = 0.8;
+
+    // Ahead of the analyser, so everything that reacts to the music follows the fades too.
+    musicFade = ctx.createGain();
+    musicFade.connect(analyser);
 
     compressor = ctx.createDynamicsCompressor();
     // Broadcasting standard multiband-style dynamic loudness leveling:
@@ -69,13 +75,40 @@ export function attach(el) {
     if (!ctx) return;
     if (!sources.has(el)) {
       const src = ctx.createMediaElementSource(el);
-      src.connect(analyser);
+      src.connect(musicFade);
       sources.set(el, src);
     }
     if (ctx.state === 'suspended') ctx.resume();
   } catch {
     // Visualizer is optional; playback works without it.
   }
+}
+
+export function getAudioContext() {
+  setupGraph();
+  if (ctx?.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+// Fades the music on the audio clock, so it stays smooth with the window hidden or the phone locked.
+// Both directions spend longest at the quiet end, which is how a fade should sound.
+export function setMusicFade(to, seconds = 0) {
+  setupGraph();
+  if (!ctx || !musicFade) return;
+  const gain = musicFade.gain;
+  const now = ctx.currentTime;
+  const from = gain.value;
+  gain.cancelScheduledValues(now);
+  if (seconds <= 0 || Math.abs(from - to) < 0.001) {
+    gain.setValueAtTime(to, now);
+    return;
+  }
+  const curve = new Float32Array(FADE_CURVE_POINTS);
+  for (let i = 0; i < FADE_CURVE_POINTS; i++) {
+    const t = i / (FADE_CURVE_POINTS - 1);
+    curve[i] = to > from ? from + (to - from) * t * t : to + (from - to) * (1 - t) * (1 - t);
+  }
+  gain.setValueCurveAtTime(curve, now, seconds);
 }
 
 // How long sound takes from here to the speakers. Bluetooth makes this large enough to hear.

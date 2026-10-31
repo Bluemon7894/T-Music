@@ -179,6 +179,7 @@ export const useFriends = create((set, get) => {
     requests: [],
     invites: [],
     sharing: DEFAULT_SHARING,
+    sentRequests: {}, // people asked this session, so the button doesn't offer it twice
 
     start() {
       const uid = myUid();
@@ -212,7 +213,7 @@ export const useFriends = create((set, get) => {
       stopListening = [];
       for (const stop of friendWatchers.values()) stop();
       friendWatchers.clear();
-      set({ friendCode: null, friends: {}, requests: [], invites: [], sharing: DEFAULT_SHARING });
+      set({ friendCode: null, friends: {}, requests: [], invites: [], sharing: DEFAULT_SHARING, sentRequests: {} });
     },
 
     // Signing out: look offline right away instead of waiting for the connection to drop.
@@ -263,6 +264,26 @@ export const useFriends = create((set, get) => {
       }
     },
 
+    // For someone we can already see, such as a member of the same room: no code needed.
+    async requestFriend(uid) {
+      if (!uid || uid === myUid() || get().friends[uid]) return;
+      if (get().requests.some((r) => r.uid === uid)) {
+        await get().acceptRequest(uid).catch(() => toast(OFFLINE_MESSAGE));
+        return;
+      }
+      set({ sentRequests: { ...get().sentRequests, [uid]: true } });
+      try {
+        await waitForConnection();
+        await dbSet(dbRef('friendRequests', uid, myUid()), myProfile());
+        toast('친구 요청을 보냈어요');
+      } catch (e) {
+        console.warn('[friends]', e);
+        const { [uid]: _, ...rest } = get().sentRequests;
+        set({ sentRequests: rest });
+        toast(OFFLINE_MESSAGE);
+      }
+    },
+
     async acceptRequest(uid) {
       const me = myUid();
       const since = Date.now();
@@ -294,6 +315,7 @@ export const useFriends = create((set, get) => {
         toast('방을 만들지 못했습니다');
         return;
       }
+      useRoom.getState().pardon(uid);
       try {
         await waitForConnection();
         const { name, photo } = myProfile();

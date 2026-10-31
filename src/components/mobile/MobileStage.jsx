@@ -11,9 +11,9 @@ import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
 import LyricsView from '../layout/LyricsView.jsx';
-import Turntable from '../layout/Turntable.jsx';
+import Deck from '../layout/Deck.jsx';
 import { QueueList, AutoplayToggle } from '../layout/NowPanel.jsx';
-import { StageProgress } from '../layout/Stage.jsx';
+import { NextTrack, StageProgress } from '../layout/Stage.jsx';
 
 const TABS = [
   { id: 'now', label: '지금 재생', icon: Sparkles },
@@ -87,8 +87,9 @@ function StageView({ track }) {
       <div className={`m-stage-body tab-${tab}`}>
         {tab === 'now' && (
           <>
-            <Turntable track={track} playing={playing} />
+            <Deck track={track} playing={playing} />
             <Visualizer variant="bars" bars={36} className="now-viz" />
+            <NextTrack />
           </>
         )}
         {tab === 'lyrics' && <LyricsView key={track.id} track={track} variant="stage" />}

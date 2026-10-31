@@ -488,6 +488,8 @@
 .tt-arm { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .tt-arm-plate { fill: rgba(10, 6, 20, 0.55); stroke: rgba(196, 181, 253, 0.28); stroke-width: 0.3; }
 .tt-arm-swing { filter: drop-shadow(0 1.2px 1.2px rgba(0, 0, 0, 0.65)); }
+/* Off the record the arm sits higher, so its shadow falls further away and softer. */
+.tt-arm-swing.lifted { filter: drop-shadow(0 3px 3.5px rgba(0, 0, 0, 0.5)); }
 .tt-arm-weight { fill: #6d5aa8; stroke: rgba(233, 227, 255, 0.5); stroke-width: 0.25; }
 .tt-arm-tube { fill: none; stroke: url(#tt-arm-metal); stroke-width: 1.15; stroke-linecap: round; }
 .tt-arm-head { fill: #c4b5fd; stroke: #2a1f47; stroke-width: 0.2; }
@@ -522,6 +524,69 @@
 .tt-led i { width: 1.2cqw; height: 1.2cqw; border-radius: 50%; background: rgba(196, 181, 253, 0.25); transition: background 0.4s, box-shadow 0.4s; }
 .tt-led.on { color: var(--v-200); }
 .tt-led.on i { background: #e9d5ff; box-shadow: 0 0 1.4cqw 0.3cqw rgba(192, 132, 252, 0.9); }
+
+/* Cassette deck, in the same square as the turntable: the tape in its bay above, the meter and keys below. */
+.cs-glow { position: absolute; left: 4%; right: 4%; top: 11%; height: 54%; border-radius: 5cqw; background: rgba(167, 139, 250, 0.55); filter: blur(10px); opacity: 0.25; pointer-events: none; }
+.cs-bay { position: absolute; left: 6%; right: 6%; top: 13%; height: 50%; padding: 1.6cqw; box-sizing: border-box; border-radius: 3cqw; background: rgba(8, 5, 16, 0.82); box-shadow: inset 0 1px 7px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(196, 181, 253, 0.22); overflow: hidden; }
+.cs-tape { position: relative; width: 100%; height: 100%; border-radius: 2cqw; background: linear-gradient(160deg, #43336b, #1f1636 62%, #2d2149); box-shadow: 0 0.6cqw 1.6cqw rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.18); }
+.cs-door { position: absolute; inset: 0; pointer-events: none; border-radius: 3cqw; background: linear-gradient(115deg, rgba(255, 255, 255, 0.14), transparent 26%, transparent 62%, rgba(255, 255, 255, 0.06) 78%, transparent 90%); }
+.cs-screw { position: absolute; width: 1.5cqw; height: 1.5cqw; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #d9d0f5, #5b4a86 70%); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
+.cs-label { position: absolute; left: 5%; right: 5%; top: 5%; height: 72%; border-radius: 1.2cqw; overflow: hidden; background: var(--v-800); }
+.cs-label .thumb { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; object-fit: cover; }
+.cs-label::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10, 6, 20, 0.55), rgba(10, 6, 20, 0.08) 34%, rgba(10, 6, 20, 0.35)); }
+.cs-title { position: absolute; z-index: 1; left: 3%; right: 3%; top: 4%; font-size: 2.6cqw; font-weight: 800; letter-spacing: -0.01em; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cs-window { position: absolute; left: 16%; right: 16%; top: 32%; height: 31%; border-radius: 1.5cqw; background: rgba(9, 6, 18, 0.94); box-shadow: 0 0 0 1px rgba(233, 227, 255, 0.28), inset 0 1px 5px rgba(0, 0, 0, 0.9); overflow: hidden; }
+.cs-reels { display: block; width: 100%; height: 100%; }
+.cs-pack { fill: #3f2f66; stroke: rgba(196, 181, 253, 0.28); stroke-width: 0.4; }
+.cs-hub { fill: #e9e3ff; }
+.cs-hub-hole { fill: #141024; }
+.cs-hub-tooth { fill: #e9e3ff; }
+.cs-lip { position: absolute; left: 20%; right: 20%; bottom: 0; height: 16%; background: linear-gradient(180deg, #3a2c5e, #241a3f); clip-path: polygon(7% 0, 93% 0, 100% 100%, 0 100%); }
+.cs-panel { position: absolute; left: 6%; right: 6%; top: 66.5%; bottom: 5%; display: flex; gap: 3cqw; align-items: stretch; }
+.cs-vu { flex: 0 0 46%; height: 100%; min-width: 0; filter: drop-shadow(0 0.5cqw 1.2cqw rgba(0, 0, 0, 0.6)); }
+.cs-vu.lit { filter: drop-shadow(0 0.5cqw 1.2cqw rgba(0, 0, 0, 0.6)) drop-shadow(0 0 1.4cqw rgba(246, 190, 90, 0.4)); }
+.cs-vu-bezel { fill: url(#cs-vu-bezel); stroke: rgba(233, 227, 255, 0.35); stroke-width: 0.5; }
+.cs-vu-screw { fill: #cfc4f2; stroke: rgba(0, 0, 0, 0.5); stroke-width: 0.2; }
+.cs-vu-face { fill: url(#cs-vu-glow); }
+.cs-vu-scale { fill: none; stroke: #2a1a0c; stroke-width: 0.7; }
+.cs-vu-hot { fill: none; stroke: #c81e1e; stroke-width: 2.4; }
+.cs-vu-tick { stroke: #2a1a0c; stroke-width: 0.35; }
+.cs-vu-tick.major { stroke-width: 0.65; }
+.cs-vu-tick.hot { stroke: #c81e1e; }
+.cs-vu-number { fill: #2a1a0c; font-size: 4.3px; font-weight: 800; }
+.cs-vu-number.hot { fill: #c81e1e; }
+.cs-vu-sign { fill: #2a1a0c; font-size: 6px; font-weight: 800; }
+.cs-vu-sign.hot { fill: #c81e1e; }
+.cs-vu-percent { fill: none; stroke: rgba(42, 26, 12, 0.6); stroke-width: 0.35; }
+.cs-vu-small { fill: rgba(42, 26, 12, 0.8); font-size: 2.9px; font-weight: 700; letter-spacing: 0.03em; }
+.cs-vu-text { fill: #2a1a0c; font-size: 8.5px; font-weight: 900; letter-spacing: 0.1em; }
+.cs-vu-lamp { fill: #5e1616; stroke: rgba(42, 26, 12, 0.7); stroke-width: 0.35; transition: fill 0.25s; }
+.cs-vu-lamp.on { fill: #ff3b30; transition: none; }
+.cs-vu-needle { stroke: #17100a; stroke-width: 0.7; stroke-linecap: round; }
+.cs-vu-needle-shadow { stroke: rgba(60, 30, 0, 0.32); stroke-width: 0.8; }
+.cs-vu-hood { fill: #1b1230; stroke: rgba(233, 227, 255, 0.25); stroke-width: 0.3; }
+/* With the deck stopped the lamp behind the scale goes down, and comes back when the tape runs. */
+.cs-vu-shade { fill: #120a04; opacity: 0.52; transition: opacity 0.7s; }
+.cs-vu.lit .cs-vu-shade { opacity: 0; }
+.cs-vu-glass { fill: rgba(255, 255, 255, 0.13); pointer-events: none; }
+.cs-side { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 1.5cqw; }
+.cs-readout { display: flex; align-items: center; justify-content: space-between; gap: 1.5cqw; }
+.cs-counter { padding: 0.5cqw 1.3cqw; border-radius: 1cqw; background: rgba(8, 5, 16, 0.85); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9); color: var(--v-200); font-size: 3.6cqw; font-weight: 800; letter-spacing: 0.14em; font-variant-numeric: tabular-nums; }
+.cs-deck .tt-led { position: static; }
+.cs-keys { flex: 1; display: flex; gap: 1cqw; min-height: 0; }
+.cs-key { flex: 1; min-width: 0; display: grid; place-items: center; border-radius: 1.2cqw; color: var(--sub); background: linear-gradient(180deg, #5b4a86, #3a2c5e); box-shadow: 0 0.9cqw 0 #1b1230, inset 0 1px 0 rgba(255, 255, 255, 0.22); margin-bottom: 0.9cqw; transition: transform 0.07s ease-out, box-shadow 0.07s ease-out, color 0.2s; }
+.cs-key svg { width: 3.6cqw; height: 3.6cqw; }
+.cs-key.down { transform: translateY(0.7cqw); box-shadow: 0 0.2cqw 0 #1b1230, inset 0 1px 3px rgba(0, 0, 0, 0.5); color: #fff; }
+
+.stage-deck-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; min-width: 0; min-height: 0; }
+.stage-upnext { display: flex; align-items: center; gap: 10px; width: 100%; max-width: min(340px, 90%); padding: 7px 12px 7px 7px; border-radius: 14px; background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line); color: var(--sub); text-align: left; transition: background 0.2s; }
+.stage-upnext:hover { background: rgba(255, 255, 255, 0.13); color: #fff; }
+.stage-upnext .thumb { width: 38px; height: 38px; flex: none; border-radius: 8px; }
+.stage-upnext span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.stage-upnext small { font-size: 11px; font-weight: 700; color: var(--dim); letter-spacing: 0.02em; }
+.stage-upnext b { font-size: 13px; color: var(--text, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage-upnext svg { flex: none; }
+.stage-upnext.only-short { display: none; }
 
 .stage-info { display: flex; flex-direction: column; gap: 10px; max-width: 560px; min-height: 0; height: 100%; max-height: 100%; justify-content: center; overflow: visible; box-sizing: border-box; }
 .stage-info.with-lyrics { max-width: 680px; height: 100%; max-height: 100%; min-height: 0; gap: 6px; justify-content: flex-start; overflow: visible; }
@@ -989,6 +1054,7 @@
 
 @media (max-height: 840px) {
   .stage-next { display: none; }
+  .stage-upnext.only-short { display: flex; }
   .stage-main { padding-top: 52px; padding-bottom: 24px; }
   .stage-info h1 { font-size: clamp(26px, 3.4vw, 44px); -webkit-line-clamp: 2; }
   .stage-artist { font-size: 16px; }
@@ -1151,6 +1217,10 @@
 .room-members .avatar { width: 32px; height: 32px; }
 .room-member-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .room-member-name small { color: var(--dim); font-weight: 500; }
+.room-member-actions { flex: none; display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 4px; }
+.room-member-actions .text-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; font-size: 12.5px; white-space: nowrap; }
+.room-member-sent { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; font-size: 12.5px; font-weight: 700; color: var(--dim); white-space: nowrap; }
+.room-kick:hover { color: #fca5a5; }
 .room-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: rgba(250, 204, 21, 0.14); color: #facc15; font-size: 11.5px; font-weight: 700; }
 .room-queue li { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .room-queue .thumb { width: 40px; height: 40px; flex: none; border-radius: 8px; }

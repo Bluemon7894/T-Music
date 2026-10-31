@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api, streamUrl } from '../lib/api.js';
-import { attach, startAudioOnsetDetection } from '../lib/audio.js';
+import { attach, setMusicFade, startAudioOnsetDetection } from '../lib/audio.js';
+import { cancelSound, commitEnd, endLead, hasStarted, isEndCommitted, isEnding, isStarting, isWaitingForCue, playEndSound, playStartSound, setDeckLevel, setStarted, startCue, useDeck } from './deck.js';
 import { useLibrary } from './library.js';
 import { toast } from './ui.js';
 import { IS_ANDROID } from '../lib/platform.js';
@@ -95,6 +96,76 @@ let retried = new Set();
 let room = null;
 export function bindRoom(hooks) {
   room = hooks;
+}
+
+const soundsOn = () => (room ? room.soundsOn() : useDeck.getState().sounds);
+
+// The music comes up once it's really playing, however long the stream took to get ready.
+let riseOnPlaying = 0;
+function riseMusic(seconds) {
+  const a = active();
+  if (!a.paused && a.readyState >= 3) setMusicFade(1, seconds);
+  else riseOnPlaying = seconds;
+}
+
+function dropSound() {
+  riseOnPlaying = 0;
+  cancelSound();
+}
+
+// Alone, the music waits for the deck to get going: the needle has to land first.
+function playWithDeck() {
+  const a = active();
+  if (isWaitingForCue()) return; // the sound's cue starts whichever track is current by then
+  if (isEnding()) dropSound();
+  if (hasStarted() || !soundsOn()) {
+    setStarted(true);
+    a.play().catch(() => {});
+    return;
+  }
+  setStarted(true);
+  usePlayer.setState({ playing: true });
+  attach(a);
+  playStartSound((seconds) => {
+    const el = active();
+    attach(el);
+    el.play().catch(() => {});
+    riseMusic(seconds);
+  });
+}
+
+// In a room the track runs on the room's clock, so nothing can wait: the music stays silent until the cue.
+function firstPlayInRoom(secondsUntilMusic) {
+  if (hasStarted()) return;
+  setStarted(true);
+  if (!soundsOn()) return;
+  playStartSound(riseMusic, Math.max(0, secondsUntilMusic - startCue()));
+}
+
+// Nothing plays after this track unless something changes before it ends.
+function queueStopsHere() {
+  const { queue, index, repeat, autoplay } = usePlayer.getState();
+  if (repeat !== 'off' || room?.hasQueued()) return false;
+  const next = queue[index + 1];
+  return next ? !autoplay && next.isAutoplay : !autoplay;
+}
+
+function queueFinished() {
+  if (isEnding()) commitEnd();
+  else if (hasStarted() && soundsOn()) playEndSound();
+  setStarted(false);
+}
+
+// The end sound has to begin before the last track ends, for the two to cross.
+function watchQueueEnd(a) {
+  if (!isFinite(a.duration) || !a.duration) return;
+  const left = a.duration - a.currentTime;
+  const stops = room ? room.endingSoon(left, queueStopsHere()) : queueStopsHere();
+  if (isEnding()) {
+    if (!isEndCommitted() && (!stops || left > endLead() + 1)) dropSound();
+    return;
+  }
+  if (stops && !a.paused && !isStarting() && left <= endLead() && left > 0.25 && hasStarted() && soundsOn()) playEndSound(left);
 }
 
 // Actual listening time tracker (measures real wall-clock listening duration while audio is playing)
@@ -281,13 +352,19 @@ export const usePlayer = create((set, get) => ({
     if (room) { room.togglePlay(); return; }
     const a = active();
     if (get().index < 0) return;
+    if (isWaitingForCue()) {
+      dropSound();
+      setStarted(false);
+      set({ playing: false });
+      return;
+    }
     if (a.paused) {
       attach(a);
       const targetTime = get().time;
       if (targetTime > 0 && Math.abs(a.currentTime - targetTime) > 1) {
         try { a.currentTime = targetTime; } catch {}
       }
-      a.play().catch(() => {});
+      playWithDeck();
     } else {
       a.pause();
     }
@@ -320,6 +397,7 @@ export const usePlayer = create((set, get) => ({
       if (!autoplay && nextTrack.isAutoplay) {
         // Autoplay is OFF: do not play auto-recommended tracks!
         room?.onStopped();
+        queueFinished();
         active().pause();
         active().currentTime = 0;
         set({ playing: false, loading: false, time: 0 });
@@ -344,6 +422,7 @@ export const usePlayer = create((set, get) => ({
     // If autoplay is OFF, stop playback cleanly!
     if (!autoplay) {
       room?.onStopped();
+      queueFinished();
       active().pause();
       active().currentTime = 0;
       set({ playing: false, loading: false, time: 0 });
@@ -364,6 +443,7 @@ export const usePlayer = create((set, get) => ({
     } else {
       // If truly all network/fallback attempts failed:
       room?.onStopped();
+      queueFinished();
       active().pause();
       set({ playing: false, loading: false });
       toast('추천곡을 불러올 수 없습니다 (네트워크 확인)');
@@ -396,12 +476,14 @@ export const usePlayer = create((set, get) => ({
   setVolume(v) {
     set({ volume: v, muted: v === 0 });
     for (const a of audios) { a.volume = v; a.muted = v === 0; }
+    setDeckLevel(v);
     persistPrefs();
   },
   toggleMute() {
     const muted = !get().muted;
     set({ muted });
     for (const a of audios) a.muted = muted;
+    setDeckLevel(muted ? 0 : get().volume);
     persistPrefs();
   },
 
@@ -461,6 +543,7 @@ export const usePlayer = create((set, get) => ({
     currentListenTrack = track;
     const src = streamUrl(track.id);
     retried.delete(track.id);
+    if (isEnding()) dropSound();
     if (spare().dataset.id === track.id) {
       // Already buffered by _preloadNext: just swap.
       active().pause();
@@ -476,7 +559,7 @@ export const usePlayer = create((set, get) => ({
     a.muted = get().muted;
     set({ time: a.currentTime || 0, duration: track.duration || 0, loading: a.readyState < 3 });
     for (const el of audios) attach(el);
-    if (!room) a.play().catch(() => {});
+    if (!room) playWithDeck();
     else if (!fromRoom) room.onLoad(track);
     useLibrary.getState().pushRecent(track);
     updateMediaSession(track);
@@ -631,6 +714,17 @@ export const usePlayer = create((set, get) => ({
 
 }));
 
+setDeckLevel(usePlayer.getState().muted ? 0 : usePlayer.getState().volume);
+
+// Changing the style or turning the sounds off mid-sound: drop it, and don't leave the music waiting.
+useDeck.subscribe((s, prev) => {
+  if (s.style === prev.style && s.sounds === prev.sounds) return;
+  if (s.sounds && s.style === prev.style) return;
+  const waiting = isWaitingForCue() && !room;
+  if (isStarting() || isEnding()) dropSound();
+  if (waiting) active().play().catch(() => {});
+});
+
 // How the listen-together room drives playback; these skip the checks above on purpose.
 export const roomPlayer = {
   // People who can't control playback just show the room's track; controllers keep their queue.
@@ -651,10 +745,26 @@ export const roomPlayer = {
   play() {
     const a = active();
     attach(a);
+    firstPlayInRoom(0);
     if (a.paused) a.play().catch(() => {});
   },
   pause() {
+    if (isWaitingForCue()) {
+      dropSound();
+      setStarted(false);
+    }
     active().pause();
+  },
+  // Waiting for the moment the room's new track starts.
+  hold(secondsUntilMusic) {
+    attach(active());
+    active().pause();
+    firstPlayInRoom(secondsUntilMusic);
+  },
+  finished: queueFinished,
+  // Not following the room any more: whatever it was doing to the sound is over.
+  release() {
+    if (isStarting() || isEnding()) dropSound();
   },
   seekTo(t) {
     try {
@@ -673,6 +783,8 @@ export const roomPlayer = {
 export function resetPlayer() {
   commitListen();
   currentListenTrack = null;
+  dropSound();
+  setStarted(false);
   for (const a of audios) {
     a.pause();
     a.removeAttribute('src');
@@ -696,6 +808,10 @@ audios.forEach((a, i) => {
       consecutiveErrors = 0;
       clearTimeout(errorSkipTimer);
       usePlayer.setState({ playing: true, loading: false });
+      if (riseOnPlaying) {
+        setMusicFade(1, riseOnPlaying);
+        riseOnPlaying = 0;
+      }
       const curTrack = usePlayer.getState().current();
       startListening(curTrack);
       startAudioOnsetDetection(a, curTrack?.id);
@@ -705,6 +821,8 @@ audios.forEach((a, i) => {
   a.addEventListener('pause', () => {
     if (isActive()) {
       usePlayer.setState({ playing: false });
+      if (isEnding() && !isEndCommitted() && a.duration - a.currentTime > 0.5) dropSound();
+      if (isStarting() && !isWaitingForCue()) dropSound();
       pauseListening();
       savePlayerState({ wasPlaying: false, time: a.currentTime });
     }
@@ -728,6 +846,7 @@ audios.forEach((a, i) => {
     }
     const b = a.buffered.length ? a.buffered.end(a.buffered.length - 1) : 0;
     usePlayer.setState({ time: a.currentTime, buffered: b });
+    watchQueueEnd(a);
     if ('mediaSession' in navigator && a.duration) {
       try { navigator.mediaSession.setPositionState({ duration: a.duration, position: Math.min(a.currentTime, a.duration), playbackRate: 1 }); } catch { /* ignore */ }
     }

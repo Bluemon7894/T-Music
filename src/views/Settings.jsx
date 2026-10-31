@@ -17,6 +17,9 @@ import { useAsync } from '../components/common.jsx';
 import { AccountCard, FriendPrivacyCard } from '../components/Account.jsx';
 import { useLibrary } from '../store/library.js';
 import { usePlayer, applyOutputDevice } from '../store/player.js';
+import { useDeck } from '../store/deck.js';
+import { useRoom } from '../store/room.js';
+import { useAccount } from '../store/account.js';
 import { useDownloads, openDownloads } from '../store/downloads.js';
 import { useUpdater } from '../store/updater.js';
 import { toast, useUI } from '../store/ui.js';
@@ -37,6 +40,12 @@ export default function Settings() {
   const latestVersion = useUpdater((s) => s.latestVersion);
   const checkUpdate = useUpdater((s) => s.check);
   const openModal = useUpdater((s) => s.openModal);
+
+  const deckStyle = useDeck((s) => s.style);
+  const deckSounds = useDeck((s) => s.sounds);
+  const inRoom = useRoom((s) => s.attached);
+  const roomSounds = useRoom((s) => s.meta?.sounds === true);
+  const isRoomHost = useRoom((s) => s.meta?.hostUid) === useAccount((s) => s.user?.uid);
 
   // Audio Normalization state
   const [normalize, setNormalizeState] = useState(isNormalizeEnabled);
@@ -207,6 +216,29 @@ export default function Settings() {
               <span className="muted small">곡마다 들쑥날쑥한 볼륨 차이를 실시간으로 완만하게 맞춰줍니다.</span>
             </div>
             <div className={`switch ${normalize ? 'on' : ''}`} />
+          </div>
+
+          <div className="set-item" style={{ cursor: 'default' }}>
+            <div className="set-item-text">
+              <span className="set-item-title">플레이어 스타일</span>
+              <span className="muted small">전체 화면 플레이어를 턴테이블이나 카세트로 바꿉니다. 효과음도 함께 바뀝니다.</span>
+            </div>
+            <div className="seg">
+              <button className={deckStyle === 'turntable' ? 'on' : ''} onClick={() => useDeck.getState().setStyle('turntable')}>턴테이블</button>
+              <button className={deckStyle === 'cassette' ? 'on' : ''} onClick={() => useDeck.getState().setStyle('cassette')}>카세트</button>
+            </div>
+          </div>
+
+          <div className="set-item" onClick={() => useDeck.getState().setSounds(!deckSounds)}>
+            <div className="set-item-text">
+              <span className="set-item-title">시작·끝 효과음</span>
+              <span className="muted small">
+                {inRoom && !isRoomHost
+                  ? `같이 듣기 중에는 방장의 설정을 따릅니다. 지금 방은 ${roomSounds ? '켜짐' : '꺼짐'}이에요.`
+                  : '처음 재생할 때와 대기열이 모두 끝날 때 소리가 음악과 자연스럽게 이어집니다. 일시정지나 곡 넘김에는 나지 않아요.'}
+              </span>
+            </div>
+            <div className={`switch ${deckSounds ? 'on' : ''}`} />
           </div>
 
           {!IS_ANDROID && devices.length > 0 && (

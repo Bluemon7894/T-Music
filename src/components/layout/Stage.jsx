@@ -1,7 +1,8 @@
-// Fullscreen "stage": the turntable, synchronized lyrics and the up-next strip. Esc or the button closes it.
+// Fullscreen "stage": the deck, synchronized lyrics and the up-next strip. Esc or the button closes it.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronDown, Shuffle, SkipBack, SkipForward, Repeat, Repeat1, Mic2, Volume2, Volume1, VolumeX } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
+import { useRoom } from '../../store/room.js';
 import { useUI } from '../../store/ui.js';
 import { api } from '../../lib/api.js';
 import { Thumb, ArtistLinks, PlayButton } from '../common.jsx';
@@ -9,7 +10,7 @@ import { LikeButton } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import { Slider } from './PlayerDock.jsx';
 import LyricsView from './LyricsView.jsx';
-import Turntable from './Turntable.jsx';
+import Deck from './Deck.jsx';
 import { fmtTime } from '../../lib/util.js';
 import { animate, createTimeline, ease, stagger } from '../../lib/motion.js';
 
@@ -89,10 +90,32 @@ function UpNext() {
   );
 }
 
+// One line under the deck saying what comes next. In a room that's the room's queue first.
+export function NextTrack({ className = '' }) {
+  const fromRoom = useRoom((s) => (s.attached ? s.queue[0]?.track : null));
+  const fromQueue = usePlayer((s) => {
+    const next = s.queue[s.index + 1];
+    return next && (s.autoplay || !next.isAutoplay) ? next : null;
+  });
+  const track = fromRoom || fromQueue;
+  if (!track) return null;
+  return (
+    <button className={`stage-upnext ${className}`} onClick={() => usePlayer.getState().next()} title="다음 곡 재생">
+      <Thumb src={track.thumb} />
+      <span>
+        <small>다음 곡</small>
+        <b>{track.title}</b>
+      </span>
+      <SkipForward size={16} fill="currentColor" />
+    </button>
+  );
+}
+
 function StageView({ track }) {
   const setStage = useUI((s) => s.setStage);
   const playing = usePlayer((s) => s.playing);
   const contextName = usePlayer((s) => s.context?.name);
+  const inRoom = useRoom((s) => s.attached);
   const root = useRef(null);
   const [showLyrics, setShowLyrics] = useState(() => {
     try { return localStorage.getItem('t-music-stage-lyrics') !== '0'; } catch { return true; }
@@ -122,7 +145,7 @@ function StageView({ track }) {
   // New track: the record settles onto the platter.
   useEffect(() => {
     const platter = root.current.querySelector('.tt-platter');
-    animate(platter, { scale: [0.95, 1], ease: ease.bouncy, duration: 500 });
+    if (platter) animate(platter, { scale: [0.95, 1], ease: ease.bouncy, duration: 500 });
   }, [track.id]);
 
   // The wheel sets the volume anywhere on the stage, except over lyrics, which scroll.
@@ -152,7 +175,10 @@ function StageView({ track }) {
       <button className="icon-btn circle glass stage-close" onClick={close} title="닫기 (Esc)"><ChevronDown size={22} /></button>
 
       <div className={`stage-main ${showLyrics ? 'with-lyrics' : ''}`}>
-        <Turntable track={track} playing={playing} />
+        <div className="stage-deck-col">
+          <Deck track={track} playing={playing} />
+          <NextTrack className={!showLyrics && !inRoom ? 'only-short' : ''} />
+        </div>
 
         <div className={`stage-info ${showLyrics ? 'with-lyrics' : ''}`}>
           <div className="stage-header" data-rise>
@@ -179,7 +205,7 @@ function StageView({ track }) {
         </div>
       </div>
 
-      {!showLyrics && <UpNext />}
+      {!showLyrics && !inRoom && <UpNext />}
     </div>
   );
 }

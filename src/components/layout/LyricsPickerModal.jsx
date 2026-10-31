@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, Mic2, Check, Music2, RefreshCw } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import { useRoom } from '../../store/room.js';
 import { fmtTime } from '../../lib/util.js';
 
 export default function LyricsPickerModal({ track, currentData, onClose }) {
@@ -60,6 +61,7 @@ export default function LyricsPickerModal({ track, currentData, onClose }) {
       window.dispatchEvent(new CustomEvent('t-music:lyrics-changed', {
         detail: { trackId: track.id, lyrics: cand.data },
       }));
+      useRoom.getState().shareLyrics(track.id, cand.data);
       onClose();
     } catch (e) {
       console.error('Failed to set custom lyrics', e);
