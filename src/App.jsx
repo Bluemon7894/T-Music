@@ -161,9 +161,8 @@ export default function App() {
     });
   }, []);
 
+  // Don't subscribe to the playback time here: it would re-render the whole app four times a second.
   const playing = usePlayer((s) => s.playing);
-  const currentTime = usePlayer((s) => s.time);
-  const duration = usePlayer((s) => s.duration);
 
   // Update tray tooltip with current playing track
   useEffect(() => {
@@ -175,22 +174,27 @@ export default function App() {
     }
   }, [currentTrack?.id, currentTrack?.title]);
 
-  // Sync Discord Rich Presence
+  // Sync Discord Rich Presence (seeking moves the timer shown on the profile too)
   useEffect(() => {
-    if (currentTrack) {
-      const artist = currentTrack.artists?.map((a) => a.name).join(', ') || currentTrack.artist || 'T-Music';
+    if (!currentTrack) {
+      api.clearDiscordActivity().catch(() => {});
+      return undefined;
+    }
+    const send = () => {
+      const p = usePlayer.getState();
       api.updateDiscordActivity({
         id: currentTrack.id,
         title: currentTrack.title,
-        artist,
+        artist: currentTrack.artists?.map((a) => a.name).join(', ') || currentTrack.artist || 'T-Music',
         thumb: currentTrack.thumb,
         playing,
-        time: currentTime,
-        duration: currentTrack.duration || duration || 0,
+        time: p.getPreciseTime(),
+        duration: currentTrack.duration || p.duration || 0,
       }).catch(() => {});
-    } else {
-      api.clearDiscordActivity().catch(() => {});
-    }
+    };
+    send();
+    window.addEventListener('t-music:seeked', send);
+    return () => window.removeEventListener('t-music:seeked', send);
   }, [currentTrack?.id, currentTrack?.title, playing]);
 
   useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [index]);

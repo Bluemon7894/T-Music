@@ -34,7 +34,6 @@ export const api = {
   checkUpdate: () => call('checkUpdate'),
   downloadUpdate: () => call('downloadUpdate'),
   installUpdate: () => call('installUpdate'),
-  setGithubToken: (tok) => call('setGithubToken', tok),
   openExternal: (url) => call('openExternal', url),
   setTitleBarOverlay: (opts) => call('setTitleBarOverlay', opts),
   updateTrayTooltip: (text) => call('updateTrayTooltip', text),

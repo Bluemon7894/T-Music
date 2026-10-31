@@ -51,17 +51,15 @@ async function handleStream(req) {
   // without premature stream termination or 416 errors.
   const upstreamRange = range || 'bytes=0-';
 
-  const exclude = [];
-  for (let attempt = 0; attempt < 6; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     let s;
     try {
-      s = await stream.resolve(id, { exclude });
+      s = await stream.resolve(id);
     } catch (e) {
       return new Response(e.message, { status: 502, headers: CORS });
     }
     try {
-      const headers = { ...s.headers };
-      if (upstreamRange) headers.Range = upstreamRange;
+      const headers = { ...s.headers, Range: upstreamRange };
       const res = await net.fetch(s.url, { headers, bypassCustomProtocolHandlers: true });
       if (res.status === 200 || res.status === 206) {
         const h = new Headers(CORS);
@@ -82,10 +80,8 @@ async function handleStream(req) {
     } catch {
       // network error: treat like a rejected URL
     }
-    // A cached URL may simply have expired: refresh once with the same method,
-    // and only skip the method if a freshly resolved URL also fails.
+    // A cached URL may simply have expired: drop it and resolve a fresh one.
     stream.invalidate(id, s.method, s.fresh);
-    if (s.fresh) exclude.push(s.method);
   }
   return new Response('stream failed', { status: 502, headers: CORS });
 }

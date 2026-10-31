@@ -20,9 +20,6 @@ export const useUpdater = create((set, get) => ({
   lastChecked: null,
 
   init: () => {
-    const savedToken = localStorage.getItem('tmusic_github_token');
-    if (savedToken) api.setGithubToken(savedToken).catch(() => {});
-
     // Register progress listener
     api.onUpdateProgress((data) => {
       if (data.status === 'downloading') {
@@ -114,11 +111,5 @@ export const useUpdater = create((set, get) => ({
   openReleasePage: () => {
     const { releaseUrl } = get();
     api.openExternal(releaseUrl || 'https://github.com/Bluemon7894/T-Music/releases/latest');
-  },
-
-  setToken: (token) => {
-    if (token) localStorage.setItem('tmusic_github_token', token);
-    else localStorage.removeItem('tmusic_github_token');
-    api.setGithubToken(token).catch(() => {});
   },
 }));

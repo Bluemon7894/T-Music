@@ -27,21 +27,6 @@ function compareVersions(v1, v2) {
   return 0;
 }
 
-let githubToken = process.env.GITHUB_TOKEN || null;
-
-// Try to auto-resolve token from gh CLI if available
-if (!githubToken) {
-  try {
-    const { execSync } = await import('child_process');
-    const tok = execSync('gh auth token', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 2000 }).trim();
-    if (tok && tok.startsWith('gh')) githubToken = tok;
-  } catch {}
-}
-
-export function setGithubToken(token) {
-  githubToken = token || null;
-}
-
 function fetchJson(urlStr) {
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr);
@@ -49,9 +34,6 @@ function fetchJson(urlStr) {
       'User-Agent': 'T-Music-App',
       Accept: 'application/vnd.github.v3+json',
     };
-    if (githubToken) {
-      headers.Authorization = `Bearer ${githubToken}`;
-    }
     const options = {
       hostname: u.hostname,
       path: u.pathname + u.search,
@@ -79,7 +61,7 @@ function fetchJson(urlStr) {
 }
 
 export async function checkUpdate() {
-  const currentVersion = app?.getVersion ? app.getVersion() : '0.2.2';
+  const currentVersion = app.getVersion();
   try {
     const release = await fetchJson(`https://api.github.com/repos/${REPO}/releases/latest`);
     const tagName = release.tag_name || '';
@@ -128,11 +110,6 @@ function downloadFileWithRedirect(targetUrl, destPath, onProgress) {
         'User-Agent': 'T-Music-App',
         Accept: 'application/octet-stream',
       };
-      // Only attach Authorization header to api.github.com endpoints.
-      // Attaching Authorization to github.com release download URLs causes 404 / signature errors.
-      if (githubToken && u.hostname === 'api.github.com') {
-        headers.Authorization = `Bearer ${githubToken}`;
-      }
 
       const req = client.get(
         curUrl,

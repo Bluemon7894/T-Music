@@ -78,7 +78,7 @@ function StatsRow() {
       <div className="stat-card" data-enter>
         <div className="stat-top"><Mic2 size={16} /> 가장 많이 들은 아티스트</div>
         <div className="stat-mid">{st.topArtist || '아직 없어요'}</div>
-        <p className="stat-note">{st.plays ? `이번 주 ${st.plays}곡 재생` : '곡을 끝까지 들으면 기록돼요'}</p>
+        <p className="stat-note">{st.plays ? `이번 주 ${st.plays}곡 재생` : '곡을 들으면 여기에 기록돼요'}</p>
       </div>
       <div className="stat-card link" data-enter onClick={() => go('liked')}>
         <div className="stat-top"><Heart size={16} /> 좋아요</div>

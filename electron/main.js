@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as catalog from './youtube/catalog.js';
 import * as stream from './youtube/stream.js';
-import * as lyrics from './youtube/lyrics.js';
+import * as lyrics from './lyrics/index.js';
 import * as updater from './updater.js';
 import { getClient } from './youtube/client.js';
 import * as downloads from './downloads.js';
@@ -46,7 +46,6 @@ const api = {
     return updater.downloadUpdate(win?.webContents);
   },
   installUpdate: () => updater.installUpdate(),
-  setGithubToken: (tok) => updater.setGithubToken(tok),
   updateTrayTooltip: (text) => { if (tray) tray.setToolTip(text || 'T-Music'); },
   updateTrayIcon: (dataUrl) => {
     if (!tray) return false;
@@ -111,7 +110,7 @@ const api = {
       return enable;
     }
   },
-  openExternal: (url) => { if (url) shell.openExternal(url); },
+  openExternal: (url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(url); },
 };
 
 ipcMain.handle('api', async (_e, method, ...args) => {

@@ -218,20 +218,10 @@ export default function Settings() {
 
           <div className="set-item" onClick={toggleDiscordRPC}>
             <div className="set-item-text">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="set-item-head">
                 <span className="set-item-title">디스코드 활동 상태 (Rich Presence)</span>
                 {discordRPC && (
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      padding: '2px 8px',
-                      borderRadius: '10px',
-                      fontWeight: 600,
-                      background: discordStatus?.connected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)',
-                      color: discordStatus?.connected ? '#4ade80' : '#facc15',
-                      border: `1px solid ${discordStatus?.connected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(234, 179, 8, 0.3)'}`,
-                    }}
-                  >
+                  <span className={`set-badge ${discordStatus?.connected ? 'ok' : 'wait'}`}>
                     {discordStatus?.connected
                       ? `연결됨 (${discordStatus.user?.username || 'Discord'})`
                       : '디스코드 PC 앱 실행 대기 중'}
@@ -244,10 +234,12 @@ export default function Settings() {
           </div>
 
           {discordRPC && (
-            <div style={{ marginTop: '8px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', fontSize: '12px', color: 'var(--sub)', lineHeight: 1.6 }}>
-              💡 <b>디스코드 상태 표시 확인사항:</b>
-              <br />1. 웹 브라우저가 아닌 <b>디스코드 PC 프로그램(데스크톱 앱)</b>이 실행 중이어야 연동됩니다.
-              <br />2. 디스코드 설정(톱니바퀴) &gt; <b>활동 개인정보 보호</b> &gt; <b>'현재 활동을 상태 메시지로 표시'</b>가 켜져 있어야 프로필에 나타납니다.
+            <div className="set-note">
+              <b>디스코드 상태 표시 확인사항</b>
+              <ol>
+                <li>웹 브라우저가 아닌 <b>디스코드 PC 프로그램(데스크톱 앱)</b>이 실행 중이어야 연동됩니다.</li>
+                <li>디스코드 설정(톱니바퀴) &gt; <b>활동 개인정보 보호</b> &gt; <b>'현재 활동을 상태 메시지로 표시'</b>가 켜져 있어야 프로필에 나타납니다.</li>
+              </ol>
             </div>
           )}
         </section>

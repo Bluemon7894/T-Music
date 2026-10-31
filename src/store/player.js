@@ -25,12 +25,14 @@ function savePlayerState(extra = {}) {
     const curTrack = s.current();
     const a = active();
     const currentTime = isFinite(a.currentTime) && a.currentTime > 0 ? a.currentTime : (s.time || 0);
+    // Long queues are saved as a window around the current track so the index stays valid.
+    const windowStart = Math.max(0, s.index - 20);
     const data = {
       volume: s.volume,
       muted: s.muted,
       repeat: s.repeat,
       autoplay: s.autoplay,
-      queue: (s.queue || []).slice(0, 100).map((t) => ({
+      queue: (s.queue || []).slice(windowStart, windowStart + 100).map((t) => ({
         id: t.id,
         title: t.title,
         artists: t.artists || [],
@@ -39,7 +41,7 @@ function savePlayerState(extra = {}) {
         thumb: t.thumb || '',
         isAutoplay: Boolean(t.isAutoplay),
       })),
-      index: s.index,
+      index: s.index - windowStart,
       context: s.context,
       time: currentTime,
       duration: curTrack?.duration || s.duration || 0,
@@ -429,6 +431,7 @@ export const usePlayer = create((set, get) => ({
       // Already buffered by _preloadNext: just swap.
       active().pause();
       cur = 1 - cur;
+      if (active().currentTime > 0) active().currentTime = 0; // it may have played before (short repeat loops)
     } else {
       active().pause();
       active().src = src;
@@ -549,11 +552,13 @@ export const usePlayer = create((set, get) => ({
           } catch { /* ignore */ }
         }
 
-        // Tertiary fallback: fetch home recommendations
+        // Tertiary fallback: tracks from a featured playlist (shelves hold playlists, not songs)
         try {
           const homeData = await api.home();
           const shelfItems = (homeData?.shelves || []).flatMap((s) => s.items || []);
-          const more = shelfItems
+          const pick = shelfItems.find((i) => i.kind === 'playlist') || null;
+          const pl = pick ? await api.playlist(pick.id) : null;
+          const more = (pl?.tracks || [])
             .filter((t) => t && t.id && !have.has(t.id))
             .slice(0, 15)
             .map((t) => ({ ...t, isAutoplay: true }));
@@ -589,9 +594,6 @@ export const usePlayer = create((set, get) => ({
     return extendingPromise;
   },
 
-  _extendWithRadio() {
-    return this._ensureNextTracks();
-  },
 }));
 
 // Wire audio events. Events from the spare element are ignored.
@@ -653,6 +655,7 @@ audios.forEach((a, i) => {
       savePlayerState({ time: a.currentTime, wasPlaying: !a.paused });
     }
   });
+  a.addEventListener('seeked', () => { if (isActive()) window.dispatchEvent(new CustomEvent('t-music:seeked')); });
   a.addEventListener('durationchange', () => isActive() && isFinite(a.duration) && usePlayer.setState({ duration: a.duration }));
   a.addEventListener('ended', () => {
     if (!isActive()) return;
@@ -673,7 +676,7 @@ audios.forEach((a, i) => {
     if (!id) return;
     if (!isActive()) { a.dataset.id = ''; return; } // preload failed; retry when it becomes current
     if (!retried.has(id)) {
-      // One retry: the main process picks a different method if the first URL died.
+      // One retry: the main process fetches a fresh URL if the first one died.
       retried.add(id);
       const t = a.currentTime;
       a.src = streamUrl(id) + '?retry=' + Date.now();

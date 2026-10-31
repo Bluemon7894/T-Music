@@ -62,7 +62,7 @@ const BROWSE_CATEGORIES = [
       { id: 'vnS_jn2uibs', title: '한 페이지가 될 수 있게', artist: 'DAY6' },
       { id: '2I75ion7CAc', title: '가시', artist: '버즈' },
       { id: 'gsgq3A5i9dc', title: '담배가게 아가씨', artist: 'YB' },
-      { id: 'zrtwnrFefwA', title: '사랑앓이', artist: 'FT아일랜드' },
+      { id: 'yb0pYiPLfww', title: '사랑앓이', artist: 'FT아일랜드' },
     ],
   },
   {
@@ -78,8 +78,8 @@ const BROWSE_CATEGORIES = [
     label: 'J-POP', query: 'J-POP 인기곡', c1: '#f43f5e', c2: '#f59e0b',
     tracks: [
       { id: 'ZRtdQ81jPUQ', title: 'アイドル (Idol)', artist: 'YOASOBI' },
-      { id: 'zuO2fClon98', title: 'Lemon', artist: 'Kenshi Yonezu' },
-      { id: 'kffacxfA7G4', title: 'NIGHT DANCER', artist: 'imase' },
+      { id: '3NNhrqHZqlI', title: 'Lemon', artist: 'Kenshi Yonezu' },
+      { id: '0t0HtFYjcU8', title: 'NIGHT DANCER', artist: 'imase' },
       { id: 'gvwpiKtod40', title: '베텔기우스', artist: '유우리' },
     ],
   },
@@ -87,7 +87,7 @@ const BROWSE_CATEGORIES = [
     label: 'OST', query: '드라마 OST', c1: '#0ea5e9', c2: '#8b5cf6',
     tracks: [
       { id: 'O0StKlRHVeE', title: '시작 (이태원 클라쓰)', artist: '가호' },
-      { id: 'MBYY_IA_-qU', title: '너였다면', artist: '정승환' },
+      { id: 'F6ql927-RkI', title: '너였다면', artist: '정승환' },
       { id: '6rS7OUGXUik', title: '첫눈처럼 너에게 가겠다', artist: '에일리' },
       { id: 'qKXMZPH6k18', title: '흔들리는 꽃들 속에서', artist: '장범준' },
     ],
@@ -115,8 +115,8 @@ const BROWSE_CATEGORIES = [
     tracks: [
       { id: 'CFGLoQIhmow', title: 'lofi hip hop radio', artist: 'Lofi Girl' },
       { id: '1WM3MHtEjrM', title: 'Lofi Chill Beats', artist: 'Sad Music' },
-      { id: '5qap5aO4i9A', title: 'morning coffee', artist: 'potsu' },
-      { id: 'HwIA1t8rmcY', title: 'Rainy Days', artist: 'Lofi Paris' },
+      { id: 'FSnuF1FPSIU', title: 'bossa uh', artist: 'potsu' },
+      { id: 'BHtKTuLPQaE', title: 'Lo-fi Dreams for Rainy Days', artist: 'Lofi Paris' },
     ],
   },
   {
@@ -140,7 +140,7 @@ const BROWSE_CATEGORIES = [
   {
     label: '잠잘 때', query: '잠잘 때 듣는 음악', c1: '#312e81', c2: '#7c3aed',
     tracks: [
-      { id: 'zrtwnrFefwA', title: '무릎', artist: '아이유' },
+      { id: 'SfeaTW4bcAw', title: '무릎', artist: '아이유' },
       { id: 'NwI8Qp2txSA', title: '수면 음악 자장가', artist: 'Sweet Dreams' },
       { id: 'mRIGDXQVU5c', title: '스토커', artist: '10CM' },
       { id: '62Ztp9A-XO4', title: '초록빛', artist: '폴킴' },

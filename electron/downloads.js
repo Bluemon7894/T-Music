@@ -113,10 +113,9 @@ async function fetchChunk(s, start, signal) {
 
 // First chunk, retrying with other resolve methods if a URL is rejected.
 async function openSource(id, signal) {
-  const exclude = [];
   let lastError = null;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const s = await stream.resolve(id, { exclude });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const s = await stream.resolve(id);
     try {
       const first = await fetchChunk(s, 0, signal);
       return { s, first };
@@ -125,7 +124,6 @@ async function openSource(id, signal) {
       lastError = e;
     }
     stream.invalidate(id, s.method, s.fresh);
-    if (s.fresh) exclude.push(s.method);
   }
   throw lastError || new Error('download failed');
 }
@@ -155,8 +153,10 @@ async function run(job) {
     });
     let res = first.res;
     for (;;) {
+      const before = job.received;
       await pipeline(Readable.fromWeb(res.body), counter(), out, { end: false });
       if (!job.total || job.received >= job.total) break;
+      if (job.received === before) throw new Error('다운로드가 중단되었습니다');
       res = (await fetchChunk(s, job.received, signal)).res;
     }
     await new Promise((resolve, reject) => out.end((e) => (e ? reject(e) : resolve())));
@@ -221,8 +221,13 @@ export async function chooseFolder() {
     try {
       fs.writeFileSync(configFile(), JSON.stringify({ dir: selected }), 'utf8');
     } catch {}
-    index = null; // force reload from new dir
+    // Earlier downloads stay where they are (entries hold absolute paths), so bring their
+    // index along instead of making them vanish from the list.
+    const previous = load();
+    index = null;
     load();
+    index = { ...previous, ...index };
+    save();
     emit();
     return dir();
   }

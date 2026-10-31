@@ -5,6 +5,8 @@ import { app } from 'electron';
 
 // Verified working YouTube Music Discord RPC Client ID
 const DEFAULT_CLIENT_ID = '1177081335727267940';
+const ACTIVITY_LISTENING = 2;
+const STATUS_SHOWS_DETAILS = 2;
 const configFile = () => path.join(app.getPath('userData'), 'discord-rpc-config.json');
 
 let client = null;
@@ -106,6 +108,7 @@ async function connect() {
       await rpc.login().catch((err) => {
         client = null;
         lastError = err?.message || 'Discord 연결 실패';
+        rpc.destroy().catch(() => {});
         scheduleReconnect();
       });
 
@@ -150,7 +153,11 @@ function applyActivity(data) {
 
   const { id, title, artist, thumb, playing, time = 0, duration = 0 } = data;
 
+  // Discord has no field for ranking activities: its client picks which one to show. Declaring this
+  // as music ("듣는 중", not the default "하는 중") with the song title as the status text is what we control.
   const activity = {
+    type: ACTIVITY_LISTENING,
+    statusDisplayType: STATUS_SHOWS_DETAILS,
     details: (title || '음악 듣는 중').slice(0, 128),
     state: (artist || 'T-Music').slice(0, 128),
     instance: false,

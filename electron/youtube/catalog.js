@@ -3,6 +3,7 @@
 // filled from regular YouTube.
 import { call } from './client.js';
 import * as P from './parse.js';
+import { relevance, trackRelevance, albumRelevance, playlistRelevance, artistRelevance, keepRelevant } from './relevance.js';
 
 const memo = new Map();
 async function cached(key, ttlMs, fn) {
@@ -16,6 +17,7 @@ async function cached(key, ttlMs, fn) {
 
 const MIN = 60 * 1000;
 const VIDEOS_ONLY = 'EgIQAQ%3D%3D';
+const INSTRUMENTAL = /\binst\b|instrumental|\bMR\b|반주/i;
 
 function uniqueBy(list, key = (x) => x.id) {
   const seen = new Set();
@@ -39,17 +41,26 @@ function rank(tracks) {
 async function webSongs(query, limit = 20) {
   const d = await call('/search', { client: 'WEB', query, params: VIDEOS_ONLY });
   const vids = P.findAll(d, 'videoRenderer').map((v) => P.parseVideo(v, query)).filter(Boolean);
-  return rank(vids.filter((t) => t.score >= 1)).slice(0, limit);
+  return rank(vids.filter((t) => t.score >= -3)).slice(0, limit);
 }
 
 // Auto-generated "Artist - Topic" uploads carry this line in their description,
 // so adding it to the query surfaces official studio audio instead of MVs/covers.
 async function officialAudio(query, limit = 20) {
   const d = await call('/search', { client: 'WEB', query: `${query} "Provided to YouTube"`, params: VIDEOS_ONLY });
-  return P.findAll(d, 'videoRenderer')
+  const tracks = P.findAll(d, 'videoRenderer')
     .map((v) => P.parseVideo(v, query))
     .filter((t) => t && (t.topic || t.score >= 1))
+    // Noisy titles (karaoke, instrumentals) and near-zero view uploads score under 3.
+    .map((t) => ({ ...t, studioAudio: Boolean((t.topic || t.officialArtist) && t.score >= 3) }))
     .slice(0, limit);
+  // YouTube's first artist upload is its best guess, and it sees past typos and translated
+  // titles ("10CM 그라데이션" finds "Gradation"), which comparing text can't.
+  const [first, second] = tracks.filter((t) => t.officialArtist && t.score >= 3 && !INSTRUMENTAL.test(t.title) && !P.isLiveTitle(t.title));
+  // A much better known second result wins ("좋은날" has an obscure song of that exact name too).
+  const pick = second && second.score >= first.score + 3 ? second : first;
+  if (pick) pick.ytPick = true;
+  return tracks;
 }
 
 // The highlighted top result YT Music shows above the list.
@@ -81,44 +92,63 @@ export function search(query) {
     
     const ytmSongs = of('track').filter((t) => t.duration > 0);
 
-    // Merge all candidate sources and rank globally by score, view count, and official status
     const candidates = uniqueBy([
-      ...(ok(web) || []),
       ...(ok(official) || []),
+      ...(ok(web) || []),
       ...ytmSongs,
     ]);
 
-    candidates.sort((a, b) => {
-      const sa = a.score ?? 0;
-      const sb = b.score ?? 0;
-      if (sb !== sa) return sb - sa;
-      const va = a.views ?? 0;
-      const vb = b.views ?? 0;
-      if (vb !== va) return vb - va;
-      return (b.officialArtist ? 1 : 0) - (a.officialArtist ? 1 : 0);
-    });
-
-    // Filter out low-quality/low-view noise, keep high-scoring official and verified music
-    const songs = candidates
-      .filter((t) => (t.score ?? 0) >= 1 || t.officialArtist || (t.views ?? 0) >= 50000)
-      .map(P.strip);
+    // Karaoke and other junk stay below everything real, however well their long titles match.
+    // Then relevance decides. Among equally fitting results the studio recording beats its
+    // music video, and only then does popularity count.
+    const fitBand = (r) => (r >= 0.95 ? 3 : r >= 0.75 ? 2 : r >= 0.5 ? 1 : 0);
+    const flag = (v) => (v ? 1 : 0);
+    const wantsInstrumental = INSTRUMENTAL.test(query);
+    const squash = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    const scored = candidates.map((t) => ({ t, r: trackRelevance(query, t) }));
+    const literal = scored.filter((x) => x.r >= 0.95 && (x.t.score ?? 0) >= 0);
+    // YouTube's pick only outranks results that literally match when one of them confirms it's
+    // the same song under another name ("Gradation" inside "10CM _ Gradation(그라데이션)").
+    const trustPick = (t) => !literal.length || literal.some((x) => squash(x.t.rawTitle || x.t.title).includes(squash(t.title)));
+    const rated = scored
+      .map(({ t, r }) => {
+        if (t.ytPick && !trustPick(t)) t = { ...t, ytPick: false };
+        return { t, r: t.ytPick && r >= 0.5 ? Math.max(r, 0.95) : r };
+      })
+      .sort((a, b) => flag((b.t.score ?? 0) >= 0) - flag((a.t.score ?? 0) >= 0)
+        || fitBand(b.r) - fitBand(a.r)
+        || flag(b.t.ytPick) - flag(a.t.ytPick)
+        || flag(!INSTRUMENTAL.test(b.t.title) || wantsInstrumental) - flag(!INSTRUMENTAL.test(a.t.title) || wantsInstrumental)
+        || flag(b.t.studioAudio) - flag(a.t.studioAudio)
+        || (b.t.score ?? 0) - (a.t.score ?? 0)
+        || (b.t.views ?? 0) - (a.t.views ?? 0));
+    // Hour-long compilations aren't songs unless that's what was asked for.
+    const wantsLong = /모음|연속|playlist|mix|full\s*album|1\s*시간|1\s*hour/i.test(query);
+    const songLike = rated.filter((x) => wantsLong || !x.t.duration || x.t.duration <= 600);
+    let fitting = songLike.filter((x) => x.r >= 0.5);
+    // Misspelled or descriptive searches match nothing literally; trust YouTube's own picks then.
+    if (!fitting.length) fitting = songLike.filter((x) => (x.t.score ?? 0) >= 1).slice(0, 10);
+    const songs = fitting.map((x) => P.strip(x.t));
 
     const card = ok(ytm) ? parseCard(ytm.value) : null;
-    let artists = of('artist');
-    if (card?.kind === 'artist') artists = uniqueBy([card, ...artists]);
-    const albums = of('album');
-    const playlists = of('playlist').filter((p) => {
-      const author = (p.author || '').toLowerCase();
-      return !/개인|사용자|user|cover|커버/i.test(author);
-    });
+    let artistList = of('artist');
+    if (card?.kind === 'artist') artistList = uniqueBy([card, ...artistList]);
+    const artists = keepRelevant(artistList, query, artistRelevance);
+    const albums = keepRelevant(of('album'), query, albumRelevance);
+    const playlists = keepRelevant(
+      of('playlist').filter((p) => !/개인|사용자|user|cover|커버/i.test(p.author || '')),
+      query,
+      playlistRelevance,
+    );
 
-    const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '');
-    const q = norm(query);
-    let top;
-    if (card) top = card;
-    else if (artists[0] && norm(artists[0].name) === q) top = artists[0];
-    else if (albums[0] && norm(albums[0].title) === q) top = albums[0];
-    else top = songs[0] || artists[0] || albums[0] || null;
+    // Top result: whatever explains the query best. On a tie an artist only wins if YT Music
+    // itself highlighted them; otherwise "Blinding Lights" finds an obscure act of that name.
+    const contenders = [
+      artists[0] && { item: artists[0], r: artistRelevance(query, artists[0]), rank: card?.id === artists[0].id ? 3 : 0 },
+      songs[0] && { item: songs[0], r: fitting[0].r, rank: 2 },
+      albums[0] && { item: albums[0], r: relevance(query, [albums[0].title]), rank: 1 },
+    ].filter(Boolean).sort((a, b) => b.r - a.r || b.rank - a.rank);
+    const top = contenders[0]?.item || null;
 
     if (!songs.length && !artists.length && !albums.length && !playlists.length && [ytm, official, web].every((r) => r.status === 'rejected')) {
       throw new Error('검색에 실패했습니다. 인터넷 연결을 확인하세요.');

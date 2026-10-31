@@ -125,7 +125,7 @@ export function getAudioOnset(trackId) {
 }
 
 export function startAudioOnsetDetection(audioEl, trackId) {
-  if (!trackId) return;
+  if (!trackId || onsetTrackId === trackId) return; // once per track; pause/resume must not reset it
   onsetTrackId = trackId;
   currentOnsetSec = 0;
   clearInterval(onsetCheckTimer);

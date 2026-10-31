@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Music, Play, Pause, RotateCw } from 'lucide-react';
 import { useNav } from '../store/nav.js';
-import { usePlayer } from '../store/player.js';
 import { errorText } from '../lib/api.js';
 import { pop } from '../lib/motion.js';
-import { getAudioOnset } from '../lib/audio.js';
 
 export function useAsync(fn, deps) {
   const [state, setState] = useState({ loading: true, data: null, error: null });
@@ -136,74 +134,4 @@ export function Empty({ icon: Icon, title, text, children }) {
       {children && <div className="empty-actions">{children}</div>}
     </div>
   );
-}
-
-// Zero-configuration automatic lyrics sync engine with continuous 10-second dynamic recalibration
-// Aligns YouTube audio with LRC timestamps using hardware audio onset and progressive tempo drift scaling
-export function useAutoLyricsSync(track, data) {
-  const [autoOffset, setAutoOffset] = useState(0);
-
-  useEffect(() => {
-    if (!track?.id || !data) {
-      setAutoOffset(0);
-      return;
-    }
-
-    const lines = data.lines || [];
-    const trackDur = track.duration || 0;
-    const lyricsDur = data.lyricsDuration || 0;
-
-    let baseOffset = 0;
-    const initialOnset = getAudioOnset(track.id);
-    if (initialOnset >= 0.4 && initialOnset <= 12.0) {
-      baseOffset = initialOnset;
-    } else if (typeof data.autoOffset === 'number') {
-      baseOffset = data.autoOffset;
-    }
-
-    // Progressive drift rate: accounts for subtle speed/sample rate variance between YouTube and studio audio
-    let driftRate = 0;
-    if (trackDur > 25 && lyricsDur > 25) {
-      const netDiff = (trackDur - baseOffset) - lyricsDur;
-      if (Math.abs(netDiff) >= 0.5 && Math.abs(netDiff) <= 15.0) {
-        driftRate = Math.max(-0.04, Math.min(0.04, netDiff / lyricsDur));
-      }
-    }
-
-    const computeCurrentOffset = (t) => {
-      const currentOnset = getAudioOnset(track.id) || baseOffset;
-      const effectiveT = Math.max(0, (t || 0) - currentOnset);
-      const progressiveDrift = driftRate * effectiveT;
-      return Math.round((currentOnset + progressiveDrift) * 100) / 100;
-    };
-
-    // 1. Initial calibration
-    setAutoOffset(computeCurrentOffset(usePlayer.getState().getPreciseTime()));
-
-    // 2. Hardware audio onset listener (fires when real musical signal bursts after intro silence)
-    const onOnset = (e) => {
-      if (e.detail?.trackId === track.id && typeof e.detail?.onset === 'number') {
-        baseOffset = e.detail.onset;
-        setAutoOffset(computeCurrentOffset(usePlayer.getState().getPreciseTime()));
-      }
-    };
-    window.addEventListener('audio-onset-detected', onOnset);
-
-    // 3. 10-Second Active Synchronizer Watchdog:
-    // Periodically re-evaluates audio progress every 10 seconds during playback,
-    // verifies timing against musical phrases, and dynamically fine-tunes the offset
-    const syncInterval = setInterval(() => {
-      if (!usePlayer.getState().playing) return;
-      const t = usePlayer.getState().getPreciseTime();
-      const updated = computeCurrentOffset(t);
-      setAutoOffset((prev) => (Math.abs(prev - updated) >= 0.04 ? updated : prev));
-    }, 10000);
-
-    return () => {
-      clearInterval(syncInterval);
-      window.removeEventListener('audio-onset-detected', onOnset);
-    };
-  }, [track?.id, track?.duration, data]);
-
-  return autoOffset;
 }

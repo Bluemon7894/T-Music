@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Mic2, Check, Music2, RefreshCw } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { fmtTime } from '../../lib/util.js';
 
-export default function LyricsPickerModal({ track, currentData, onSelect, onClose }) {
+export default function LyricsPickerModal({ track, currentData, onClose }) {
   const [query, setQuery] = useState(() => {
     const artist = Array.isArray(track?.artists) ? track.artists[0]?.name : track?.artist || '';
     const title = track?.rawTitle || track?.title || '';
@@ -13,19 +14,6 @@ export default function LyricsPickerModal({ track, currentData, onSelect, onClos
   const [candidates, setCandidates] = useState([]);
   const [applyingId, setApplyingId] = useState(null);
   const inputRef = useRef(null);
-  const modalRef = useRef(null);
-  const backdropRef = useRef(null);
-
-  useEffect(() => {
-    const el = backdropRef.current;
-    if (!el) return;
-    const onWheel = (e) => {
-      e.stopPropagation();
-    };
-    el.addEventListener('wheel', onWheel, { passive: true });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, []);
-
   const fetchCandidates = async (searchQuery) => {
     if (!track?.id) return;
     setLoading(true);
@@ -51,12 +39,12 @@ export default function LyricsPickerModal({ track, currentData, onSelect, onClos
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        e.stopPropagation();
+        e.stopImmediatePropagation(); // the stage behind us also closes on Esc
         onClose();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
 
   const handleSearch = (e) => {
@@ -72,7 +60,6 @@ export default function LyricsPickerModal({ track, currentData, onSelect, onClos
       window.dispatchEvent(new CustomEvent('t-music:lyrics-changed', {
         detail: { trackId: track.id, lyrics: cand.data },
       }));
-      onSelect?.(cand.data);
       onClose();
     } catch (e) {
       console.error('Failed to set custom lyrics', e);
@@ -89,14 +76,13 @@ export default function LyricsPickerModal({ track, currentData, onSelect, onClos
     return false;
   };
 
-  return (
+  // Rendered on <body>: ancestors with backdrop-filter or transforms would otherwise confine it.
+  return createPortal(
     <div
-      ref={backdropRef}
       className="lyrics-picker-backdrop"
-      onWheel={(e) => e.stopPropagation()}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="lyrics-picker-modal" ref={modalRef} role="dialog" aria-modal="true">
+      <div className="lyrics-picker-modal" role="dialog" aria-modal="true">
         <div className="lyrics-picker-header">
           <div className="lyrics-picker-title">
             <Mic2 size={20} className="lyrics-picker-icon" />
@@ -212,6 +198,7 @@ export default function LyricsPickerModal({ track, currentData, onSelect, onClos
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -1,14 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
-import { Radio, X, Maximize2, ListMusic, Sparkles, Mic2, Search } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Radio, X, Maximize2, ListMusic, Sparkles, Mic2 } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useLibrary } from '../../store/library.js';
-import { api } from '../../lib/api.js';
-import { Thumb, ArtistLinks, Equalizer, useAutoLyricsSync } from '../common.jsx';
+import { Thumb, ArtistLinks, Equalizer } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import Visualizer from '../Visualizer.jsx';
-import LyricsPickerModal from './LyricsPickerModal.jsx';
+import LyricsView from './LyricsView.jsx';
 import { fmtTime } from '../../lib/util.js';
 import { useTilt, animate, ease } from '../../lib/motion.js';
 import logo from '../../assets/logo-mark.png';
@@ -75,187 +74,12 @@ function Idle() {
   );
 }
 
-function LyricsView({ track }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const autoOffset = useAutoLyricsSync(track, data);
-  const seek = usePlayer((s) => s.seek);
-  const playing = usePlayer((s) => s.playing);
-  const activeLineRef = useRef(null);
-  const [activeIdx, setActiveIdx] = useState(-1);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setData(null);
-    api.lyrics(track)
-      .then((res) => { if (!cancelled) { setData(res); setLoading(false); } })
-      .catch(() => { if (!cancelled) { setData(null); setLoading(false); } });
-    return () => { cancelled = true; };
-  }, [track?.id]);
-
-  useEffect(() => {
-    const onLyricsChanged = (e) => {
-      if (e.detail?.trackId === track?.id && e.detail?.lyrics) {
-        setData(e.detail.lyrics);
-      }
-    };
-    window.addEventListener('t-music:lyrics-changed', onLyricsChanged);
-    return () => window.removeEventListener('t-music:lyrics-changed', onLyricsChanged);
-  }, [track?.id]);
-
-  const lines = data?.lines || [];
-
-  // Real-time 60fps RAF sync loop with automatic offset compensation
-  useEffect(() => {
-    if (!lines.length) {
-      setActiveIdx(-1);
-      return;
-    }
-
-    let rafId;
-    const checkSync = () => {
-      const t = usePlayer.getState().getPreciseTime();
-      let best = -1;
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].time + autoOffset <= t + 0.05) {
-          best = i;
-        } else {
-          break;
-        }
-      }
-      setActiveIdx((prev) => (prev !== best ? best : prev));
-      if (usePlayer.getState().playing) {
-        rafId = requestAnimationFrame(checkSync);
-      }
-    };
-
-    checkSync();
-    if (playing) {
-      rafId = requestAnimationFrame(checkSync);
-    }
-    return () => cancelAnimationFrame(rafId);
-  }, [lines, autoOffset, playing]);
-
-  useEffect(() => {
-    const activeLine = activeLineRef.current;
-    if (activeLine) {
-      const container = activeLine.closest('.np-body');
-      if (container) {
-        const containerRect = container.getBoundingClientRect();
-        const lineRect = activeLine.getBoundingClientRect();
-        const currentScrollTop = container.scrollTop;
-        const targetScrollTop =
-          currentScrollTop +
-          (lineRect.top - containerRect.top) -
-          containerRect.height / 2 +
-          lineRect.height / 2;
-        container.scrollTo({
-          top: Math.max(0, targetScrollTop),
-          behavior: 'smooth',
-        });
-      }
-    }
-  }, [activeIdx]);
-
-  if (loading) {
-    return (
-      <div className="lyrics-sk">
-        <div className="sk" style={{ width: '60%' }} />
-        <div className="sk" style={{ width: '85%' }} />
-        <div className="sk" style={{ width: '45%' }} />
-        <div className="sk" style={{ width: '75%' }} />
-        <div className="sk" style={{ width: '65%' }} />
-        <div className="sk" style={{ width: '80%' }} />
-      </div>
-    );
-  }
-
-  const hasSynced = lines.length > 0;
-  const hasPlain = !!data?.plainLyrics;
-
-  if (!hasSynced && !hasPlain) {
-    return (
-      <>
-        <div className="lyrics-empty">
-          <Mic2 size={32} opacity={0.35} />
-          <p>가사를 찾을 수 없습니다</p>
-          <button
-            className="lyrics-search-btn"
-            onClick={() => setPickerOpen(true)}
-          >
-            <Search size={14} /> 가사 직접 찾기
-          </button>
-        </div>
-        {pickerOpen && (
-          <LyricsPickerModal
-            track={track}
-            currentData={data}
-            onSelect={(newData) => setData(newData)}
-            onClose={() => setPickerOpen(false)}
-          />
-        )}
-      </>
-    );
-  }
-
-  return (
-    <div className="lyrics-view">
-      <div className="lyrics-meta">
-        <div className="lyrics-meta-left">
-          <h3>{track.title}</h3>
-          <p>{track.artists?.map((a) => a.name).join(', ')}</p>
-          <div className="lyrics-meta-badges">
-            {!hasSynced && hasPlain && (
-              <span className="lyrics-nosync-pill">싱크 미지원</span>
-            )}
-            <button
-              className="lyrics-picker-pill"
-              onClick={() => setPickerOpen(true)}
-              title="가사 직접 찾기"
-            >
-              <ListMusic size={13} /> 가사 직접 찾기
-            </button>
-          </div>
-        </div>
-      </div>
-      {hasSynced ? (
-        <div className="lyrics-lines">
-          {lines.map((l, i) => {
-            const isActive = i === activeIdx;
-            return (
-              <div
-                key={l.time + '-' + i}
-                ref={isActive ? activeLineRef : null}
-                className={`lyrics-line ${isActive ? 'active' : ''}`}
-                onClick={() => seek(Math.max(0, l.time + autoOffset))}
-              >
-                {l.text || '...'}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="stage-lyrics-plain-box" style={{ padding: '4px 6px' }}>
-          <div className="lyrics-plain">{data.plainLyrics}</div>
-          {data.footer && <div className="stage-lyrics-footer" style={{ textAlign: 'left', marginTop: '12px' }}>{data.footer}</div>}
-        </div>
-      )}
-      {pickerOpen && (
-        <LyricsPickerModal
-          track={track}
-          currentData={data}
-          onSelect={(newData) => setData(newData)}
-          onClose={() => setPickerOpen(false)}
-        />
-      )}
-    </div>
-  );
-}
-
 export default function NowPanel() {
-  const { queue, index, jumpTo, removeAt, autoplay, toggleAutoplay, context } = usePlayer();
+  const queue = usePlayer((s) => s.queue);
+  const index = usePlayer((s) => s.index);
+  const autoplay = usePlayer((s) => s.autoplay);
+  const contextName = usePlayer((s) => s.context?.name);
+  const { jumpTo, removeAt, toggleAutoplay } = usePlayer.getState();
   const panelTab = useUI((s) => s.panelTab);
   const setPanelTab = useUI((s) => s.setPanelTab);
   const togglePanel = useUI((s) => s.togglePanel);
@@ -277,7 +101,7 @@ export default function NowPanel() {
 
       <div className="np-body">
         {!cur && <Idle />}
-        {cur && panelTab === 'lyrics' && <LyricsView track={cur} />}
+        {cur && panelTab === 'lyrics' && <LyricsView key={cur.id} track={cur} />}
         {cur && panelTab === 'next' && (
           <>
             <NowCard track={cur} />
@@ -285,7 +109,7 @@ export default function NowPanel() {
               <>
                 <div className="np-section">
                   <span>다음 곡</span>
-                  {context?.name && <small>{context.name}</small>}
+                  {contextName && <small>{contextName}</small>}
                 </div>
                 {manualUpcoming.slice(0, 6).map(({ t, i }) => (
                   <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />

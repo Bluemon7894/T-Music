@@ -4,7 +4,7 @@ import { usePlayer } from '../store/player.js';
 
 // Spectrum drawn on canvas. `variant`: "bars" (horizontal strip) or "ring" (around a disc).
 // When paused or before audio starts it idles with a gentle synthetic wave.
-export default function Visualizer({ variant = 'bars', bars = 48, className = '' }) {
+export default function Visualizer({ variant = 'bars', bars = 48, innerRatio = 0.36, spanRatio = 0.13, className = '' }) {
   const ref = useRef(null);
   const playing = usePlayer((s) => s.playing);
   const playingRef = useRef(playing);
@@ -60,8 +60,8 @@ export default function Visualizer({ variant = 'bars', bars = 48, className = ''
       if (variant === 'ring') {
         const cx = W / 2;
         const cy = H / 2;
-        const inner = Math.min(W, H) * 0.36;
-        const span = Math.min(W, H) * 0.13;
+        const inner = Math.min(W, H) * innerRatio;
+        const span = Math.min(W, H) * spanRatio;
         const bw = (2 * Math.PI * inner) / bars * 0.55;
         for (let i = 0; i < bars; i++) {
           const a = (i / bars) * Math.PI * 2 - Math.PI / 2;
@@ -87,7 +87,7 @@ export default function Visualizer({ variant = 'bars', bars = 48, className = ''
     };
     raf = requestAnimationFrame(draw);
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, [variant, bars]);
+  }, [variant, bars, innerRatio, spanRatio]);
 
   return <canvas ref={ref} className={`viz viz-${variant} ${className}`} />;
 }

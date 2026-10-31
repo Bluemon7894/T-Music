@@ -97,28 +97,34 @@ function PortalSubMenu({ itemRef, parentRef, items, onClose, onKeepOpen }) {
         x={coords.x}
         y={coords.y}
         onClose={onClose}
-        sub={{ width: coords.subWidth }}
+        parentWidth={coords.subWidth}
       />
     </div>,
     document.body
   );
 }
 
-function MenuList({ items, x, y, onClose, sub }) {
+function MenuList({ items, x, y, onClose, parentWidth = 0 }) {
   const ref = useRef(null);
   const [pos, setPos] = useState({ left: x, top: y });
   const [open, setOpen] = useState(-1);
 
   // Keep the menu inside the window.
   useLayoutEffect(() => {
-    const r = ref.current.getBoundingClientRect();
+    const el = ref.current;
+    const width = el.offsetWidth;
+    const height = el.offsetHeight;
     let left = x;
     let top = y;
-    if (left + r.width > window.innerWidth - 8) left = sub ? x - r.width - (sub.width || 0) + 4 : window.innerWidth - r.width - 8;
-    if (top + r.height > window.innerHeight - 8) top = Math.max(8, window.innerHeight - r.height - 8);
+    if (left + width > window.innerWidth - 8) left = parentWidth ? x - width - parentWidth + 4 : window.innerWidth - width - 8;
+    if (top + height > window.innerHeight - 8) top = window.innerHeight - height - 8;
     setPos({ left: Math.max(8, left), top: Math.max(8, top) });
+  }, [x, y, parentWidth]);
+
+  // Entrance plays once per menu, however often the parent re-renders.
+  useLayoutEffect(() => {
     animate(ref.current, { opacity: [0, 1], scale: [0.94, 1], translateY: [-6, 0], ease: ease.snap });
-  }, [x, y, sub]);
+  }, []);
 
   return (
     <div className="ctx-menu" ref={ref} style={pos} onClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>

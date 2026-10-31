@@ -195,6 +195,8 @@ export function parseViews(str) {
   return 0;
 }
 
+export const isLiveTitle = (title) => /\blive\b|라이브|콘서트|concert/i.test(title || '');
+
 export function musicScore(t, query = '') {
   let s = 0;
   if (t.topic) s += 4;
@@ -361,6 +363,6 @@ export function parsePlaylistPanel(r) {
 
 export function strip(t) {
   if (!t) return t;
-  const { score, topic, officialArtist, verified, views, rawTitle, ...rest } = t;
+  const { score, topic, officialArtist, verified, views, rawTitle, studioAudio, ytPick, ...rest } = t;
   return rest;
 }

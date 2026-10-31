@@ -5,7 +5,6 @@ import { useNav, useRoute } from '../../store/nav.js';
 import { useUI, toast } from '../../store/ui.js';
 import { usePlayer } from '../../store/player.js';
 import { useDownloads } from '../../store/downloads.js';
-import { api, errorText } from '../../lib/api.js';
 import { animate, ease } from '../../lib/motion.js';
 import { Thumb, Equalizer } from '../common.jsx';
 import logo from '../../assets/logo-mark.png';
@@ -16,8 +15,6 @@ const NAV = [
   { id: 'library', label: '보관함', icon: Library },
   { id: 'downloads', label: '다운로드', icon: ArrowDownToLine },
 ];
-
-
 
 function NavList() {
   const route = useRoute();
@@ -50,26 +47,11 @@ function NavList() {
   );
 }
 
-export default function Sidebar() {
-  const lib = useLibrary();
-  const go = useNav((s) => s.go);
-  const route = useRoute();
-  const openMenu = useUI((s) => s.openMenu);
-  const prompt = useUI((s) => s.prompt);
-  const ctxName = usePlayer((s) => s.context?.name);
+// Lives outside Sidebar: a component defined during render remounts all its rows each time.
+function Row({ active, onClick, onContextMenu, art, name, sub, isDragOver, onDragOver, onDragLeave, onDrop }) {
+  const isPlaying = usePlayer((s) => s.context?.name === name);
   const playing = usePlayer((s) => s.playing);
-  const [tab, setTab] = useState('playlists');
-  const [dragOverId, setDragOverId] = useState(null);
-
-  const isActive = (name, id) => route.name === name && (id == null || route.params.id === id);
-  const newPlaylist = () => go('local', { id: lib.createPlaylist() });
-
-  const playlistMenu = (e, p) => openMenu(e, [
-    { label: '이름 바꾸기', icon: Pencil, onClick: () => prompt({ title: '플레이리스트 이름 바꾸기', value: p.name, submitLabel: '저장', onSubmit: (v) => v.trim() && lib.renamePlaylist(p.id, v.trim()) }) },
-    { label: '삭제', icon: Trash2, onClick: () => { lib.deletePlaylist(p.id); if (isActive('local', p.id)) go('home'); toast('플레이리스트를 삭제했습니다'); } },
-  ]);
-
-  const Row = ({ active, onClick, onContextMenu, art, name, sub, isDragOver, onDragOver, onDragLeave, onDrop }) => (
+  return (
     <div
       className={`lib-row ${active ? 'active' : ''} ${isDragOver ? 'drag-over' : ''}`}
       onClick={onClick}
@@ -80,12 +62,30 @@ export default function Sidebar() {
     >
       {art}
       <div className="lib-text">
-        <div className={`lib-name ${ctxName === name ? 'playing' : ''}`}>{name}</div>
+        <div className={`lib-name ${isPlaying ? 'playing' : ''}`}>{name}</div>
         <div className="lib-sub">{sub}</div>
       </div>
-      {ctxName === name && <Equalizer playing={playing} />}
+      {isPlaying && <Equalizer playing={playing} />}
     </div>
   );
+}
+
+export default function Sidebar() {
+  const lib = useLibrary();
+  const go = useNav((s) => s.go);
+  const route = useRoute();
+  const openMenu = useUI((s) => s.openMenu);
+  const prompt = useUI((s) => s.prompt);
+  const [tab, setTab] = useState('playlists');
+  const [dragOverId, setDragOverId] = useState(null);
+
+  const isActive = (name, id) => route.name === name && (id == null || route.params.id === id);
+  const newPlaylist = () => go('local', { id: lib.createPlaylist() });
+
+  const playlistMenu = (e, p) => openMenu(e, [
+    { label: '이름 바꾸기', icon: Pencil, onClick: () => prompt({ title: '플레이리스트 이름 바꾸기', value: p.name, submitLabel: '저장', onSubmit: (v) => v.trim() && lib.renamePlaylist(p.id, v.trim()) }) },
+    { label: '삭제', icon: Trash2, onClick: () => { lib.deletePlaylist(p.id); if (isActive('local', p.id)) go('home'); toast('플레이리스트를 삭제했습니다'); } },
+  ]);
 
   return (
     <aside className="sidebar">

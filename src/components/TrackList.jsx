@@ -175,8 +175,7 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
               if (onReorder) {
                 e.preventDefault();
                 setDragOverIdx(null);
-                const reorderFrom = e.dataTransfer.getData('text/reorder-from') || e.dataTransfer.getData('text/plain');
-                const from = parseInt(reorderFrom, 10);
+                const from = parseInt(e.dataTransfer.getData('text/reorder-from'), 10);
                 if (!isNaN(from) && from !== i) onReorder(from, i);
               }
             }}

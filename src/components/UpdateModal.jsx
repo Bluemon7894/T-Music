@@ -23,7 +23,10 @@ export default function UpdateModal() {
   const renderedNotes = useMemo(() => {
     if (!releaseNotes) return '';
     try {
-      return marked.parse(releaseNotes, { gfm: true, breaks: true });
+      // Release notes are text: raw HTML in them is dropped, not rendered.
+      const renderer = new marked.Renderer();
+      renderer.html = () => '';
+      return marked.parse(releaseNotes, { gfm: true, breaks: true, renderer });
     } catch {
       return releaseNotes;
     }
@@ -45,7 +48,7 @@ export default function UpdateModal() {
           <div>
             <h2 className="update-modal-title">새로운 버전이 준비되었습니다</h2>
             <div className="update-modal-versions">
-              <span className="v-tag cur">v{currentVersion || '0.3.8'}</span>
+              <span className="v-tag cur">v{currentVersion}</span>
               <ArrowRight size={14} className="v-arrow" />
               <span className="v-tag next">v{latestVersion}</span>
             </div>
@@ -77,7 +80,7 @@ export default function UpdateModal() {
           <div className="update-progress-section">
             <div className="update-progress-labels">
               <span>다운로드 중...</span>
-              <span>{progress.percent}% {progress.total > 0 && `(${fmtBytes ? fmtBytes(progress.received) : Math.round(progress.received / (1024 * 1024)) + 'MB'} / ${fmtBytes ? fmtBytes(progress.total) : Math.round(progress.total / (1024 * 1024)) + 'MB'})`}</span>
+              <span>{progress.percent}% {progress.total > 0 && `(${fmtBytes(progress.received)} / ${fmtBytes(progress.total)})`}</span>
             </div>
             <div className="update-progress-bar-bg">
               <div

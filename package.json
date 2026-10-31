@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@xhayper/discord-rpc": "^1.5.1",
-    "marked": "^18.1.2",
     "youtubei.js": "^18.3.0"
   },
   "devDependencies": {
@@ -24,6 +23,7 @@
     "electron": "^45.1.0",
     "electron-builder": "^26.18.0",
     "lucide-react": "^1.63.0",
+    "marked": "^18.1.2",
     "pretendard": "^1.3.9",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
