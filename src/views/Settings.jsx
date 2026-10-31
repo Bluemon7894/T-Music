@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useAsync } from '../components/common.jsx';
+import { AccountCard } from '../components/Account.jsx';
 import { useLibrary } from '../store/library.js';
 import { usePlayer, applyOutputDevice } from '../store/player.js';
 import { useDownloads, openDownloads } from '../store/downloads.js';
@@ -162,6 +163,8 @@ export default function Settings() {
       <div className="page-title" data-enter><h1>설정</h1></div>
 
       <div className="settings-grid">
+        <AccountCard />
+
         <section className="set-card" data-enter>
           <h2><Radio size={18} /> 재생 및 음질 설정</h2>
           <p className="muted">오디오 재생 방식과 볼륨, 출력 장치를 설정해요.</p>

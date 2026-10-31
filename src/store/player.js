@@ -86,6 +86,13 @@ let extendingPromise = null;
 const usedRadioSeeds = new Set();
 let retried = new Set();
 
+// Set while in a listen-together room. Playback commands then go through the room, and the room
+// starts, stops and moves playback for everyone through roomPlayer. See store/room.js.
+let room = null;
+export function bindRoom(hooks) {
+  room = hooks;
+}
+
 // Actual listening time tracker (measures real wall-clock listening duration while audio is playing)
 let currentListenTrack = null;
 let listenStartTime = null;
@@ -175,6 +182,7 @@ export const usePlayer = create((set, get) => ({
 
   playList(tracks, start = 0, context = null) {
     if (!tracks?.length) return;
+    if (room && !room.allowTrackChange()) return;
     commitListen();
     let queue = tracks.slice();
     let index = start;
@@ -194,6 +202,7 @@ export const usePlayer = create((set, get) => ({
   },
 
   playNext(track) {
+    if (room) { room.enqueue([track]); return; }
     const { queue, index } = get();
     const cleanTrack = { ...track, isAutoplay: false };
     if (index < 0) return get().playList([cleanTrack]);
@@ -208,6 +217,7 @@ export const usePlayer = create((set, get) => ({
   addToQueue(tracks) {
     const list = (Array.isArray(tracks) ? tracks : [tracks]).map((t) => ({ ...t, isAutoplay: false }));
     if (!list.length) return;
+    if (room) { room.enqueue(list); return; }
     const { queue, index } = get();
     if (index < 0) return get().playList(list);
     const q = queue.slice();
@@ -256,6 +266,7 @@ export const usePlayer = create((set, get) => ({
   },
 
   jumpTo(i) {
+    if (room && !room.allowTrackChange()) return;
     commitListen();
     set({ index: i });
     savePlayerState({ time: 0, wasPlaying: true });
@@ -263,6 +274,7 @@ export const usePlayer = create((set, get) => ({
   },
 
   toggle() {
+    if (room) { room.togglePlay(); return; }
     const a = active();
     if (get().index < 0) return;
     if (a.paused) {
@@ -278,20 +290,32 @@ export const usePlayer = create((set, get) => ({
   },
 
   async next(auto = false) {
+    if (room && !(auto ? room.allowAuto() : room.allowTrackChange())) return;
     const { queue, index, repeat, autoplay } = get();
     if (auto && repeat === 'one') {
       commitListen();
+      if (room) { room.seek(0); return; }
       active().currentTime = 0;
       active().play().catch(() => {});
       return;
     }
     commitListen();
 
+    const queued = room?.takeQueued();
+    if (queued) {
+      const q = queue.slice();
+      q.splice(index + 1, 0, queued);
+      set({ queue: q, index: index + 1 });
+      get()._load();
+      return;
+    }
+
     // Check if next track is an auto-recommended track while autoplay is turned off
     const nextTrack = queue[index + 1];
     if (nextTrack) {
       if (!autoplay && nextTrack.isAutoplay) {
         // Autoplay is OFF: do not play auto-recommended tracks!
+        room?.onStopped();
         active().pause();
         active().currentTime = 0;
         set({ playing: false, loading: false, time: 0 });
@@ -315,6 +339,7 @@ export const usePlayer = create((set, get) => ({
     // End of queue reached:
     // If autoplay is OFF, stop playback cleanly!
     if (!autoplay) {
+      room?.onStopped();
       active().pause();
       active().currentTime = 0;
       set({ playing: false, loading: false, time: 0 });
@@ -334,6 +359,7 @@ export const usePlayer = create((set, get) => ({
       get()._load();
     } else {
       // If truly all network/fallback attempts failed:
+      room?.onStopped();
       active().pause();
       set({ playing: false, loading: false });
       toast('추천곡을 불러올 수 없습니다 (네트워크 확인)');
@@ -341,10 +367,12 @@ export const usePlayer = create((set, get) => ({
   },
 
   prev() {
+    if (room && !room.allowTrackChange()) return;
     commitListen();
     const a = active();
     if (a.currentTime > 3 || get().index <= 0) {
-      a.currentTime = 0;
+      if (room) room.seek(0);
+      else a.currentTime = 0;
       return;
     }
     set({ index: get().index - 1 });
@@ -352,6 +380,7 @@ export const usePlayer = create((set, get) => ({
   },
 
   seek(t) {
+    if (room) { room.seek(t); return; }
     const a = active();
     const dur = a.duration || get().duration || 0;
     const safeT = Math.max(0, dur > 0 ? Math.min(t, Math.max(0, dur - 0.5)) : t);
@@ -420,7 +449,8 @@ export const usePlayer = create((set, get) => ({
 
   // ---- internals ----
 
-  _load() {
+  // `fromRoom`: the room asked for this track, so it isn't announced back to the room.
+  _load(fromRoom = false) {
     commitListen();
     const track = get().current();
     if (!track) return;
@@ -442,7 +472,8 @@ export const usePlayer = create((set, get) => ({
     a.muted = get().muted;
     set({ time: a.currentTime || 0, duration: track.duration || 0, loading: a.readyState < 3 });
     for (const el of audios) attach(el);
-    a.play().catch(() => {});
+    if (!room) a.play().catch(() => {});
+    else if (!fromRoom) room.onLoad(track);
     useLibrary.getState().pushRecent(track);
     updateMediaSession(track);
     savePlayerState({ time: 0, wasPlaying: true });
@@ -479,7 +510,7 @@ export const usePlayer = create((set, get) => ({
   },
 
   async _ensureNextTracks(force = false) {
-    if (!get().autoplay) return false;
+    if (!get().autoplay || room?.following()) return false;
     if (extendingPromise) return extendingPromise;
     extendingPromise = (async () => {
       try {
@@ -595,6 +626,59 @@ export const usePlayer = create((set, get) => ({
   },
 
 }));
+
+// How the listen-together room drives playback; these skip the checks above on purpose.
+export const roomPlayer = {
+  // People who can't control playback just show the room's track; controllers keep their queue.
+  load(track, replaceQueue) {
+    const { queue, index } = usePlayer.getState();
+    const found = replaceQueue ? -1 : queue.findIndex((t) => t.id === track.id);
+    if (replaceQueue) {
+      usePlayer.setState({ queue: [track], index: 0, context: null });
+    } else if (found >= 0) {
+      usePlayer.setState({ index: found });
+    } else {
+      const q = queue.slice();
+      q.splice(index + 1, 0, track);
+      usePlayer.setState({ queue: q, index: index + 1 });
+    }
+    usePlayer.getState()._load(true);
+  },
+  play() {
+    const a = active();
+    attach(a);
+    if (a.paused) a.play().catch(() => {});
+  },
+  pause() {
+    active().pause();
+  },
+  seekTo(t) {
+    try {
+      active().currentTime = t;
+      usePlayer.setState({ time: t });
+    } catch { /* not loaded yet; the room's next correction tries again */ }
+  },
+  setRate(rate) {
+    for (const a of audios) if (a.playbackRate !== rate) a.playbackRate = rate;
+  },
+  time: () => active().currentTime || 0,
+  isPaused: () => active().paused,
+};
+
+// Signing out: what was playing belonged to that account.
+export function resetPlayer() {
+  commitListen();
+  currentListenTrack = null;
+  for (const a of audios) {
+    a.pause();
+    a.removeAttribute('src');
+    a.load();
+    a.dataset.id = '';
+  }
+  usePlayer.setState({ queue: [], index: -1, context: null, playing: false, loading: false, time: 0, duration: 0, buffered: 0 });
+  savePlayerState({ time: 0, wasPlaying: false });
+  updateMediaSession(null);
+}
 
 // Wire audio events. Events from the spare element are ignored.
 let lastTimeSave = 0;

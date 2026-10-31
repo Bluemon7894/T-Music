@@ -37,4 +37,23 @@ export function colorFor(key = '') {
   return `hsl(${hue} 55% 42%)`;
 }
 
+// The same order all day and a different one tomorrow, so daily picks really change daily.
+export function dailyOrder(list, salt = '', date = new Date()) {
+  let state = 0;
+  for (const c of `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}:${salt}`) state = (state * 31 + c.charCodeAt(0)) >>> 0;
+  const random = () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const out = list.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export const artistNames = (t) => (t?.artists || []).map((a) => a.name).join(', ');

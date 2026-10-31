@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, shell, Tray, Menu, nativeImage } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,6 +9,7 @@ import * as updater from './updater.js';
 import { getClient } from './youtube/client.js';
 import * as downloads from './downloads.js';
 import * as discord from './discord.js';
+import * as auth from './auth.js';
 import { registerScheme, handleProtocol } from './protocol.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -16,6 +17,13 @@ const BG = '#0a0712';
 
 let tray = null;
 let isQuitting = false;
+let pendingInvite = null;
+
+function rememberInvite(argv) {
+  const match = argv.map((arg) => /^tmusic:\/\/join\/([A-Za-z0-9]{6})/.exec(arg)).find(Boolean);
+  if (match) pendingInvite = match[1].toUpperCase();
+  return Boolean(match);
+}
 
 registerScheme();
 
@@ -111,6 +119,15 @@ const api = {
     }
   },
   openExternal: (url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(url); },
+  googleAvailable: () => auth.isGoogleConfigured(),
+  googleSignIn: () => auth.googleSignIn(),
+  cancelGoogleSignIn: () => auth.cancelGoogleSignIn(),
+  copyText: (text) => clipboard.writeText(String(text)),
+  takeInvite: () => {
+    const code = pendingInvite;
+    pendingInvite = null;
+    return code;
+  },
 };
 
 ipcMain.handle('api', async (_e, method, ...args) => {
@@ -248,12 +265,17 @@ if (!app.requestSingleInstanceLock()) {
     isQuitting = true;
   });
 
-  app.on('second-instance', () => {
+  // Only an installed copy registers the link type; a dev build would point it at electron.exe.
+  if (app.isPackaged) app.setAsDefaultProtocolClient('tmusic');
+  rememberInvite(process.argv);
+
+  app.on('second-instance', (_e, argv) => {
     const [win] = BrowserWindow.getAllWindows();
     if (win) {
       if (!win.isVisible()) win.show();
       if (win.isMinimized()) win.restore();
       win.focus();
+      if (rememberInvite(argv)) win.webContents.send('invite');
     }
   });
 

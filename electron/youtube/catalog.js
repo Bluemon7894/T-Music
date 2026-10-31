@@ -341,7 +341,7 @@ export function home() {
       try {
         const d = await call('/search', { client: 'YTMUSIC', query: s.query });
         const items = P.findAll(d, 'musicResponsiveListItemRenderer').map((r) => P.parseResponsive(r)).filter((i) => i && (i.kind === 'playlist' || i.kind === 'album'));
-        return { title: s.title, items: uniqueBy(items, (x) => x.kind + x.id).slice(0, 12) };
+        return { title: s.title, items: uniqueBy(items, (x) => x.kind + x.id) };
       } catch {
         return { title: s.title, items: [] };
       }

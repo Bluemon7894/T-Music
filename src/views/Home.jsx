@@ -5,7 +5,7 @@ import { useLibrary, weeklyStats } from '../store/library.js';
 import { useDownloads } from '../store/downloads.js';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
-import { greeting, fmtBytes } from '../lib/util.js';
+import { dailyOrder, greeting, fmtBytes } from '../lib/util.js';
 import { useEnter, animate, stagger, ease } from '../lib/motion.js';
 import { splitText } from 'animejs';
 import { useAsync, Thumb, PlayButton, SkeletonCards } from '../components/common.jsx';
@@ -94,18 +94,30 @@ function StatsRow() {
   );
 }
 
+const SHELF_ITEMS = 12;
+const RECOMMEND_SEEDS = 10;
+const MIN_FRESH_PICKS = 6;
+
 export default function Home() {
   const lib = useLibrary();
   const go = useNav((s) => s.go);
   const playList = usePlayer((s) => s.playList);
-  const seed = lib.recent[0]?.id;
+  const recentIds = lib.recent.slice(0, RECOMMEND_SEEDS).map((t) => t.id).join();
+  const seed = useMemo(() => dailyOrder(lib.recent.slice(0, RECOMMEND_SEEDS), 'seed')[0], [recentIds]);
   const home = useAsync(() => api.home(), []);
-  const forYou = useAsync(() => (seed ? api.related(seed) : Promise.resolve([])), [seed]);
+  const forYou = useAsync(async () => {
+    if (!seed) return [];
+    const heard = new Set(lib.recent.map((t) => t.id));
+    const related = await api.related(seed.id);
+    const fresh = related.filter((t) => !heard.has(t.id));
+    return dailyOrder(fresh.length >= MIN_FRESH_PICKS ? fresh : related, seed.id);
+  }, [seed?.id]);
   const [hero, setHero] = useState(null);
   const ref = useRef(null);
   useEnter(ref, [home.data ? 1 : 0]);
 
-  const featured = useMemo(() => (home.data?.shelves || []).map((s) => s.items[0]).concat((home.data?.shelves || []).map((s) => s.items[1])).filter(Boolean).slice(0, 9), [home.data]);
+  const shelves = useMemo(() => (home.data?.shelves || []).map((s) => ({ ...s, items: dailyOrder(s.items, s.title).slice(0, SHELF_ITEMS) })), [home.data]);
+  const featured = useMemo(() => shelves.map((s) => s.items[0]).concat(shelves.map((s) => s.items[1])).filter(Boolean).slice(0, 9), [shelves]);
 
   const quick = useMemo(() => {
     const items = [{ kind: 'liked', title: '좋아요 표시한 곡', icon: <Heart size={20} fill="#fff" /> }];
@@ -169,12 +181,12 @@ export default function Home() {
       <StatsRow />
 
       {lib.recent.length > 0 && <Shelf title="최근 재생한 곡" items={lib.recent.slice(0, 20).map((t) => ({ ...t, kind: 'track', isRecent: true }))} />}
-      {forYou.data?.length > 0 && <Shelf title="취향 저격 추천" subtitle={`'${lib.recent[0].title}'를 좋아한다면`} items={forYou.data.map((t) => ({ ...t, kind: 'track' }))} />}
+      {forYou.data?.length > 0 && <Shelf title="취향 저격 추천" subtitle={`'${seed?.title}'를 좋아한다면`} items={forYou.data.map((t) => ({ ...t, kind: 'track' }))} />}
       {lib.followed.length > 0 && <Shelf title="팔로우한 아티스트" items={lib.followed.map((a) => ({ ...a, kind: 'artist' }))} />}
 
       {home.loading && !home.data && <><div className="sk-shelf-title sk" /><SkeletonCards /><div className="sk-shelf-title sk" /><SkeletonCards /></>}
       {home.error && <div className="inline-error">추천을 불러오지 못했어요. <button className="text-btn" onClick={home.retry}>다시 시도</button></div>}
-      {home.data?.shelves.map((s) => <Shelf key={s.title} title={s.title} items={s.items} />)}
+      {shelves.map((s) => <Shelf key={s.title} title={s.title} items={s.items} />)}
     </div>
   );
 }

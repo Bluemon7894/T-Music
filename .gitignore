@@ -1,3 +1,6 @@
 node_modules/
 dist/
 release/
+
+# Google OAuth client for sign-in (see auth.config.example.json)
+electron/auth.config.json

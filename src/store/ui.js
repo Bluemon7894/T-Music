@@ -18,7 +18,7 @@ export const useUI = create((set, get) => ({
     setTimeout(() => { if (get().toast?.id === id) set({ toast: null }); }, 2600);
   },
 
-  dialog: null, // { title, value, placeholder, onSubmit }
+  dialog: null, // { title, value, placeholder, onSubmit }, or { title, message, onSubmit } to just confirm
   prompt(opts) { set({ dialog: opts }); },
   closeDialog() { set({ dialog: null }); },
 

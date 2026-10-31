@@ -38,6 +38,12 @@ export const api = {
   setTitleBarOverlay: (opts) => call('setTitleBarOverlay', opts),
   updateTrayTooltip: (text) => call('updateTrayTooltip', text),
   updateTrayIcon: (dataUrl) => call('updateTrayIcon', dataUrl),
+  googleAvailable: () => call('googleAvailable'),
+  googleSignIn: () => call('googleSignIn'),
+  cancelGoogleSignIn: () => call('cancelGoogleSignIn'),
+  copyText: (text) => call('copyText', text),
+  takeInvite: () => call('takeInvite'),
+  onInvite: (cb) => window.api?.onInvite?.(cb) || (() => {}),
   onUpdateProgress: (cb) => window.api?.onUpdateProgress?.(cb) || (() => {}),
   onMediaControl: (cb) => window.api?.onMediaControl?.(cb) || (() => {}),
 };

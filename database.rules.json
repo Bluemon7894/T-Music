@@ -1,0 +1,53 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$code": {
+        ".read": "auth != null && $code.length === 6",
+        ".write": "auth != null && !newData.exists() && !data.child('members').exists()",
+        "meta": {
+          ".write": "auth != null && (!data.exists() || data.child('hostUid').val() === auth.uid || data.child('expiresAt').val() < now || !root.child('rooms').child($code).child('members').child(data.child('hostUid').val()).exists())",
+          ".validate": "newData.hasChildren(['hostUid', 'name', 'controlMode', 'createdAt', 'expiresAt'])",
+          "hostUid": { ".validate": "newData.isString()" },
+          "name": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "controlMode": { ".validate": "newData.val() === 'host' || newData.val() === 'everyone'" },
+          "createdAt": { ".validate": "newData.isNumber()" },
+          "expiresAt": { ".validate": "newData.isNumber() && newData.val() <= now + 90000000" },
+          "$other": { ".validate": false }
+        },
+        "members": {
+          ".write": "auth != null && root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('rooms').child($code).child('meta').exists()",
+            ".validate": "newData.hasChildren(['name', 'joinedAt'])",
+            "name": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "photo": { ".validate": "newData.isString() && newData.val().length <= 500" },
+            "joinedAt": { ".validate": "newData.val() === now" },
+            "$other": { ".validate": false }
+          }
+        },
+        "playback": {
+          ".write": "auth != null && (root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid || (root.child('rooms').child($code).child('meta/controlMode').val() === 'everyone' && root.child('rooms').child($code).child('members').child(auth.uid).exists()))",
+          ".validate": "newData.hasChildren(['track', 'positionMs', 'playing', 'updatedAt', 'rev', 'by'])",
+          "track": { "id": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{11}$/)" } },
+          "positionMs": { ".validate": "newData.isNumber()" },
+          "playing": { ".validate": "newData.isBoolean()" },
+          "updatedAt": { ".validate": "newData.val() === now" },
+          "rev": { ".validate": "newData.isNumber()" },
+          "by": { ".validate": "newData.val() === auth.uid" }
+        },
+        "queue": {
+          ".write": "auth != null && root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid",
+          "$key": {
+            ".write": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && (!data.exists() || data.child('by').val() === auth.uid || root.child('rooms').child($code).child('meta/controlMode').val() === 'everyone')",
+            ".validate": "newData.hasChildren(['track', 'by', 'byName'])",
+            "track": { "id": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{11}$/)" } },
+            "by": { ".validate": "newData.val() === auth.uid" },
+            "byName": { ".validate": "newData.isString() && newData.val().length <= 40" }
+          }
+        }
+      }
+    }
+  }
+}

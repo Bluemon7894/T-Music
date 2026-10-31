@@ -165,26 +165,7 @@ const TABS = [
   { id: 'playlists', label: '플레이리스트' },
 ];
 
-export const HISTORY_KEY = 't-music-search-history';
-export const readHistory = () => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; } };
-export function remember(q) {
-  if (!q || !q.trim()) return;
-  try {
-    const next = [q.trim(), ...readHistory().filter((x) => x !== q.trim())].slice(0, 14);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent('search-history-changed'));
-  } catch { /* ignore */ }
-}
-export function removeHistory(item) {
-  try {
-    const next = readHistory().filter((x) => x !== item);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent('search-history-changed'));
-    return next;
-  } catch {
-    return [];
-  }
-}
+export const remember = (q) => useLibrary.getState().rememberSearch(q);
 
 function TopResult({ item }) {
   const go = useNav((s) => s.go);
@@ -373,26 +354,15 @@ function Browse() {
   const go = useNav((s) => s.go);
   const openMenu = useUI((s) => s.openMenu);
   const recent = useLibrary((s) => s.recent).slice(0, 8);
-  const [history, setHistory] = useState(readHistory);
+  const history = useLibrary((s) => s.searches);
   const ref = useRef(null);
   useEnter(ref, [], { step: 22 });
 
-  useEffect(() => {
-    const onHist = () => setHistory(readHistory());
-    window.addEventListener('search-history-changed', onHist);
-    return () => window.removeEventListener('search-history-changed', onHist);
-  }, []);
-
-  const clear = () => {
-    try { localStorage.removeItem(HISTORY_KEY); } catch { /* ignore */ }
-    setHistory([]);
-    window.dispatchEvent(new CustomEvent('search-history-changed'));
-  };
+  const clear = () => useLibrary.getState().clearSearches();
 
   const removeItem = (item, e) => {
     e?.stopPropagation();
-    const next = removeHistory(item);
-    setHistory(next);
+    useLibrary.getState().forgetSearch(item);
   };
 
   return (

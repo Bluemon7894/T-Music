@@ -5,6 +5,8 @@ import { usePlayer } from './store/player.js';
 import { useUI } from './store/ui.js';
 import { initDownloads } from './store/downloads.js';
 import { useUpdater } from './store/updater.js';
+import { useAccount } from './store/account.js';
+import { useRoom } from './store/room.js';
 import Sidebar from './components/layout/Sidebar.jsx';
 import TopBar from './components/layout/TopBar.jsx';
 import PlayerDock from './components/layout/PlayerDock.jsx';
@@ -12,12 +14,14 @@ import NowPanel from './components/layout/NowPanel.jsx';
 import Stage from './components/layout/Stage.jsx';
 import UpdateModal from './components/UpdateModal.jsx';
 import { ContextMenu, Toast, Dialog } from './components/Overlays.jsx';
+import Login, { Splash } from './views/Login.jsx';
 import Home from './views/Home.jsx';
 import Search from './views/Search.jsx';
 import Artist from './views/Artist.jsx';
 import Library from './views/Library.jsx';
 import Downloads from './views/Downloads.jsx';
 import Settings from './views/Settings.jsx';
+import Room from './views/Room.jsx';
 import { Album, Playlist, Liked, LocalPlaylist } from './views/Collection.jsx';
 
 function View({ route }) {
@@ -32,6 +36,7 @@ function View({ route }) {
     case 'library': return <Library />;
     case 'downloads': return <Downloads />;
     case 'settings': return <Settings />;
+    case 'room': return <Room />;
     default: return <Home />;
   }
 }
@@ -136,7 +141,7 @@ function useShortcuts() {
   }, []);
 }
 
-export default function App() {
+function MainApp() {
   const route = useRoute();
   const panelOpen = useUI((s) => s.panelOpen);
   const stage = useUI((s) => s.stage);
@@ -149,6 +154,19 @@ export default function App() {
   useEffect(() => {
     initDownloads();
     useUpdater.getState().init();
+  }, []);
+
+  // Invite links: tmusic://join/CODE, possibly opened before the app was running or signed in.
+  useEffect(() => {
+    const openInvite = () => {
+      api.takeInvite().then((code) => {
+        if (!code) return;
+        useNav.getState().go('room', {});
+        useRoom.getState().join(code);
+      }).catch(() => {});
+    };
+    openInvite();
+    return api.onInvite(openInvite);
   }, []);
 
   // Handle media controls from system tray
@@ -216,4 +234,12 @@ export default function App() {
       <UpdateModal />
     </div>
   );
+}
+
+export default function App() {
+  const status = useAccount((s) => s.status);
+  const offline = useAccount((s) => s.offline);
+  if (status === 'loading') return <Splash />;
+  if (status === 'signedOut' && !offline) return <Login />;
+  return <MainApp />;
 }

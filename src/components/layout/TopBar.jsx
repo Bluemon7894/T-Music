@@ -6,7 +6,8 @@ import { useDownloads } from '../../store/downloads.js';
 import { useUpdater } from '../../store/updater.js';
 import { api } from '../../lib/api.js';
 import { ProgressRing } from '../DownloadButton.jsx';
-import { readHistory, removeHistory, HISTORY_KEY } from '../../views/Search.jsx';
+import { AccountButton } from '../Account.jsx';
+import { useLibrary } from '../../store/library.js';
 
 function UpdatePill() {
   const hasUpdate = useUpdater((s) => s.hasUpdate);
@@ -47,16 +48,10 @@ export default function TopBar() {
   const togglePanel = useUI((s) => s.togglePanel);
   const [text, setText] = useState('');
   const [sugs, setSugs] = useState([]);
-  const [history, setHistory] = useState(readHistory);
+  const history = useLibrary((s) => s.searches);
   const [focus, setFocus] = useState(false);
   const [hi, setHi] = useState(-1);
   const inputRef = useRef(null);
-
-  useEffect(() => {
-    const onHist = () => setHistory(readHistory());
-    window.addEventListener('search-history-changed', onHist);
-    return () => window.removeEventListener('search-history-changed', onHist);
-  }, []);
 
   useEffect(() => {
     if (route.name === 'search') setText(route.params.q || '');
@@ -91,16 +86,8 @@ export default function TopBar() {
     else go('search', { q: query });
   };
 
-  const removeHistoryItem = (item) => {
-    const next = removeHistory(item);
-    setHistory(next);
-  };
-
-  const clearAllHistory = () => {
-    try { localStorage.removeItem(HISTORY_KEY); } catch { /* ignore */ }
-    setHistory([]);
-    window.dispatchEvent(new CustomEvent('search-history-changed'));
-  };
+  const removeHistoryItem = (item) => useLibrary.getState().forgetSearch(item);
+  const clearAllHistory = () => useLibrary.getState().clearSearches();
 
   const activeList = text.trim() ? sugs : history;
 
@@ -188,6 +175,7 @@ export default function TopBar() {
         <DownloadPill />
         <button className={`icon-btn circle glass ${panelOpen ? 'on' : ''}`} onClick={togglePanel} title="지금 재생 중 패널"><PanelRight size={17} /></button>
         <button className={`icon-btn circle glass ${route.name === 'settings' ? 'on' : ''}`} onClick={() => go('settings')} title="설정"><Settings size={17} /></button>
+        <AccountButton />
       </div>
     </header>
   );

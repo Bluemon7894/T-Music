@@ -190,11 +190,13 @@ export function Dialog() {
   };
   return (
     <div className="modal-back" onMouseDown={close}>
-      <form className="modal" onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
+      <form className="modal" onMouseDown={(e) => e.stopPropagation()} onSubmit={submit} onKeyDown={(e) => e.key === 'Escape' && close()}>
         <h3>{dialog.title}</h3>
-        <input autoFocus value={value} placeholder={dialog.placeholder} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && close()} />
+        {dialog.message
+          ? <p className="modal-msg">{dialog.message}</p>
+          : <input autoFocus value={value} placeholder={dialog.placeholder} onChange={(e) => setValue(e.target.value)} />}
         <div className="modal-actions">
-          <button type="button" className="pill" onClick={close}>취소</button>
+          <button type="button" className="pill" autoFocus={Boolean(dialog.message)} onClick={close}>취소</button>
           <button type="submit" className="pill white">{dialog.submitLabel || '확인'}</button>
         </div>
       </form>
