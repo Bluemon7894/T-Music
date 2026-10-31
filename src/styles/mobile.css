@@ -24,6 +24,19 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .mood:hover::before { transform: translateX(-120%); }
 .card:active, .tl-row:active, .q-row:active, .quick-tile:active, .stat-card.link:active, .m-sheet-item:active, .liked-banner:active { background-color: var(--glass-3); }
 
+/* Big live blurs and repainted glows are fine on a desktop GPU and drain a phone. The same looks
+   come from flat gradients here. */
+.aurora, .browse-tile-bg { display: none; }
+.modal-back, .update-modal-backdrop, .lyrics-picker-backdrop, .toast, .suggestions, .card-remove, .now-art-hint, .stage-volume { backdrop-filter: none; -webkit-backdrop-filter: none; }
+.modal-back { background: rgba(6, 3, 14, 0.84); }
+.update-modal-backdrop { background: rgba(8, 4, 18, 0.88); }
+.lyrics-picker-backdrop { background: rgba(0, 0, 0, 0.84); }
+.update-pill, .update-available-btn, .dl-pill, .dock-play.loading { animation: none; }
+.card-art, .ph-art-wrap, .top-result, .now-art, .login-mark, .stage-disc-wrap { transform-style: flat; }
+.cf-card { box-shadow: 0 14px 26px -14px rgba(0, 0, 0, 0.9), 0 0 0 1px var(--line); }
+.cf-card.active { box-shadow: 0 18px 34px -16px rgba(124, 58, 237, 0.85), 0 0 0 1px var(--line-2); }
+.ph-backdrop { filter: blur(36px) saturate(1.4); }
+
 /* ---------- shell ---------- */
 .m-app {
   --m-bottom: calc(58px + var(--safe-bottom));
@@ -362,7 +375,14 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .friend-add .btn-primary { flex: none; padding: 0 12px; font-size: 13px; }
 
 /* ---------- sign-in ---------- */
-.login { padding: calc(20px + var(--safe-top)) 16px calc(20px + var(--safe-bottom)); }
+.login {
+  padding: calc(20px + var(--safe-top)) 16px calc(20px + var(--safe-bottom));
+  background:
+    radial-gradient(90% 40% at 10% 0%, rgba(91, 33, 182, 0.7), transparent 70%),
+    radial-gradient(70% 34% at 100% 30%, rgba(162, 28, 175, 0.32), transparent 70%),
+    radial-gradient(90% 36% at 50% 100%, rgba(55, 48, 163, 0.42), transparent 70%),
+    var(--bg);
+}
 .login-drag { display: none; }
 .login-card { padding: 26px 20px 20px; border-radius: 24px; backdrop-filter: none; }
 .login-mark { width: 76px; height: 76px; }
@@ -382,7 +402,7 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
   padding: var(--safe-top) 0 var(--safe-bottom);
   will-change: transform;
 }
-.m-stage .stage-bg { animation: none; filter: blur(60px) saturate(1.5) brightness(0.5); }
+.m-stage .stage-bg { animation: none; filter: blur(36px) saturate(1.5) brightness(0.5); }
 .m-stage-top { position: relative; z-index: 3; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; }
 .m-stage-top .seg { min-width: 0; }
 .m-stage-top .seg button { padding: 0 9px; font-size: 12px; gap: 4px; height: 30px; }

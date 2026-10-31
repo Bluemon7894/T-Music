@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { getAnalyser } from '../lib/audio.js';
 import { usePlayer } from '../store/player.js';
+import { IS_ANDROID } from '../lib/platform.js';
 
 // Spectrum drawn on canvas. `variant`: "bars" (horizontal strip) or "ring" (around a disc).
 // When paused or before audio starts it idles with a gentle synthetic wave.
@@ -18,7 +19,7 @@ export default function Visualizer({ variant = 'bars', bars = 48, innerRatio = 0
     const levels = new Float32Array(bars);
 
     const resize = () => {
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1, IS_ANDROID ? 2 : Infinity);
       canvas.width = canvas.clientWidth * dpr;
       canvas.height = canvas.clientHeight * dpr;
     };

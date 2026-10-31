@@ -2,8 +2,10 @@ package com.bluemon7894.tmusic;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -26,8 +28,11 @@ public class MainActivity extends Activity {
     private static final int REQUEST_FILE = 1;
     private static final int REQUEST_SAVE = 2;
     private static final int REQUEST_NOTIFICATIONS = 3;
+    // The page uses browser features from this version on. Phones get WebView updates from the Play Store.
+    private static final int MIN_WEBVIEW_VERSION = 105;
 
     private FrameLayout root;
+    private boolean started;
     private ValueCallback<Uri[]> fileCallback;
     private String pendingSave;
 
@@ -51,9 +56,42 @@ public class MainActivity extends Activity {
         setContentView(root);
         root.setOnApplyWindowInsetsListener((view, insets) -> applyInsets(insets));
 
+        if (webViewTooOld()) {
+            askToUpdateWebView();
+            return;
+        }
+        started = true;
         WebHost.get(this).attach(this, root);
         handleIntent(getIntent());
         askForNotifications();
+    }
+
+    private boolean webViewTooOld() {
+        PackageInfo webView = WebView.getCurrentWebViewPackage();
+        if (webView == null || webView.versionName == null) return false;
+        try {
+            return Integer.parseInt(webView.versionName.split("\\.")[0]) < MIN_WEBVIEW_VERSION;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private void askToUpdateWebView() {
+        String provider = WebView.getCurrentWebViewPackage().packageName;
+        new AlertDialog.Builder(this)
+            .setTitle("Android 시스템 WebView를 업데이트해 주세요")
+            .setMessage("T-Music은 WebView " + MIN_WEBVIEW_VERSION + " 이상에서 실행됩니다. Play 스토어에서 업데이트한 뒤 다시 열어 주세요.")
+            .setCancelable(false)
+            .setPositiveButton("Play 스토어 열기", (dialog, which) -> {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + provider)));
+                } catch (Exception e) {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=" + provider)));
+                }
+                finish();
+            })
+            .setNegativeButton("닫기", (dialog, which) -> finish())
+            .show();
     }
 
     private WindowInsets applyInsets(WindowInsets insets) {
@@ -73,7 +111,7 @@ public class MainActivity extends Activity {
             if (bottom > 200 * density) bottom = 0;
         }
         root.setPadding(0, 0, 0, keyboard);
-        WebHost.get(this).setInsets(top / density, bottom / density);
+        if (started) WebHost.get(this).setInsets(top / density, bottom / density);
         return Build.VERSION.SDK_INT >= 30 ? WindowInsets.CONSUMED : insets.consumeSystemWindowInsets();
     }
 
@@ -87,7 +125,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        handleIntent(intent);
+        if (started) handleIntent(intent);
     }
 
     private void handleIntent(Intent intent) {
@@ -108,23 +146,24 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        WebHost.get(this).bridge.emit("visibility", "visible", true);
+        if (started) WebHost.get(this).bridge.emit("visibility", "visible", true);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        WebHost.get(this).bridge.emit("visibility", "visible", false);
+        if (started) WebHost.get(this).bridge.emit("visibility", "visible", false);
     }
 
     @Override
     public void onBackPressed() {
-        WebHost.get(this).bridge.emit("back");
+        if (started) WebHost.get(this).bridge.emit("back");
+        else finish();
     }
 
     @Override
     protected void onDestroy() {
-        WebHost.get(this).detach(this);
+        if (started) WebHost.get(this).detach(this);
         super.onDestroy();
     }
 

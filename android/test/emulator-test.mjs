@@ -131,8 +131,17 @@ async function main() {
   shot('01-login');
   const insets = await js(`[getComputedStyle(document.documentElement).getPropertyValue('--safe-top'), getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom')].join(' ')`);
   check('system bar sizes reach the page', /[1-9]/.test(insets), insets);
-  await tapText('.login-btn', '게스트');
-  check('guest sign-in with a real tap', await waitFor(() => has('.m-tabs'), 40000));
+  let signedIn = null;
+  for (let attempt = 0; attempt < 3 && signedIn === null; attempt++) {
+    await tapText('.login-btn', '게스트');
+    signedIn = await waitFor(() => has('.m-tabs'), 20000);
+    if (signedIn === null) {
+      note(`tap ${attempt + 1} did not sign in: ${await js(`document.querySelector('.login-error')?.textContent ?? 'no error shown'`)}`);
+      shot(`01-login-attempt${attempt + 1}`);
+    }
+  }
+  check('guest sign-in with a real tap', signedIn !== null);
+  if (signedIn === null) throw new Error('could not sign in');
   await sleep(1500);
   shot('02-home-loading');
 

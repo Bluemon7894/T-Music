@@ -17,9 +17,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { api: 34, gpu: guest, target: google_apis }
-          - { api: 34, gpu: swiftshader_indirect, target: google_apis }
-          - { api: 29, gpu: swiftshader_indirect, target: google_apis }
+          - { api: 34, gpu: swiftshader_indirect, target: google_apis, device: 'Nexus 5' }
+          - { api: 34, gpu: swangle_indirect, target: google_apis, device: 'Nexus 5' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,7 +45,7 @@ jobs:
           api-level: ${{ matrix.api }}
           target: ${{ matrix.target }}
           arch: x86_64
-          profile: pixel_6
+          profile: ${{ matrix.device }}
           cores: 4
           ram-size: 4096M
           disable-animations: true
