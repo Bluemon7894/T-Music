@@ -14,6 +14,7 @@ export const api = {
   lyrics: (track) => call('lyrics', track),
   refreshLyrics: (track) => call('refreshLyrics', track),
   setLanguage: (language) => call('setLanguage', language),
+  translateLyrics: (lines, target) => call('translateLyrics', lines, target),
   lyricsCandidates: (track, query) => call('lyricsCandidates', track, query),
   cleanLyricsQuery: (track) => call('cleanLyricsQuery', track),
   setCustomLyrics: (trackId, lyricsData) => call('setCustomLyrics', trackId, lyricsData),

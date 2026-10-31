@@ -3,7 +3,7 @@
 // Firebase talks to its own servers directly and doesn't come through here.
 import { Native } from './native.js';
 
-const PROXIED = /^https:\/\/([^/]+\.)?(youtube\.com|googlevideo\.com|lrclib\.net|music\.163\.com|qq\.com|kugou\.com|naver\.com|api\.github\.com|oauth2\.googleapis\.com)(\/|$)/i;
+const PROXIED = /^https:\/\/([^/]+\.)?(youtube\.com|googlevideo\.com|lrclib\.net|music\.163\.com|qq\.com|kugou\.com|naver\.com|api\.github\.com|oauth2\.googleapis\.com|translate\.googleapis\.com)(\/|$)/i;
 
 const realFetch = window.fetch.bind(window);
 

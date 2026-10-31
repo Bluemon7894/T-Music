@@ -5,6 +5,7 @@ import './proxyFetch.js';
 import * as catalog from '../../electron/youtube/catalog.js';
 import * as stream from '../../electron/youtube/stream.js';
 import * as lyrics from '../../electron/lyrics/index.js';
+import { translateLines } from '../../electron/lyrics/translate.js';
 import { getClient } from '../../electron/youtube/client.js';
 import * as downloads from './downloads.js';
 import * as updater from './updater.js';
@@ -79,6 +80,7 @@ const api = {
   home: () => catalog.home(),
   lyrics: (track) => lyrics.getLyrics(track),
   refreshLyrics: (track) => lyrics.refreshLyrics(track),
+  translateLyrics: (lines, target) => translateLines(lines, target),
   setLanguage: (language) => {
     catalog.setLanguage(language);
     window.TMusicNative.setLanguage(language);

@@ -11,6 +11,7 @@ import * as downloads from './downloads.js';
 import * as discord from './discord.js';
 import * as auth from './auth.js';
 import * as lang from './lang.js';
+import { translateLines } from './lyrics/translate.js';
 import { registerScheme, handleProtocol } from './protocol.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -69,6 +70,7 @@ const api = {
   album: (id) => catalog.album(id),
   artist: (id) => catalog.artist(id),
   playlist: (id) => catalog.playlist(id),
+  translateLyrics: (lines, target) => translateLines(lines, target),
   setLanguage: (language) => {
     lang.setLanguage(language);
     catalog.setLanguage(language);

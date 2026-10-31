@@ -267,8 +267,13 @@ export default function Settings() {
       <div className="page-title" data-enter><h1>{tr('설정')}</h1></div>
 
       <div className="settings-grid">
-        <div className="settings-col">
+        <div className="settings-top">
           <AccountCard />
+          <FriendPrivacyCard />
+        </div>
+
+        <div className="settings-columns">
+        <div className="settings-col">
 
           <section className="set-card" data-enter>
             <h2><Radio size={18} />{' '}{tr('재생 및 음질 설정')}</h2>
@@ -383,8 +388,6 @@ export default function Settings() {
           </section>
         </div>
         <div className="settings-col">
-          <FriendPrivacyCard />
-
           {!IS_ANDROID && <section className="set-card" data-enter>
             <h2><Monitor size={18} />{' '}{tr('시스템 및 연동')}</h2>
             <p className="muted">{tr('윈도우 시작 및 디스코드 상태 표시 설정을 관리해요.')}</p>
@@ -454,6 +457,7 @@ export default function Settings() {
               <button className="btn" onClick={importLib}><Upload size={15} />{' '}{tr('복원')}</button>
             </div>
           </section>
+        </div>
         </div>
       </div>
     </div>

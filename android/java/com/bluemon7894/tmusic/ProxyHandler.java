@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 final class ProxyHandler {
     private static final Pattern ALLOWED = Pattern.compile(
         "(.+\\.)?(youtube\\.com|googlevideo\\.com|ytimg\\.com|lrclib\\.net|music\\.163\\.com|qq\\.com|kugou\\.com|naver\\.com"
-            + "|api\\.github\\.com|github\\.com|githubusercontent\\.com|oauth2\\.googleapis\\.com)");
+            + "|api\\.github\\.com|github\\.com|githubusercontent\\.com|oauth2\\.googleapis\\.com|translate\\.googleapis\\.com)");
     private static final String[] SKIPPED_REQUEST_HEADERS = { "host", "content-length", "connection", "accept-encoding" };
 
     private final Map<String, JSONObject> pending = new ConcurrentHashMap<>();

@@ -1,8 +1,9 @@
 // Synced lyrics, shared by the side panel and the fullscreen stage.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ListMusic, Mic2, RefreshCw, Search } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { useRoom } from '../../store/room.js';
+import { usePrefs } from '../../store/prefs.js';
 import { lyricsKey, saveAlignment, useAlignments } from '../../store/lyricAlignments.js';
 import { toast } from '../../store/ui.js';
 import { api, streamUrl } from '../../lib/api.js';
@@ -96,6 +97,37 @@ function useActiveLine(lines, offset) {
   return active;
 }
 
+const LYRIC_LANGUAGES = [{ id: 'original', label: tr('원본') }, { id: 'ko', label: '한글' }, { id: 'en', label: 'English' }];
+
+// The original stays on screen; a translation goes under it. Asked for only while it's chosen.
+function useTranslation(texts, target) {
+  const [state, setState] = useState({ lines: null, loading: false });
+  const key = texts.join('\n');
+
+  useEffect(() => {
+    if (target === 'original' || !key.trim()) {
+      setState({ lines: null, loading: false });
+      return undefined;
+    }
+    let stale = false;
+    setState({ lines: null, loading: true });
+    api.translateLyrics(texts, target)
+      .then((answer) => { if (!stale) setState({ lines: answer?.lines || null, loading: false }); })
+      .catch((e) => {
+        console.warn('[lyrics]', e);
+        if (stale) return;
+        setState({ lines: null, loading: false });
+        toast(tr('가사를 번역하지 못했어요. 인터넷 연결을 확인해 주세요.'));
+      });
+    return () => { stale = true; };
+  }, [key, target]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return state;
+}
+
+// Lyrics already in the chosen language would just say everything twice.
+const sameText = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
 function LyricsSkeleton() {
   return (
     <div className="lyr-sk">
@@ -134,6 +166,14 @@ export default function LyricsView({ track, variant = 'panel' }) {
   const seek = usePlayer((s) => s.seek);
   const lines = data?.lines || [];
   const active = useActiveLine(lines, offset);
+  const lyricLanguage = usePrefs((s) => s.lyricLanguage);
+  const setPref = usePrefs((s) => s.setPref);
+  const texts = useMemo(() => (lines.length ? lines.map((l) => l.text || '') : String(data?.plainLyrics || '').split('\n')), [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const translation = useTranslation(texts, lyricLanguage);
+  const translatedLine = (i) => {
+    const text = translation.lines?.[i];
+    return text && !sameText(text, texts[i]) ? <span className="lyr-tr">{text}</span> : null;
+  };
   const scroller = useRef(null);
   const activeLine = useRef(null);
   const holdUntil = useRef(0);
@@ -188,6 +228,12 @@ export default function LyricsView({ track, variant = 'panel' }) {
             {!hasSynced && <span className="lyr-pill"><Mic2 size={12} />{' '}{tr('싱크 미지원')}</span>}
             <button className="lyr-pill action" onClick={openPicker}><ListMusic size={12} />{' '}{tr('가사 직접 찾기')}</button>
             {resyncButton('lyr-pill action')}
+            <div className="seg lyr-lang" role="group" aria-label={tr('가사 번역')}>
+              {LYRIC_LANGUAGES.map((l) => (
+                <button key={l.id} className={lyricLanguage === l.id ? 'on' : ''} onClick={() => setPref({ lyricLanguage: l.id })}>{l.label}</button>
+              ))}
+            </div>
+            {translation.loading && <span className="lyr-pill"><RefreshCw size={12} className="spin" />{' '}{tr('번역 중...')}</span>}
           </div>
           <div className="lyr-scroll" ref={scroller} onWheel={holdScroll} onPointerDown={holdScroll}>
             {hasSynced ? (
@@ -200,12 +246,15 @@ export default function LyricsView({ track, variant = 'panel' }) {
                     onClick={() => { holdUntil.current = 0; seek(Math.max(0, l.time + offset)); }}
                   >
                     {l.text || '...'}
+                    {translatedLine(i)}
                   </div>
                 ))}
               </div>
             ) : (
               <>
-                <div className="lyr-plain">{data.plainLyrics}</div>
+                <div className="lyr-plain">
+                  {translation.lines ? texts.map((text, i) => <div key={i}>{text || '\u00a0'}{translatedLine(i)}</div>) : data.plainLyrics}
+                </div>
                 {data.footer && <div className="lyr-footer">{data.footer}</div>}
               </>
             )}

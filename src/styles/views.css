@@ -204,11 +204,18 @@
 .job-err { color: var(--danger); font-size: 11.5px; }
 
 /* ---------- settings ---------- */
-/* Two stacks, so cards of different heights never leave a hole beside them. */
-.settings-grid { display: flex; align-items: flex-start; gap: 14px; }
-.settings-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
-.settings-col .set-card { height: auto; }
-@container main (max-width: 720px) { .settings-grid { flex-direction: column; align-items: stretch; } }
+/* Two stacks, so cards of different heights never leave a hole beside them. The cards share out whatever
+   is left, so both stacks start and end on the same line. */
+.settings-grid { display: flex; flex-direction: column; gap: 14px; }
+.settings-top { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.settings-columns { display: flex; align-items: stretch; gap: 14px; }
+.settings-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.settings-col .set-card { flex: 1 1 auto; height: auto; }
+.settings-top .set-card { height: auto; }
+@container main (max-width: 720px) {
+  .settings-top { grid-template-columns: minmax(0, 1fr); }
+  .settings-columns { flex-direction: column; }
+}
 .set-card { margin: 0 !important; padding: 22px; border-radius: var(--r-lg); background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; align-items: flex-start; height: 100%; box-sizing: border-box; }
 .set-card h2 { display: flex; align-items: center; gap: 8px; font-size: 17px; margin: 0; }
 .set-card h2 svg { color: var(--v-300); }
@@ -392,6 +399,9 @@
   justify-self: center;
   transform-style: preserve-3d;
   perspective: 1200px;
+  /* On its own layer the deck is drawn in one piece. Otherwise each part snaps to screen pixels on its
+     own when it isn't tilted, and the parts end up slightly out of line. */
+  will-change: transform;
 }
 .stage-main.with-lyrics .stage-disc-wrap {
   width: min(42vh, 29vw, 440px);
@@ -693,6 +703,10 @@
   line-height: 1;
   white-space: nowrap;
 }
+.lyr-lang button { height: 24px; padding: 0 9px; font-size: 11.5px; }
+.lyr-tr { display: block; margin-top: 3px; font-size: 0.72em; font-weight: 500; line-height: 1.35; letter-spacing: 0; opacity: 0.72; }
+.lyr-line.active .lyr-tr { opacity: 0.92; }
+.lyr-plain .lyr-tr { margin: 1px 0 8px; opacity: 0.7; }
 .lyr-pill.action { color: var(--v-200); cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s; }
 .lyr-pill.action:hover:not(:disabled) { background: rgba(139, 92, 246, 0.28); border-color: rgba(167, 139, 250, 0.55); color: #fff; }
 .lyr-pill.action:disabled { opacity: 0.7; cursor: default; }

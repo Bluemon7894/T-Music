@@ -165,6 +165,7 @@ async function main() {
   check('home loads through the proxy', typeof home === 'number' && home > 0, `${home} in ${Date.now() - started} ms`);
   const search = await js(`window.api.call('search', '아이유 라일락').then((r) => r.songs?.length ?? 0).catch((e) => 'error: ' + e.message)`);
   check('search works through the proxy', typeof search === 'number' && search > 0, search);
+  note(`translation through the proxy: ${await js(`window.api.call('translateLyrics', ['Good morning', 'See you tomorrow'], 'ko').then((r) => JSON.stringify({ from: r.from, lines: r.lines.filter(Boolean).length })).catch((e) => 'error: ' + e.message)`)}`);
   await waitFor(() => has('.cf-card'), 20000);
   await sleep(1500);
   shot('03-home');

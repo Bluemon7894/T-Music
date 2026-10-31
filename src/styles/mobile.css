@@ -343,16 +343,16 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .job-top { flex-direction: column; gap: 2px; }
 
 /* ---------- settings ---------- */
-.settings-grid { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
-.settings-col { display: contents; }
-.settings-col:first-child > :nth-child(1) { order: 0; }
-.settings-col:last-child > :nth-child(1) { order: 1; }
-.settings-col:first-child > :nth-child(2) { order: 2; }
-.settings-col:last-child > :nth-child(2) { order: 3; }
-.settings-col:last-child > :nth-child(3) { order: 4; }
-.settings-col:first-child > :nth-child(3) { order: 5; }
-.settings-col:last-child > :nth-child(4) { order: 6; }
-.settings-col:first-child > :nth-child(4) { order: 7; }
+.settings-grid { gap: 10px; }
+.settings-top, .settings-columns, .settings-col { display: contents; }
+.settings-top > :nth-child(1) { order: 0; }
+.settings-top > :nth-child(2) { order: 1; }
+.settings-col:first-child > :nth-child(1) { order: 2; }
+.settings-col:last-child > :nth-child(1) { order: 3; }
+.settings-col:last-child > :nth-child(2) { order: 4; }
+.settings-col:first-child > :nth-child(2) { order: 5; }
+.settings-col:last-child > :nth-child(3) { order: 6; }
+.settings-col:first-child > :nth-child(3) { order: 7; }
 .set-card { padding: 16px; height: auto; border-radius: 18px; }
 .set-item { padding: 12px 0; }
 .set-stats { gap: 6px; }
@@ -454,6 +454,7 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .lyr-stage .lyr-line.active { font-size: calc(23px * var(--lyric-scale, 1)); }
 .lyr-stage .lyr-plain { font-size: calc(16px * var(--lyric-scale, 1)); }
 .lyr-pill { height: 30px; }
+.lyr-lang button { height: 30px; padding: 0 11px; font-size: 12px; }
 
 /* ---------- player rows ---------- */
 .q-row { gap: 10px; padding: 7px 2px 7px 4px; }

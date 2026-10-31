@@ -18,12 +18,13 @@ export const usePrefs = create((set, get) => ({
   resumeOnLaunch: saved.resumeOnLaunch === true,
   lyricSize: ['small', 'normal', 'large'].includes(saved.lyricSize) ? saved.lyricSize : 'normal',
   calmMotion: saved.calmMotion === true,
+  lyricLanguage: ['original', 'ko', 'en'].includes(saved.lyricLanguage) ? saved.lyricLanguage : 'original',
 
   setPref(patch) {
     set(patch);
-    const { resumeOnLaunch, lyricSize, calmMotion } = get();
+    const { resumeOnLaunch, lyricSize, calmMotion, lyricLanguage } = get();
     apply({ lyricSize, calmMotion });
-    try { localStorage.setItem(KEY, JSON.stringify({ resumeOnLaunch, lyricSize, calmMotion })); } catch { /* it still applies this session */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ resumeOnLaunch, lyricSize, calmMotion, lyricLanguage })); } catch { /* it still applies this session */ }
   },
 }));
 
