@@ -112,11 +112,18 @@
 .lib-cta { margin: 10px 4px; padding: 18px; border-radius: var(--r); background: linear-gradient(160deg, rgba(139, 92, 246, 0.18), rgba(139, 92, 246, 0.04)); border: 1px solid var(--line); display: flex; flex-direction: column; align-items: flex-start; gap: 10px; color: var(--sub); }
 .lib-cta p { font-size: 13px; line-height: 1.5; color: var(--v-100); font-weight: 600; }
 
+@media (max-height: 760px) {
+  .nav { padding-bottom: 8px; }
+  .nav-item { height: 38px; font-size: 14px; }
+  .lib-head { padding-top: 8px; }
+}
+
 /* ---------- top bar ---------- */
 .topbar { grid-area: top; display: flex; align-items: center; gap: 14px; padding-right: 148px; -webkit-app-region: drag; position: relative; z-index: 100; min-width: 0; }
 .topbar button, .topbar input, .searchbox { -webkit-app-region: no-drag; }
 .tb-nav { display: flex; gap: 6px; flex: none; }
-.tb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 1; min-width: 0; }
+.tb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+.tb-right > * { flex: none; }
 .searchbox { position: relative; flex: 0 1 480px; min-width: 140px; display: flex; align-items: center; height: 44px; padding: 0 12px 0 16px; border-radius: 22px; background: var(--glass-2); border: 1px solid var(--line); transition: border-color 0.2s, background 0.2s, box-shadow 0.3s, flex-basis 0.4s var(--out); }
 .searchbox:hover { background: var(--glass-3); }
 .searchbox.focus { flex-basis: 560px; border-color: rgba(196, 181, 253, 0.55); background: rgba(20, 12, 38, 0.85); box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18), var(--glow); z-index: 110; }

@@ -314,7 +314,7 @@ export const useRoom = create((set, get) => {
           const diff = orderOf(x) - orderOf(y);
           return Number.isNaN(diff) || diff === 0 ? (a < b ? -1 : 1) : diff;
         });
-        set({ queue: sorted.map(([key, item]) => ({ key, ...item })) });
+        set({ queue: sorted.map(([key, item]) => ({ key, ...item, track: safeTrack(item.track) })).filter((item) => item.track) });
       }),
     ];
   };

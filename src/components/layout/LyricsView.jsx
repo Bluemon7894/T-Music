@@ -162,7 +162,7 @@ export default function LyricsView({ track, variant = 'panel' }) {
     const box = scroller.current;
     const line = activeLine.current;
     if (!box || !line || performance.now() < holdUntil.current) return;
-    const top = line.offsetTop - box.offsetTop - box.clientHeight / 2 + line.offsetHeight / 2;
+    const top = line.offsetTop - box.clientHeight / 2 + line.offsetHeight / 2;
     box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   }, [active]);
 

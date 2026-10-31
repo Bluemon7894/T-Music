@@ -2,7 +2,7 @@
 import { ListEnd } from 'lucide-react';
 import SharePanel from '../components/SharePanel.jsx';
 import { auth } from '../lib/firebase.js';
-import { canEditPlaylist } from '../lib/sharedPlaylists.js';
+import { canEditPlaylist, confirmDeletePlaylist } from '../lib/sharedPlaylists.js';
 import { useRef, useState } from 'react';
 import { Heart, ListMusic, Shuffle, PlusCircle, CheckCircle2, Pencil, Trash2, Search as SearchIcon, Radio } from 'lucide-react';
 import { api } from '../lib/api.js';
@@ -182,7 +182,7 @@ const isOwnShare = (p) => p.share?.ownerUid === auth.currentUser?.uid;
 
 export function LocalPlaylist({ id }) {
   const pl = useLibrary((s) => s.playlists.find((p) => p.id === id));
-  const { addToPlaylist, removeFromPlaylist, renamePlaylist, deletePlaylist, reorderPlaylist } = useLibrary.getState();
+  const { addToPlaylist, removeFromPlaylist, renamePlaylist, reorderPlaylist } = useLibrary.getState();
   const prompt = useUI((s) => s.prompt);
   const go = useNav((s) => s.go);
   const ref = usePage([id]);
@@ -236,7 +236,7 @@ export function LocalPlaylist({ id }) {
       <div className="page-body">
         <ActionBar tracks={pl.tracks} context={context}>
           {editable && <button className="icon-btn big" title="이름 바꾸기" onClick={rename}><Pencil size={21} /></button>}
-          <button className="icon-btn big" title={pl.share && !isOwnShare(pl) ? '내 보관함에서 빼기' : '삭제'} onClick={() => { deletePlaylist(pl.id); go('home'); toast('플레이리스트를 삭제했습니다'); }}><Trash2 size={21} /></button>
+          <button className="icon-btn big" title={pl.share && !isOwnShare(pl) ? '내 보관함에서 빼기' : '삭제'} onClick={() => confirmDeletePlaylist(pl, () => go('home'))}><Trash2 size={21} /></button>
         </ActionBar>
         <SharePanel playlist={pl} />
         {pl.tracks.length ? (

@@ -130,7 +130,7 @@
 .shelf-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 8px; }
 .shelf-sub { color: var(--dim); font-size: 13px; margin-top: 4px; }
 .shelf-nav { display: flex; align-items: center; gap: 6px; }
-.shelf-row { display: grid; grid-auto-flow: column; grid-auto-columns: 188px; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 10px 14px 14px; perspective: 1000px; scroll-snap-type: x proximity; }
+.shelf-row { display: grid; grid-auto-flow: column; grid-auto-columns: 188px; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 10px 14px 14px; scroll-padding: 0 14px; perspective: 1000px; scroll-snap-type: x proximity; }
 .shelf-row::-webkit-scrollbar { display: none; }
 .shelf-row.fade-r { mask-image: linear-gradient(90deg, #000 88%, transparent); }
 .shelf-row.fade-l { mask-image: linear-gradient(90deg, transparent, #000 10%); }

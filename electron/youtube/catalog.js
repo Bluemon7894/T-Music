@@ -17,6 +17,8 @@ async function cached(key, ttlMs, fn) {
 
 const MIN = 60 * 1000;
 const VIDEOS_ONLY = 'EgIQAQ%3D%3D';
+const FEW_PLAYLIST_TRACKS = 20;
+const MAX_PLAYLIST_PAGES = 5;
 const INSTRUMENTAL = /\binst\b|instrumental|\bMR\b|반주/i;
 
 function uniqueBy(list, key = (x) => x.id) {
@@ -26,6 +28,20 @@ function uniqueBy(list, key = (x) => x.id) {
     if (!k || seen.has(k)) return false;
     seen.add(k);
     return true;
+  });
+}
+
+const squash = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+// One channel often uploads a recording twice, as audio and as a video.
+function uniqueRecordings(tracks) {
+  const kept = [];
+  return tracks.filter((t) => {
+    const twin = kept.some((k) => squash(k.title) === squash(t.title)
+      && squash(k.artists?.[0]?.name) === squash(t.artists?.[0]?.name)
+      && Math.abs(k.duration - t.duration) <= 1);
+    if (!twin) kept.push(t);
+    return !twin;
   });
 }
 
@@ -51,6 +67,8 @@ async function officialAudio(query, limit = 20) {
   const tracks = P.findAll(d, 'videoRenderer')
     .map((v) => P.parseVideo(v, query))
     .filter((t) => t && (t.topic || t.score >= 1))
+    // "Release - Topic" mirrors whole albums with barely any listeners and no artist name.
+    .filter((t) => !(t.topic && t.artists[0]?.name === 'Release'))
     // Noisy titles (karaoke, instrumentals) and near-zero view uploads score under 3.
     .map((t) => ({ ...t, studioAudio: Boolean((t.topic || t.officialArtist) && t.score >= 3) }))
     .slice(0, limit);
@@ -104,7 +122,7 @@ export function search(query) {
     const fitBand = (r) => (r >= 0.95 ? 3 : r >= 0.75 ? 2 : r >= 0.5 ? 1 : 0);
     const flag = (v) => (v ? 1 : 0);
     const wantsInstrumental = INSTRUMENTAL.test(query);
-    const squash = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    const wantsLive = P.isLiveTitle(query);
     const scored = candidates.map((t) => ({ t, r: trackRelevance(query, t) }));
     const literal = scored.filter((x) => x.r >= 0.95 && (x.t.score ?? 0) >= 0);
     // YouTube's pick only outranks results that literally match when one of them confirms it's
@@ -119,6 +137,7 @@ export function search(query) {
         || fitBand(b.r) - fitBand(a.r)
         || flag(b.t.ytPick) - flag(a.t.ytPick)
         || flag(!INSTRUMENTAL.test(b.t.title) || wantsInstrumental) - flag(!INSTRUMENTAL.test(a.t.title) || wantsInstrumental)
+        || flag(!P.isLiveTitle(b.t.title) || wantsLive) - flag(!P.isLiveTitle(a.t.title) || wantsLive)
         || flag(b.t.studioAudio) - flag(a.t.studioAudio)
         || (b.t.score ?? 0) - (a.t.score ?? 0)
         || (b.t.views ?? 0) - (a.t.views ?? 0));
@@ -128,7 +147,7 @@ export function search(query) {
     let fitting = songLike.filter((x) => x.r >= 0.5);
     // Misspelled or descriptive searches match nothing literally; trust YouTube's own picks then.
     if (!fitting.length) fitting = songLike.filter((x) => (x.t.score ?? 0) >= 1).slice(0, 10);
-    const songs = fitting.map((x) => P.strip(x.t));
+    const songs = uniqueRecordings(fitting.map((x) => P.strip(x.t)));
 
     const card = ok(ytm) ? parseCard(ytm.value) : null;
     let artistList = of('artist');
@@ -250,15 +269,30 @@ export function artist(id) {
   });
 }
 
+// YT Music sends a long playlist a page at a time.
+async function playlistRows(first) {
+  const shelf = P.find(first, 'musicPlaylistShelfRenderer') || P.find(first, 'musicShelfRenderer') || {};
+  const rows = P.findAll(shelf, 'musicResponsiveListItemRenderer');
+  let token = P.find(shelf, 'continuationCommand')?.token;
+  for (let page = 1; token && page < MAX_PLAYLIST_PAGES; page++) {
+    const more = await call('/browse', { client: 'YTMUSIC', continuation: token }).catch(() => null);
+    rows.push(...P.findAll(more, 'musicResponsiveListItemRenderer'));
+    token = P.find(more, 'continuationCommand')?.token;
+  }
+  return rows;
+}
+
 export function playlist(id) {
   return cached('playlist:' + id, 30 * MIN, async () => {
     const browseId = id.startsWith('VL') ? id : 'VL' + id;
     let result = null;
+    let rowCount = 0;
     try {
       const d = await call('/browse', { client: 'YTMUSIC', browseId });
       const h = headerOf(d);
-      const tracks = uniqueBy(P.findAll(P.find(d, 'musicPlaylistShelfRenderer') || P.find(d, 'musicShelfRenderer') || {}, 'musicResponsiveListItemRenderer')
-        .map((r) => P.parseResponsive(r)).filter((t) => t?.kind === 'track'));
+      const rows = await playlistRows(d);
+      rowCount = rows.length;
+      const tracks = uniqueBy(rows.map((r) => P.parseResponsive(r)).filter((t) => t?.kind === 'track'));
       if (tracks.length) {
         result = {
           title: P.text(h.title),
@@ -272,23 +306,31 @@ export function playlist(id) {
     } catch {
       // fall through to regular YouTube
     }
-    if (!result) {
-      const d = await call('/browse', { client: 'WEB', browseId });
-      const meta = P.find(d, 'playlistMetadataRenderer') || {};
-      const tracks = uniqueBy([
-        ...P.findAll(d, 'playlistVideoRenderer').map(P.parsePlaylistVideo),
-        ...P.findAll(d, 'lockupViewModel').map((l) => P.parseLockup(l)),
-      ].filter(Boolean)).map(P.strip);
-      result = {
-        title: meta.title || P.text(P.find(d, 'pageHeaderViewModel')?.title) || '재생목록',
-        author: '',
-        info: `${tracks.length}곡`,
-        description: meta.description || '',
-        thumb: tracks[0]?.thumb || null,
-        tracks,
-      };
+    // Logged out, YT Music can cut a curated playlist down to its first 2 tracks, and the parser
+    // skips long videos. Regular YouTube has them all, so a short answer gets checked against it.
+    if (!result || result.tracks.length < Math.max(rowCount, FEW_PLAYLIST_TRACKS)) {
+      try {
+        const d = await call('/browse', { client: 'WEB', browseId });
+        const meta = P.find(d, 'playlistMetadataRenderer') || {};
+        const tracks = uniqueBy([
+          ...P.findAll(d, 'playlistVideoRenderer').map(P.parsePlaylistVideo),
+          ...P.findAll(d, 'lockupViewModel').map((l) => P.parseLockup(l)),
+        ].filter(Boolean)).map(P.strip);
+        if (tracks.length > (result?.tracks.length || 0)) {
+          result = {
+            title: result?.title || meta.title || P.text(P.find(d, 'pageHeaderViewModel')?.title) || '재생목록',
+            author: result?.author || '',
+            info: `${tracks.length}곡`,
+            description: result?.description || meta.description || '',
+            thumb: result?.thumb || tracks[0]?.thumb || null,
+            tracks,
+          };
+        }
+      } catch (e) {
+        if (!result) throw e;
+      }
     }
-    if (!result.tracks.length) throw new Error('재생목록을 불러올 수 없습니다.');
+    if (!result?.tracks.length) throw new Error('재생목록을 불러올 수 없습니다.');
     return { kind: 'playlist', id: browseId.slice(2), ...result };
   });
 }

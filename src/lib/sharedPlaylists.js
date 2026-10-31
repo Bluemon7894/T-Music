@@ -6,7 +6,7 @@ import { deleteDoc, doc, getDoc, onSnapshot, runTransaction, serverTimestamp, se
 import { auth, db } from './firebase.js';
 import { safeTrack } from './safeTrack.js';
 import { useLibrary } from '../store/library.js';
-import { toast } from '../store/ui.js';
+import { toast, useUI } from '../store/ui.js';
 
 const ID_LENGTH = 22;
 const ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -200,6 +200,26 @@ export async function openSharedPlaylist(text) {
   const data = snap.data();
   const id = useLibrary.getState().createPlaylist(String(data.name || '').slice(0, 100) || '공유 플레이리스트', remoteTracks(data), { share: toShare(shareId, data) });
   return id;
+}
+
+export function confirmDeletePlaylist(playlist, afterDelete) {
+  const { share } = playlist;
+  const shared = Boolean(share);
+  const mine = share?.ownerUid === myUid();
+  useUI.getState().prompt({
+    title: shared && !mine ? '내 보관함에서 뺄까요?' : `'${playlist.name}' 플레이리스트를 삭제할까요?`,
+    message: !shared
+      ? '플레이리스트가 삭제되고 되돌릴 수 없습니다. 곡 자체는 지워지지 않아요.'
+      : mine
+        ? '공유도 함께 끝납니다. 링크를 받은 친구에게는 복사본만 남아요.'
+        : '내 보관함에서만 사라지고, 공유 플레이리스트는 그대로 남아요.',
+    submitLabel: shared && !mine ? '빼기' : '삭제',
+    onSubmit: () => {
+      useLibrary.getState().deletePlaylist(playlist.id);
+      afterDelete?.();
+      toast(shared && !mine ? '내 보관함에서 뺐습니다' : '플레이리스트를 삭제했습니다');
+    },
+  });
 }
 
 export async function deleteOwnedShares() {

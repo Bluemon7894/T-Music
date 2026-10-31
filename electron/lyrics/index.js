@@ -17,7 +17,7 @@ const CONFIDENT_SCORE = 85; // right title, right artist, length within a couple
 const TIGHT_DRIFT = 2.5;
 
 const dir = () => path.join(app.getPath('userData'), 'lyrics');
-const fileOf = (id) => path.join(dir(), `${id}.json`);
+const fileOf = (id) => path.join(dir(), `${String(id).replace(/[^\w-]/g, '')}.json`);
 const memory = new Map();
 const emptyUntil = new Map();
 const inflight = new Map();

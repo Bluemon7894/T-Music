@@ -3,7 +3,7 @@ import { Link2, Share2, Users, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { auth } from '../lib/firebase.js';
 import { setPlaylistEditable, shareLink, sharePlaylist, stopSharing } from '../lib/sharedPlaylists.js';
-import { toast } from '../store/ui.js';
+import { toast, useUI } from '../store/ui.js';
 
 export default function SharePanel({ playlist }) {
   const [busy, setBusy] = useState(false);
@@ -56,7 +56,18 @@ export default function SharePanel({ playlist }) {
         <button className={!share.editable ? 'on' : ''} disabled={busy} onClick={() => run(() => setPlaylistEditable(share.id, false), '변경하지 못했습니다')}>보기만</button>
         <button className={share.editable ? 'on' : ''} disabled={busy} onClick={() => run(() => setPlaylistEditable(share.id, true), '변경하지 못했습니다')}>같이 편집</button>
       </div>
-      <button className="btn" disabled={busy} onClick={() => run(() => stopSharing(share.id), '공유를 끝내지 못했습니다')}><X size={15} /> 공유 끝내기</button>
+      <button
+        className="btn"
+        disabled={busy}
+        onClick={() => useUI.getState().prompt({
+          title: '공유를 끝낼까요?',
+          message: '링크가 더 이상 열리지 않고, 받은 친구에게는 지금까지의 복사본만 남아요.',
+          submitLabel: '공유 끝내기',
+          onSubmit: () => run(() => stopSharing(share.id), '공유를 끝내지 못했습니다'),
+        })}
+      >
+        <X size={15} /> 공유 끝내기
+      </button>
     </div>
   );
 }

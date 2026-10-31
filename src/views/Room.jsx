@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Copy, Crown, GripVertical, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { Empty, ArtistLinks, Thumb } from '../components/common.jsx';
 import LyricsView from '../components/layout/LyricsView.jsx';
-import { safeTrack } from '../lib/safeTrack.js';
+import { safePhoto, safeTrack } from '../lib/safeTrack.js';
 import { useFriends } from '../store/friends.js';
 import { usePlayer } from '../store/player.js';
 import { useAccount } from '../store/account.js';
@@ -168,8 +168,8 @@ function InRoom() {
         <ul>
           {list.map(([memberUid, m]) => (
             <li key={memberUid}>
-              {m.photo
-                ? <img className="avatar" src={m.photo} alt="" referrerPolicy="no-referrer" draggable={false} />
+              {safePhoto(m.photo)
+                ? <img className="avatar" src={safePhoto(m.photo)} alt="" referrerPolicy="no-referrer" draggable={false} />
                 : <span className="avatar fallback"><Users size={15} /></span>}
               <i className={`room-dot ${m.listening ? 'on' : ''}`} title={m.listening ? '듣는 중' : '자리 비움'} />
               <span className="room-member-name">{m.name}{memberUid === uid && <small> (나)</small>}</span>

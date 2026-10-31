@@ -1233,3 +1233,10 @@
 .room-queue-index { flex: none; min-width: 18px; color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; text-align: center; }
 .room-queue-move { display: inline-flex; flex: none; }
 .room-queue ul { max-height: 420px; overflow-y: auto; }
+
+/* room for the window buttons when the top bar gets narrow */
+@media (max-width: 1200px) {
+  .dl-pill span, .update-pill span { display: none; }
+  .dl-pill, .update-pill { padding: 0 8px; }
+}
+.mini ~ .toast { left: 8px; right: 8px; bottom: 8px; width: auto; max-width: none; transform: none; font-size: 12px; }

@@ -173,10 +173,15 @@ const api = {
   },
 };
 
-ipcMain.handle('api', async (_e, method, ...args) => {
-  const fn = api[method];
-  if (!fn) throw new Error('unknown method ' + method);
-  return fn(...args);
+// Only the app's own page may use the API, and only the methods listed above.
+function isAppPage(url) {
+  return process.env.VITE_DEV_URL ? String(url).startsWith(process.env.VITE_DEV_URL) : String(url).startsWith('file://');
+}
+
+ipcMain.handle('api', async (e, method, ...args) => {
+  if (!isAppPage(e.senderFrame?.url)) throw new Error('not allowed');
+  if (!Object.hasOwn(api, method)) throw new Error('unknown method ' + method);
+  return api[method](...args);
 });
 
 function getAppIconPath() {
@@ -228,6 +233,11 @@ function createWindow() {
       e.preventDefault();
       win.hide();
     }
+  });
+
+  // A dropped link or file must never replace the app with another page, which would get its API.
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url !== win.webContents.getURL()) e.preventDefault();
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {

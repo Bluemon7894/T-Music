@@ -76,7 +76,7 @@ export function enqueue(tracks) {
   load();
   let added = 0;
   for (const t of tracks) {
-    if (!t?.id || index[t.id] || jobs.has(t.id)) continue;
+    if (!/^[\w-]{11}$/.test(t?.id) || index[t.id] || jobs.has(t.id)) continue; // the id names a file
     jobs.set(t.id, { track: t, status: 'queued', received: 0, total: 0 });
     added++;
   }

@@ -19,7 +19,7 @@ import { useLibrary } from '../store/library.js';
 import { usePlayer, applyOutputDevice } from '../store/player.js';
 import { useDownloads, openDownloads } from '../store/downloads.js';
 import { useUpdater } from '../store/updater.js';
-import { toast } from '../store/ui.js';
+import { toast, useUI } from '../store/ui.js';
 import { fmtBytes } from '../lib/util.js';
 import { useEnter } from '../lib/motion.js';
 import { isNormalizeEnabled, setNormalize, getAudioSinkId, setAudioSinkId } from '../lib/audio.js';
@@ -150,13 +150,20 @@ export default function Settings() {
       try {
         const data = JSON.parse(await input.files[0].text());
         const listOf = (value) => (Array.isArray(value) ? value.filter((x) => x?.id) : []);
-        useLibrary.setState({
-          liked: listOf(data.liked),
-          playlists: listOf(data.playlists).map((p) => ({ ...p, name: String(p.name || '플레이리스트'), tracks: listOf(p.tracks) })),
-          savedAlbums: listOf(data.savedAlbums),
-          followed: listOf(data.followed),
+        useUI.getState().prompt({
+          title: '보관함을 복원할까요?',
+          message: '지금 있는 좋아요, 플레이리스트, 앨범, 팔로우가 백업 내용으로 바뀌고 계정에도 반영됩니다.',
+          submitLabel: '복원',
+          onSubmit: () => {
+            useLibrary.setState({
+              liked: listOf(data.liked),
+              playlists: listOf(data.playlists).map((p) => ({ ...p, name: String(p.name || '플레이리스트'), tracks: listOf(p.tracks) })),
+              savedAlbums: listOf(data.savedAlbums),
+              followed: listOf(data.followed),
+            });
+            toast('보관함을 복원했습니다');
+          },
         });
-        toast('보관함을 복원했습니다');
       } catch {
         toast('파일을 읽을 수 없습니다');
       }
@@ -266,7 +273,7 @@ export default function Settings() {
 
         <section className="set-card" data-enter>
           <h2><Library size={18} /> 보관함</h2>
-          <p className="muted">좋아요와 플레이리스트는 이 기기에만 안전하게 저장돼요. 유튜브 계정과는 연결되지 않습니다.</p>
+          <p className="muted">좋아요와 플레이리스트는 계정에 저장돼서 다른 PC에서도 이어져요. 유튜브 계정과는 연결되지 않습니다.</p>
           <div className="set-stats">
             <div><b>{lib.liked.length}</b><span>좋아요</span></div>
             <div><b>{lib.playlists.length}</b><span>플레이리스트</span></div>

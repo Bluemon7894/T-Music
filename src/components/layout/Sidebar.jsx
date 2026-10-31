@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Home, Search, Library, ArrowDownToLine, Users, UserRoundPlus, Plus, Heart, ListMusic, Trash2, Pencil, Disc3 } from 'lucide-react';
 import { useLibrary } from '../../store/library.js';
+import { canEditPlaylist, confirmDeletePlaylist } from '../../lib/sharedPlaylists.js';
 import { useNav, useRoute } from '../../store/nav.js';
 import { useUI, toast } from '../../store/ui.js';
 import { usePlayer } from '../../store/player.js';
@@ -33,10 +34,13 @@ function NavList() {
   // Slide the highlight pill to the active item with a spring.
   useLayoutEffect(() => {
     const items = list.current?.querySelectorAll('.nav-item');
-    if (!items || active < 0) { if (pill.current) pill.current.style.opacity = 0; return; }
-    const el = items[active];
+    if (!items || active < 0) { if (pill.current) pill.current.style.opacity = 0; return undefined; }
     pill.current.style.opacity = 1;
-    animate(pill.current, { translateY: el.offsetTop, height: el.offsetHeight, ease: ease.bouncy });
+    animate(pill.current, { translateY: items[active].offsetTop, height: items[active].offsetHeight, ease: ease.bouncy });
+    // The items get shorter in a low window, and the pill has to follow.
+    const follow = () => animate(pill.current, { translateY: items[active].offsetTop, height: items[active].offsetHeight, duration: 1 });
+    window.addEventListener('resize', follow);
+    return () => window.removeEventListener('resize', follow);
   }, [active]);
 
   return (
@@ -91,8 +95,8 @@ export default function Sidebar() {
   const newPlaylist = () => go('local', { id: lib.createPlaylist() });
 
   const playlistMenu = (e, p) => openMenu(e, [
-    { label: '이름 바꾸기', icon: Pencil, onClick: () => prompt({ title: '플레이리스트 이름 바꾸기', value: p.name, submitLabel: '저장', onSubmit: (v) => v.trim() && lib.renamePlaylist(p.id, v.trim()) }) },
-    { label: '삭제', icon: Trash2, onClick: () => { lib.deletePlaylist(p.id); if (isActive('local', p.id)) go('home'); toast('플레이리스트를 삭제했습니다'); } },
+    ...(canEditPlaylist(p) ? [{ label: '이름 바꾸기', icon: Pencil, onClick: () => prompt({ title: '플레이리스트 이름 바꾸기', value: p.name, submitLabel: '저장', onSubmit: (v) => v.trim() && lib.renamePlaylist(p.id, v.trim()) }) }] : []),
+    { label: '삭제', icon: Trash2, onClick: () => confirmDeletePlaylist(p, () => { if (isActive('local', p.id)) go('home'); }) },
   ]);
 
   return (
@@ -190,6 +194,7 @@ export default function Sidebar() {
                 art={p.thumb || p.tracks[0]?.thumb ? <Thumb src={p.thumb || p.tracks[0]?.thumb} className="lib-art" /> : <div className="lib-art"><ListMusic size={18} /></div>}
                 isDragOver={dragOverId === p.id}
                 onDragOver={(e) => {
+                  if (!canEditPlaylist(p)) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'copy';
                   if (dragOverId !== p.id) setDragOverId(p.id);

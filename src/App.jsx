@@ -57,6 +57,7 @@ function useShortcuts() {
     };
 
     const onKey = (e) => {
+      if (document.querySelector('.modal-back,.lyrics-picker-backdrop,.update-modal-backdrop')) return;
       const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
       if (typing) return;
       const p = usePlayer.getState();

@@ -17,7 +17,7 @@ import {
 import { auth, rtdb } from '../lib/firebase.js';
 import { api } from '../lib/api.js';
 import { OFFLINE_MESSAGE, waitForConnection, within } from '../lib/online.js';
-import { safeTrack } from '../lib/safeTrack.js';
+import { safePhoto, safeTrack } from '../lib/safeTrack.js';
 import { useNav } from './nav.js';
 import { usePlayer } from './player.js';
 import { useRoom } from './room.js';
@@ -99,7 +99,7 @@ export const useFriends = create((set, get) => {
     const stops = [
       onValue(dbRef('profiles', uid), (snap) => {
         const p = snap.val() || {};
-        patchFriend(uid, { name: p.name || '알 수 없음', photo: p.photo || null });
+        patchFriend(uid, { name: p.name || '알 수 없음', photo: safePhoto(p.photo) });
       }),
       onValue(dbRef('presence', uid), (snap) => {
         const p = snap.val();
@@ -137,7 +137,7 @@ export const useFriends = create((set, get) => {
   };
 
   const onRequests = (snap) => {
-    const requests = Object.entries(snap.val() || {}).map(([uid, r]) => ({ uid, name: r.name || '알 수 없음', photo: r.photo || null })).sort((a, b) => (a.uid < b.uid ? -1 : 1));
+    const requests = Object.entries(snap.val() || {}).map(([uid, r]) => ({ uid, name: r.name || '알 수 없음', photo: safePhoto(r.photo) })).sort((a, b) => (a.uid < b.uid ? -1 : 1));
     for (const r of requests) {
       if (!announced.has(`request:${r.uid}`)) toast(`${r.name}님이 친구 요청을 보냈어요`);
       notify(`request:${r.uid}`, '친구 요청', `${r.name}님이 친구 요청을 보냈어요`, () => useNav.getState().go('friends', {}));
@@ -153,7 +153,7 @@ export const useFriends = create((set, get) => {
         remove(dbRef('invites', myUid(), id)).catch(() => {});
         continue;
       }
-      invites.push({ id, ...invite });
+      invites.push({ id, ...invite, fromPhoto: safePhoto(invite.fromPhoto) });
       notify(`invite:${id}`, '같이 듣기 초대', `${invite.fromName || '친구'}님이 같이 듣자고 해요`, () => useUI.getState().setMini(false));
     }
     set({ invites });
