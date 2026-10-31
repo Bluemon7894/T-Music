@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Radio, X, Maximize2, ListMusic, Sparkles, Mic2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronsUp, Radio, X, Maximize2, ListMusic, Sparkles, Mic2 } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useLibrary } from '../../store/library.js';
@@ -82,14 +82,19 @@ function RoomQueueSection() {
   const queue = useRoom((s) => s.queue);
   const uid = auth.currentUser?.uid;
   const isHost = useRoom((s) => s.meta?.hostUid === uid);
-  const removeFromQueue = useRoom((s) => s.removeFromQueue);
+  const canReorder = useRoom((s) => s.meta?.hostUid === uid || s.meta?.controlMode === 'everyone');
+  const { removeFromQueue, moveInQueue } = useRoom.getState();
   return (
     <>
       <div className="np-section"><span>같이듣기 대기열</span><small>{queue.length}곡</small></div>
       {queue.map((item, i) => {
         const track = safeTrack(item.track);
         if (!track) return null;
-        const extra = isHost || item.by === uid ? [{ divider: true }, { label: '대기열에서 삭제', icon: X, onClick: () => removeFromQueue(item.key) }] : [];
+        const extra = [
+          ...(canReorder && i > 0 ? [{ label: '맨 위로', icon: ChevronsUp, onClick: () => moveInQueue(i, 0) }, { label: '위로', icon: ChevronUp, onClick: () => moveInQueue(i, i - 1) }] : []),
+          ...(canReorder && i < queue.length - 1 ? [{ label: '아래로', icon: ChevronDown, onClick: () => moveInQueue(i, i + 1) }] : []),
+          ...(isHost || item.by === uid ? [{ divider: true }, { label: '대기열에서 삭제', icon: X, onClick: () => removeFromQueue(item.key) }] : []),
+        ];
         return <QueueRow key={item.key} index={i + 1} track={track} menu={trackMenuItems(track, extra)} />;
       })}
       {!queue.length && <p className="np-hint">곡을 우클릭해서 대기열에 추가하면 멤버 모두의 다음 곡이 돼요.</p>}

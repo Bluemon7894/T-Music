@@ -12,6 +12,7 @@ import {
 import { auth, firebaseConfig } from '../lib/firebase.js';
 import { api, errorText } from '../lib/api.js';
 import { deleteCloudData, startLibrarySync, stopLibrarySync } from '../lib/librarySync.js';
+import { waitForConnection, within } from '../lib/online.js';
 import { deleteOwnedShares, startSharedPlaylists, stopSharedPlaylists } from '../lib/sharedPlaylists.js';
 import { useFriends } from './friends.js';
 import { forgetLibrary, libraryData, setLibraryOwner } from './library.js';
@@ -57,6 +58,9 @@ async function googleCredential() {
   const tokens = await api.googleSignIn();
   return tokens && GoogleAuthProvider.credential(tokens.idToken, tokens.accessToken);
 }
+
+const SIGN_OUT_STEP_MS = 6000;
+const DELETE_STEP_MS = 20000;
 
 export const useAccount = create((set, get) => {
   let owner;
@@ -108,7 +112,7 @@ export const useAccount = create((set, get) => {
     await useFriends.getState().deleteEverything();
     stopSharedPlaylists();
     stopLibrarySync();
-    await deleteCloudData(guest.uid).catch(() => {});
+    await within(deleteCloudData(guest.uid), DELETE_STEP_MS).catch(() => {});
     carriedOver = data;
     try {
       await signInWithCredential(auth, credential);
@@ -126,12 +130,11 @@ export const useAccount = create((set, get) => {
   // A guest or a deleted account is gone for good, so it really leaves its room and ends its
   // shares. A Google account signing out stays in its room and comes back to it next time.
   const leaveEverything = async ({ forGood }) => {
-    const room = useRoom.getState();
-    if (forGood) await room.leave();
-    else room.disconnect();
     resetPlayer();
+    const room = useRoom.getState();
+    await within(forGood ? room.leave() : Promise.resolve(room.disconnect()), SIGN_OUT_STEP_MS).catch(() => {});
     await (forGood ? useFriends.getState().deleteEverything() : useFriends.getState().goOffline());
-    if (forGood) await deleteOwnedShares();
+    if (forGood) await within(deleteOwnedShares(), SIGN_OUT_STEP_MS).catch(() => {});
     stopSharedPlaylists();
     stopLibrarySync();
   };
@@ -176,15 +179,19 @@ export const useAccount = create((set, get) => {
     async signOut() {
       const user = auth.currentUser;
       set({ status: 'loading' }); // removing a guest's data takes a few seconds
-      await leaveEverything({ forGood: Boolean(user?.isAnonymous) });
-      if (user?.isAnonymous) {
-        await deleteCloudData(user.uid).catch(() => {});
-        forgetLibrary(user.uid);
-        await deleteUser(user).catch(() => {});
+      try {
+        await leaveEverything({ forGood: Boolean(user?.isAnonymous) });
+        if (user?.isAnonymous) {
+          await within(deleteCloudData(user.uid), SIGN_OUT_STEP_MS).catch(() => {});
+          forgetLibrary(user.uid);
+          await within(deleteUser(user), SIGN_OUT_STEP_MS).catch(() => {});
+        }
+        await firebaseSignOut(auth);
+        set({ error: null });
+      } finally {
+        owner = undefined; // whatever happened, match the services to who is signed in now
+        publish();
       }
-      await firebaseSignOut(auth);
-      set({ error: null });
-      publish();
     },
 
     // Deleting needs a fresh login. Asking first means cancelling can't leave a half-deleted account.
@@ -197,10 +204,16 @@ export const useAccount = create((set, get) => {
         await reauthenticateWithCredential(user, credential);
       }
       set({ status: 'loading' });
-      await leaveEverything({ forGood: true });
-      await deleteCloudData(user.uid);
-      forgetLibrary(user.uid, { everything: !user.isAnonymous });
-      await deleteUser(user);
+      try {
+        // Nothing is removed unless we can actually reach the servers.
+        await waitForConnection();
+        await leaveEverything({ forGood: true });
+        await within(deleteCloudData(user.uid), DELETE_STEP_MS);
+        await within(deleteUser(user), DELETE_STEP_MS);
+        forgetLibrary(user.uid, { everything: !user.isAnonymous });
+      } finally {
+        owner = undefined;
+      }
     }),
   };
 });

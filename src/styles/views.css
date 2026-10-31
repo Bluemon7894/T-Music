@@ -1191,9 +1191,12 @@
 .mini-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-right: 128px; min-height: 36px; }
 .mini-text b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-text small { color: var(--sub); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mini-controls { display: flex; align-items: center; gap: 6px; -webkit-app-region: no-drag; }
-.mini-expand { margin-left: auto; }
-.mini-seek { -webkit-app-region: no-drag; }
+.mini-controls { display: flex; align-items: center; gap: 4px; -webkit-app-region: no-drag; }
+.mini-volume { display: flex; flex: 1; align-items: center; gap: 2px; min-width: 0; margin-left: 6px; }
+.mini-volume .slider.volume { flex: 1; width: auto; min-width: 0; }
+.mini-expand { flex: none; }
+.mini-seek { display: flex; align-items: center; gap: 8px; -webkit-app-region: no-drag; color: var(--sub); font-size: 11px; font-variant-numeric: tabular-nums; }
+.mini-seek .slider { flex: 1; min-width: 0; }
 
 /* friends */
 .friends-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 8px; }
@@ -1232,3 +1235,13 @@
 .invite-actions { display: flex; gap: 8px; width: 100%; }
 .invite-actions .btn-primary { flex: 1; justify-content: center; height: 38px; font-size: 13.5px; }
 .room-grid > .room-card, .friends-top > .room-card { margin: 0 !important; }
+
+/* reordering the shared queue */
+.room-queue li { padding: 4px 6px; border-radius: 10px; border: 1px solid transparent; transition: background 0.15s, border-color 0.15s; }
+.room-queue li[draggable='true'] { cursor: grab; }
+.room-queue li:hover { background: rgba(255, 255, 255, 0.05); }
+.room-queue li.drop-target { border-color: var(--v-400); background: rgba(139, 92, 246, 0.16); }
+.room-queue-grip { flex: none; color: var(--dim); }
+.room-queue-index { flex: none; min-width: 18px; color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; text-align: center; }
+.room-queue-move { display: inline-flex; flex: none; }
+.room-queue ul { max-height: 420px; overflow-y: auto; }

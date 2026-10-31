@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ipcMain, screen, shell, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, screen, session, shell, Tray, Menu, nativeImage } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -45,12 +45,14 @@ function setMiniMode(on) {
     win.setMinimumSize(MINI_SIZE.width, MINI_SIZE.height);
     win.setBounds({ ...MINI_SIZE, x: workArea.x + workArea.width - MINI_SIZE.width - MINI_MARGIN, y: workArea.y + workArea.height - MINI_SIZE.height - MINI_MARGIN });
     win.setResizable(false);
+    win.setMaximizable(false);
     win.setAlwaysOnTop(true, 'floating');
   } else {
     const { bounds, maximized } = sizeBeforeMini;
     sizeBeforeMini = null;
     win.setAlwaysOnTop(false);
     win.setResizable(true);
+    win.setMaximizable(true);
     win.setMinimumSize(...NORMAL_MIN_SIZE);
     win.setBounds(bounds);
     if (maximized) win.maximize();
@@ -303,6 +305,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     isQuitting = true;
+    session.defaultSession.flushStorageData();
   });
 
   // Only an installed copy registers the link type; a dev build would point it at electron.exe.

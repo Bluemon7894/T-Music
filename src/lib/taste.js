@@ -35,8 +35,11 @@ export function tasteProfile(listens, liked, now = Date.now()) {
 
 export const hasTaste = (profile) => profile.tracks.length >= MIN_TRACKS_FOR_TASTE;
 
+// Sorted before shuffling so that small changes in weight don't reshuffle the page while listening.
+const dailyPick = (items, keyOf, salt, count) => dailyOrder([...items].sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : 1)), salt).slice(0, count);
+
 // Favorites to start from today. Rotating through them keeps the mix from repeating.
-export const mixSeeds = (profile) => dailyOrder(profile.tracks.slice(0, SEED_POOL), 'mix').slice(0, SEEDS);
+export const mixSeeds = (profile) => dailyPick(profile.tracks.slice(0, SEED_POOL), (t) => t.id, 'mix', SEEDS);
 
 export function recentlyPlayedIds(listens, now = Date.now()) {
   return new Set(listens.filter((l) => now - l.at < FRESH_DAYS * DAY).map((l) => l.id));
@@ -69,4 +72,4 @@ export function rankMix(relatedLists, profile, exclude) {
   return mix;
 }
 
-export const artistsOfTheDay = (profile, count = 2) => dailyOrder(profile.artists.slice(0, 5), 'artists').slice(0, count);
+export const artistsOfTheDay = (profile, count = 2) => dailyPick(profile.artists.slice(0, 5), (a) => a.name, 'artists', count);

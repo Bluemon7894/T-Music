@@ -202,7 +202,7 @@ export const usePlayer = create((set, get) => ({
   },
 
   playNext(track) {
-    if (room) { room.enqueue([track]); return; }
+    if (room) { room.enqueue([track], { next: true }); return; }
     const { queue, index } = get();
     const cleanTrack = { ...track, isAutoplay: false };
     if (index < 0) return get().playList([cleanTrack]);

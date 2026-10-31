@@ -5,10 +5,12 @@ import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import { URL } from 'url';
+import crypto from 'crypto';
 
 const { app, shell } = electron || {};
 
 const REPO = 'Bluemon7894/T-Music';
+const REQUEST_TIMEOUT_MS = 30000;
 
 let downloadedInstallerPath = null;
 let downloading = false;
@@ -39,7 +41,7 @@ function fetchJson(urlStr) {
       path: u.pathname + u.search,
       headers,
     };
-    https.get(options, (res) => {
+    const req = https.get(options, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         return resolve(fetchJson(res.headers.location));
       }
@@ -56,7 +58,9 @@ function fetchJson(urlStr) {
           reject(e);
         }
       });
-    }).on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => req.destroy(new Error('GitHub 응답이 없습니다')));
   });
 }
 
@@ -83,6 +87,7 @@ export async function checkUpdate() {
       releaseNotes: release.body || '',
       releaseUrl: release.html_url || `https://github.com/${REPO}/releases/latest`,
       downloadUrl: exeAsset?.browser_download_url || null,
+      manifestUrl: release.assets?.find?.((a) => a.name === 'latest.yml')?.browser_download_url || null,
       assetId: exeAsset?.id || null,
       assetName: exeAsset?.name || null,
       assetSize: exeAsset?.size || 0,
@@ -126,7 +131,14 @@ function downloadFileWithRedirect(targetUrl, destPath, onProgress) {
           const total = parseInt(res.headers['content-length'] || '0', 10);
           let received = 0;
           const file = fs.createWriteStream(destPath);
+          const fail = (err) => {
+            file.destroy();
+            fs.unlink(destPath, () => {});
+            reject(err);
+          };
 
+          res.on('aborted', () => fail(new Error('다운로드가 중간에 끊겼습니다')));
+          res.on('error', fail);
           res.on('data', (chunk) => {
             received += chunk.length;
             if (onProgress && total > 0) {
@@ -141,15 +153,17 @@ function downloadFileWithRedirect(targetUrl, destPath, onProgress) {
           res.pipe(file);
 
           file.on('finish', () => {
-            file.close(() => resolve(destPath));
+            file.close(() => {
+              if (total > 0 && received !== total) fail(new Error('다운로드가 중간에 끊겼습니다'));
+              else resolve(destPath);
+            });
           });
 
-          file.on('error', (err) => {
-            fs.unlink(destPath, () => {});
-            reject(err);
-          });
+          file.on('error', fail);
         }
       );
+
+      req.setTimeout(REQUEST_TIMEOUT_MS, () => req.destroy(new Error('다운로드 응답이 없습니다')));
 
       req.on('error', (err) => {
         fs.unlink(destPath, () => {});
@@ -159,6 +173,25 @@ function downloadFileWithRedirect(targetUrl, destPath, onProgress) {
 
     request(targetUrl);
   });
+}
+
+// Refuse to run an installer that isn't the file the release says it published.
+async function verifyInstaller(filePath, manifestUrl) {
+  if (!manifestUrl) return;
+  const manifestPath = `${filePath}.yml`;
+  await downloadFileWithRedirect(manifestUrl, manifestPath);
+  const manifest = await fs.promises.readFile(manifestPath, 'utf8');
+  await fs.promises.unlink(manifestPath).catch(() => {});
+  const expected = /^sha512:\s*(\S+)/m.exec(manifest)?.[1];
+  if (!expected) return;
+  const hash = crypto.createHash('sha512');
+  await new Promise((resolve, reject) => {
+    fs.createReadStream(filePath).on('data', (d) => hash.update(d)).on('end', resolve).on('error', reject);
+  });
+  if (hash.digest('base64') !== expected) {
+    await fs.promises.unlink(filePath).catch(() => {});
+    throw new Error('내려받은 설치 파일이 올바르지 않습니다. 다시 시도해 주세요.');
+  }
 }
 
 export async function downloadUpdate(webContents) {
@@ -195,6 +228,7 @@ export async function downloadUpdate(webContents) {
       try {
         console.log('[updater] Downloading via browser_download_url:', info.downloadUrl);
         await tryDownload(info.downloadUrl);
+        await verifyInstaller(targetPath, info.manifestUrl);
         downloadedInstallerPath = targetPath;
         webContents?.send('update-progress', { status: 'completed', percent: 100, path: targetPath });
         return { success: true, path: targetPath };
@@ -210,6 +244,7 @@ export async function downloadUpdate(webContents) {
       try {
         console.log('[updater] Trying GitHub API asset fallback:', apiAssetUrl);
         await tryDownload(apiAssetUrl);
+        await verifyInstaller(targetPath, info.manifestUrl);
         downloadedInstallerPath = targetPath;
         webContents?.send('update-progress', { status: 'completed', percent: 100, path: targetPath });
         return { success: true, path: targetPath };
@@ -239,7 +274,9 @@ export async function installUpdate() {
   // Launch installer detached and quit current app.
   try {
     if (shell?.openPath) {
-      await shell.openPath(installerPath);
+      // Reports failure by returning a message, not by throwing.
+      const problem = await shell.openPath(installerPath);
+      if (problem) throw new Error(problem);
     } else {
       const child = spawn(installerPath, [], {
         detached: true,

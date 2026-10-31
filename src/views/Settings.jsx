@@ -149,7 +149,13 @@ export default function Settings() {
     input.onchange = async () => {
       try {
         const data = JSON.parse(await input.files[0].text());
-        useLibrary.setState({ liked: data.liked || [], playlists: data.playlists || [], savedAlbums: data.savedAlbums || [], followed: data.followed || [] });
+        const listOf = (value) => (Array.isArray(value) ? value.filter((x) => x?.id) : []);
+        useLibrary.setState({
+          liked: listOf(data.liked),
+          playlists: listOf(data.playlists).map((p) => ({ ...p, name: String(p.name || '플레이리스트'), tracks: listOf(p.tracks) })),
+          savedAlbums: listOf(data.savedAlbums),
+          followed: listOf(data.followed),
+        });
         toast('보관함을 복원했습니다');
       } catch {
         toast('파일을 읽을 수 없습니다');

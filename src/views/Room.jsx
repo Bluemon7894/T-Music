@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Copy, Crown, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Users, Wifi, WifiOff, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Crown, GripVertical, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { Empty, ArtistLinks, Thumb } from '../components/common.jsx';
 import LyricsView from '../components/layout/LyricsView.jsx';
 import { safeTrack } from '../lib/safeTrack.js';
@@ -86,10 +86,12 @@ function InRoom() {
   const attached = useRoom((s) => s.attached);
   const uid = useAccount((s) => s.user?.uid);
   const playerTrackId = usePlayer((s) => s.queue[s.index]?.id);
-  const { leave, follow, pause, setControlMode, makeHost, removeFromQueue } = useRoom.getState();
+  const { leave, follow, pause, setControlMode, makeHost, removeFromQueue, moveInQueue } = useRoom.getState();
+  const [dropAt, setDropAt] = useState(null);
 
   const isHost = meta?.hostUid === uid;
   const everyone = meta?.controlMode === 'everyone';
+  const canReorder = isHost || everyone;
   const list = Object.entries(members).sort((a, b) => Number(Boolean(b[1].listening)) - Number(Boolean(a[1].listening)) || (a[1].joinedAt || 0) - (b[1].joinedAt || 0));
   const listening = list.filter(([, m]) => m.listening).length;
   const hostListening = Boolean(members[meta?.hostUid]?.listening);
@@ -183,13 +185,42 @@ function InRoom() {
         <h3><ListMusic size={16} /> 같이듣기 대기열 <small>{queue.length}곡</small></h3>
         {queue.length ? (
           <ul>
-            {queue.map((item) => (
-              <li key={item.key}>
+            {queue.map((item, i) => (
+              <li
+                key={item.key}
+                className={dropAt === i ? 'drop-target' : ''}
+                draggable={canReorder}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/room-queue', String(i));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes('text/room-queue')) return;
+                  e.preventDefault();
+                  if (dropAt !== i) setDropAt(i);
+                }}
+                onDragLeave={() => setDropAt(null)}
+                onDragEnd={() => setDropAt(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDropAt(null);
+                  const from = parseInt(e.dataTransfer.getData('text/room-queue'), 10);
+                  if (Number.isInteger(from)) moveInQueue(from, i);
+                }}
+              >
+                {canReorder && <GripVertical size={15} className="room-queue-grip" />}
+                <span className="room-queue-index">{i + 1}</span>
                 <Thumb src={item.track?.thumb} />
                 <span className="room-queue-text">
                   <b title={item.track?.title}>{item.track?.title}</b>
                   <small>{item.byName}님이 추가</small>
                 </span>
+                {canReorder && (
+                  <span className="room-queue-move">
+                    <button className="icon-btn" disabled={i === 0} onClick={() => moveInQueue(i, i - 1)} aria-label="위로"><ChevronUp size={15} /></button>
+                    <button className="icon-btn" disabled={i === queue.length - 1} onClick={() => moveInQueue(i, i + 1)} aria-label="아래로"><ChevronDown size={15} /></button>
+                  </span>
+                )}
                 {(isHost || item.by === uid) && (
                   <button className="icon-btn" onClick={() => removeFromQueue(item.key)} aria-label="대기열에서 삭제"><X size={15} /></button>
                 )}

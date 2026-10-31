@@ -17,6 +17,7 @@ import {
 } from 'firebase/database';
 import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, rtdb } from '../lib/firebase.js';
+import { OFFLINE_MESSAGE, waitForConnection } from '../lib/online.js';
 import { safeTrack } from '../lib/safeTrack.js';
 import { bindRoom, roomPlayer, usePlayer } from './player.js';
 import { toast } from './ui.js';
@@ -26,6 +27,7 @@ const CODE_LENGTH = 6;
 const MAX_MEMBERS = 20;
 const START_LEAD_MS = 1500; // everyone gets this long to buffer before a new track starts
 const SYNC_TICK_MS = 1000;
+const MAX_ADD_AT_ONCE = 200;
 const HOST_GRACE_MS = 30000;
 const IGNORE_DRIFT = 0.05;
 const NUDGE_DRIFT = 0.15;
@@ -215,14 +217,24 @@ export const useRoom = create((set, get) => {
       set({ queue: queue.slice(1) });
       return safeTrack(first.track);
     },
-    enqueue(tracks) {
-      const code = get().code;
+    // Written together so a long album arrives in one piece and in order.
+    enqueue(tracks, { next = false } = {}) {
+      const { code, queue } = get();
       const { name } = myProfile();
-      for (const track of tracks) {
-        const safe = safeTrack(track);
-        if (safe) dbSet(push(dbRef(code, 'queue')), { track: safe, by: myUid(), byName: name }).catch(() => toast('대기열에 추가하지 못했습니다'));
-      }
-      toast(tracks.length > 1 ? `같이듣기 대기열에 ${tracks.length}곡을 추가했습니다` : '같이듣기 대기열에 추가했습니다');
+      const safe = tracks.map(safeTrack).filter(Boolean);
+      const list = safe.slice(0, MAX_ADD_AT_ONCE);
+      if (!list.length) return;
+      const first = next
+        ? Math.min(Date.now(), ...queue.map((q) => q.order).filter(Number.isFinite)) - list.length
+        : Date.now();
+      const items = {};
+      list.forEach((track, i) => {
+        items[push(dbRef(code, 'queue')).key] = { track, by: myUid(), byName: name, order: first + i };
+      });
+      update(dbRef(code, 'queue'), items).catch(() => toast('대기열에 추가하지 못했습니다'));
+      if (safe.length > list.length) toast(`한 번에 ${MAX_ADD_AT_ONCE}곡까지 추가할 수 있어요. 앞의 ${MAX_ADD_AT_ONCE}곡만 넣었습니다.`);
+      else if (next) toast('같이듣기 대기열 맨 앞에 추가했습니다');
+      else toast(list.length > 1 ? `같이듣기 대기열에 ${list.length}곡을 추가했습니다` : '같이듣기 대기열에 추가했습니다');
     },
   };
 
@@ -296,7 +308,13 @@ export const useRoom = create((set, get) => {
         if (playback && get().attached) applyPlayback(playback);
       }),
       onValue(dbRef(code, 'queue'), (snap) => {
-        set({ queue: Object.entries(snap.val() || {}).sort(([a], [b]) => (a < b ? -1 : 1)).map(([key, item]) => ({ key, ...item })) });
+        // Items from older versions have no order and go after the rest, oldest first.
+        const orderOf = (item) => (Number.isFinite(item.order) ? item.order : Infinity);
+        const sorted = Object.entries(snap.val() || {}).sort(([a, x], [b, y]) => {
+          const diff = orderOf(x) - orderOf(y);
+          return Number.isNaN(diff) || diff === 0 ? (a < b ? -1 : 1) : diff;
+        });
+        set({ queue: sorted.map(([key, item]) => ({ key, ...item })) });
       }),
     ];
   };
@@ -305,7 +323,17 @@ export const useRoom = create((set, get) => {
     const code = get().code;
     if (!code || get().attached) return;
     // Decide from the room as it is now: its listeners may not have delivered anything yet.
-    const [freshMeta, freshMembers, freshPlayback] = await Promise.all(['meta', 'members', 'playback'].map((part) => dbGet(dbRef(code, part))));
+    let freshMeta;
+    let freshMembers;
+    let freshPlayback;
+    try {
+      await waitForConnection();
+      [freshMeta, freshMembers, freshPlayback] = await Promise.all(['meta', 'members', 'playback'].map((part) => dbGet(dbRef(code, part))));
+    } catch (e) {
+      console.warn('[room]', e);
+      toast('같이 듣기에 합류하지 못했습니다. 인터넷 연결을 확인해 주세요.');
+      return;
+    }
     if (get().code !== code || get().attached) return;
     set({ meta: freshMeta.val(), members: freshMembers.val() || {}, playback: freshPlayback.val(), attached: true });
     bindRoom(hooks);
@@ -341,6 +369,7 @@ export const useRoom = create((set, get) => {
       if (get().code || !myUid()) return;
       set({ busy: true, error: null });
       try {
+        await waitForConnection();
         const uid = myUid();
         for (let attempt = 0; attempt < 5; attempt++) {
           const code = randomCode();
@@ -361,7 +390,7 @@ export const useRoom = create((set, get) => {
         throw new Error('no free code');
       } catch (e) {
         console.warn('[room]', e);
-        set({ error: '방을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.' });
+        set({ error: e.message === OFFLINE_MESSAGE ? OFFLINE_MESSAGE : '방을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.' });
       } finally {
         set({ busy: false });
       }
@@ -380,6 +409,7 @@ export const useRoom = create((set, get) => {
       }
       set({ busy: true, error: null });
       try {
+        await waitForConnection();
         const snap = await dbGet(dbRef(code));
         const room = snap.val();
         if (!room?.meta) {
@@ -398,14 +428,11 @@ export const useRoom = create((set, get) => {
         }
         await get().leave();
         watchRoom(code);
-        await new Promise((resolve) => {
-          const stop = onValue(dbRef(code, 'meta'), () => { stop(); resolve(); });
-        });
         rememberRoom(code);
         await follow();
       } catch (e) {
         console.warn('[room]', e);
-        set({ error: '방에 들어가지 못했습니다. 인터넷 연결을 확인해 주세요.' });
+        set({ error: OFFLINE_MESSAGE });
       } finally {
         set({ busy: false });
       }
@@ -482,6 +509,18 @@ export const useRoom = create((set, get) => {
     },
     makeHost(uid) {
       if (isHost()) update(dbRef(get().code, 'meta'), { hostUid: uid, ownerUid: uid }).catch(() => toast('변경하지 못했습니다'));
+    },
+    moveInQueue(from, to) {
+      const { code, queue } = get();
+      if (!canControl()) { refuse(); return; }
+      if (from === to || from < 0 || to < 0 || from >= queue.length || to >= queue.length) return;
+      const next = queue.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      set({ queue: next });
+      const orders = {};
+      next.forEach((item, i) => { orders[`${item.key}/order`] = i; });
+      update(dbRef(code, 'queue'), orders).catch(() => toast('순서를 바꾸지 못했습니다'));
     },
     removeFromQueue(key) {
       remove(dbRef(get().code, 'queue', key)).catch(() => toast('삭제하지 못했습니다'));

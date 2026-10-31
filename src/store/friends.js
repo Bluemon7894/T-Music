@@ -16,6 +16,7 @@ import {
 } from 'firebase/database';
 import { auth, rtdb } from '../lib/firebase.js';
 import { api } from '../lib/api.js';
+import { OFFLINE_MESSAGE, waitForConnection, within } from '../lib/online.js';
 import { safeTrack } from '../lib/safeTrack.js';
 import { useNav } from './nav.js';
 import { usePlayer } from './player.js';
@@ -27,6 +28,7 @@ const CODE_LENGTH = 8;
 const INVITE_LIFETIME_MS = 6 * 60 * 60 * 1000;
 const PRESENCE_DELAY_MS = 800;
 const DEFAULT_SHARING = { online: true, track: true };
+const OFFLINE_CLEANUP_MS = 4000;
 
 const dbRef = (...parts) => ref(rtdb, parts.join('/'));
 const myUid = () => auth.currentUser?.uid ?? null;
@@ -219,8 +221,8 @@ export const useFriends = create((set, get) => {
       get().stop();
       if (!uid) return;
       const presence = dbRef('presence', uid);
-      await onDisconnect(presence).cancel().catch(() => {});
-      await remove(presence).catch(() => {});
+      await within(onDisconnect(presence).cancel(), OFFLINE_CLEANUP_MS).catch(() => {});
+      await within(remove(presence), OFFLINE_CLEANUP_MS).catch(() => {});
     },
 
     // A guest connecting Google gets a real name and photo without changing accounts.
@@ -244,6 +246,7 @@ export const useFriends = create((set, get) => {
       if (code.length !== CODE_LENGTH) return `친구 코드는 ${CODE_LENGTH}자리입니다.`;
       if (code === get().friendCode) return '내 코드는 추가할 수 없어요.';
       try {
+        await waitForConnection();
         const target = (await dbGet(dbRef('friendCodes', code))).val();
         if (!target) return '이 코드의 사용자를 찾을 수 없어요.';
         if (get().friends[target]) return '이미 친구예요.';
@@ -256,13 +259,14 @@ export const useFriends = create((set, get) => {
         return null;
       } catch (e) {
         console.warn('[friends]', e);
-        return '친구 요청을 보내지 못했습니다. 인터넷 연결을 확인해 주세요.';
+        return OFFLINE_MESSAGE;
       }
     },
 
     async acceptRequest(uid) {
       const me = myUid();
       const since = Date.now();
+      await waitForConnection();
       await update(ref(rtdb), {
         [`friends/${me}/${uid}`]: { since },
         [`friends/${uid}/${me}`]: { since },
@@ -291,6 +295,7 @@ export const useFriends = create((set, get) => {
         return;
       }
       try {
+        await waitForConnection();
         const { name, photo } = myProfile();
         await dbSet(push(dbRef('invites', uid)), { from: myUid(), fromName: name, ...(photo ? { fromPhoto: photo } : {}), code, roomName: String(meta?.name || '').slice(0, 40), at: serverTimestamp() });
         toast(`${get().friends[uid]?.name || '친구'}님을 초대했어요`);
@@ -318,7 +323,7 @@ export const useFriends = create((set, get) => {
       const uid = myUid();
       if (!uid) return;
       const { friends, friendCode } = get();
-      const code = friendCode || (await dbGet(dbRef('profiles', uid, 'friendCode')).catch(() => null))?.val();
+      const code = friendCode || (await within(dbGet(dbRef('profiles', uid, 'friendCode')), OFFLINE_CLEANUP_MS).catch(() => null))?.val();
       const friendIds = Object.keys(friends);
       await get().goOffline();
       const changes = {
@@ -332,7 +337,7 @@ export const useFriends = create((set, get) => {
         changes[`friends/${uid}/${friend}`] = null;
         changes[`friends/${friend}/${uid}`] = null;
       }
-      await update(ref(rtdb), changes).catch((e) => console.warn('[friends]', e));
+      await within(update(ref(rtdb), changes), OFFLINE_CLEANUP_MS).catch((e) => console.warn('[friends]', e));
     },
   };
 });

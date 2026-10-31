@@ -1,4 +1,5 @@
 // Album, YouTube playlist, liked songs and local playlist pages share one layout.
+import { ListEnd } from 'lucide-react';
 import SharePanel from '../components/SharePanel.jsx';
 import { auth } from '../lib/firebase.js';
 import { canEditPlaylist } from '../lib/sharedPlaylists.js';
@@ -55,6 +56,7 @@ function ActionBar({ tracks, context, children }) {
       <PlayButton size={58} playing={isThis && playing} onClick={playAll} />
       <button className="icon-btn big" title="셔플 재생" onClick={shuffleAll}><Shuffle size={24} /></button>
       {tracks[0] && <button className="icon-btn big" title="비슷한 곡 라디오" onClick={() => startRadio(tracks[0])}><Radio size={24} /></button>}
+      {tracks.length > 0 && <button className="icon-btn big" title="전체를 대기열에 추가" onClick={() => usePlayer.getState().addToQueue(tracks)}><ListEnd size={24} /></button>}
       <DownloadAllButton tracks={tracks} />
       {children}
     </div>

@@ -81,6 +81,7 @@ function createSession(uid) {
     const before = new Map(prev.map((x) => [x.id, x]));
     const ops = [];
     next.forEach((item, i) => {
+      if (!item?.id) return; // a hand-edited backup can hold anything
       const old = before.get(item.id);
       before.delete(item.id);
       if (old !== item && JSON.stringify(old) !== JSON.stringify(item) && fitsInDoc(item)) ops.push(setOp(name, item, i));
@@ -133,15 +134,20 @@ function createSession(uid) {
   // The first answer from the server is merged with what's on this computer, so nothing made
   // before signing in is lost. After that the remote copy simply wins.
   const watchKeyed = (name, sort) => onSnapshot(col(name), { includeMetadataChanges: true }, (snap) => {
-    if (!merged && snap.metadata.fromCache) return;
     const remote = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    if (!merged && snap.metadata.fromCache) {
+      const known = new Set(useLibrary.getState()[name].map((x) => x?.id));
+      const missing = remote.filter((x) => !known.has(x.id));
+      if (missing.length) applyLocal({ [name]: [...useLibrary.getState()[name], ...missing].sort(sort) });
+      return;
+    }
     if (merged) {
       const sorted = remote.sort(sort);
       if (JSON.stringify(sorted) !== JSON.stringify(useLibrary.getState()[name])) applyLocal({ [name]: sorted });
       return;
     }
     const ids = new Set(remote.map((x) => x.id));
-    const localOnly = useLibrary.getState()[name].filter((x) => !ids.has(x.id) && fitsInDoc(x));
+    const localOnly = useLibrary.getState()[name].filter((x) => x?.id && !ids.has(x.id) && fitsInDoc(x));
     applyLocal({ [name]: [...remote, ...localOnly].sort(sort) });
     commit(localOnly.map((item, i) => setOp(name, item, i)));
     markMerged(name);
