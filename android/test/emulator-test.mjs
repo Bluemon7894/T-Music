@@ -179,6 +179,19 @@ async function main() {
   const box = await js(`(() => { const r = document.querySelector('.m-tabs')?.getBoundingClientRect(); return { tabsHeight: r?.height, height: innerHeight, open: document.documentElement.classList.contains('kb-open') }; })()`);
   note(`with keyboard: ${JSON.stringify(box)}`);
   check('the tab bar steps aside for the keyboard', box.open && !box.tabsHeight, JSON.stringify(box));
+
+  // Long-pressing text opens the system's text menu, the same one that offers paste.
+  const pid = shell('pidof', PACKAGE).trim();
+  await js(`(() => { const i = document.querySelector('.searchbox input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i, 'textmenu'); i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  await sleep(500);
+  const field = await rectOf('.searchbox input');
+  shell('input', 'swipe', String(field.x), String(field.y), String(field.x), String(field.y), '900');
+  await sleep(2000);
+  shot('04b-text-menu');
+  check('long-pressing text does not crash the app', shell('pidof', PACKAGE).trim() === pid);
+  note(`selected after long press: ${await js(`(() => { const i = document.querySelector('.searchbox input'); return i.selectionEnd - i.selectionStart; })()`)}`);
+  shell('input', 'keyevent', 'KEYCODE_BACK');
+  await sleep(600);
   await js(`(() => { const i = document.querySelector('.searchbox input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i, '아이유 라일락'); i.dispatchEvent(new Event('input',{bubbles:true})); i.closest('form').requestSubmit(); i.blur(); })()`);
   await waitFor(() => has('.search-songs .tl-row'), 30000);
   await sleep(1200);
