@@ -1,7 +1,7 @@
 // Runs the debug APK on a real Android system and checks what only a real system can show: taps,
 // playback through the WebView, playing on in the background, the notification, the back button and
 // links. Run with an emulator or phone attached; results and screenshots land in android/test/out.
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -101,6 +101,15 @@ async function tapText(selector, text) {
 const session = () => shell('dumpsys', 'media_session');
 const sessionState = () => /state=PlaybackState \{state=(\w+)/.exec(session())?.[1] ?? /state=(\d)/.exec(session())?.[1];
 
+// Written as it happens, so it survives the emulator itself crashing.
+function keepLog() {
+  const file = fs.createWriteStream(path.join(OUT, 'logcat.txt'));
+  const child = spawn('adb', ['logcat', '-v', 'time']);
+  child.stdout.pipe(file);
+  child.stderr.pipe(file);
+  return child;
+}
+
 async function main() {
   console.log('device', shell('getprop', 'ro.build.version.release').trim(), 'API', shell('getprop', 'ro.build.version.sdk').trim(), '| WebView', /versionName=(\S+)/.exec(shell('dumpsys', 'package', 'com.google.android.webview'))?.[1] ?? 'unknown');
 
@@ -149,7 +158,6 @@ async function main() {
   const box = await js(`(() => { const r = document.querySelector('.m-tabs')?.getBoundingClientRect(); return { tabsBottom: r?.bottom, height: innerHeight }; })()`);
   note(`with keyboard: ${JSON.stringify(box)}`);
   await js(`(() => { const i = document.querySelector('.searchbox input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i, '아이유 라일락'); i.dispatchEvent(new Event('input',{bubbles:true})); i.closest('form').requestSubmit(); i.blur(); })()`);
-  shell('input', 'keyevent', 'KEYCODE_ESCAPE');
   await waitFor(() => has('.search-songs .tl-row'), 30000);
   await sleep(1200);
   shot('05-results');
@@ -293,14 +301,14 @@ async function main() {
   shot('12-after-restart');
 }
 
+const logcat = keepLog();
 try {
   await main();
 } catch (e) {
   check('test run finished', false, e.stack);
+  note(`device state: ${spawnSync('adb', ['get-state'], { encoding: 'utf8' }).stdout || 'gone'}`);
 }
-try {
-  fs.writeFileSync(path.join(OUT, 'logcat.txt'), adb('logcat', '-d', '-t', '4000'));
-} catch { /* best effort */ }
+logcat.kill();
 fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 1));
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length} passed, ${failed.length} failed`);

@@ -31,11 +31,15 @@
 
 코드 서명 인증서가 없어서 처음 실행할 때 Windows SmartScreen 경고가 뜰 수 있습니다. **추가 정보 → 실행**을 누르면 됩니다.
 
+Android는 `android-v`로 시작하는 릴리즈에서 `T-Music-Android-x.y.z.apk`를 받아 설치하세요. Android 8.0 이상이 필요하고, 처음 설치할 때 출처를 알 수 없는 앱 허용을 물어봅니다.
+
 ## 재생 방식
 
 `<audio src="ytm://stream/VIDEO_ID">` 요청을 Electron 메인 프로세스가 받아 처리합니다. 다운로드한 곡은 디스크에서 바로 보내고, 그 밖의 곡은 실제 음원 주소로 바꿔 1MB씩 나눠 받아 중계합니다. 유튜브는 한 번에 길게 받는 요청의 속도를 제한하기 때문입니다. YouTube 플레이어를 쓰지 않으므로 광고가 끼어들 곳이 없습니다.
 
 음원 주소는 InnerTube의 visionOS 클라이언트로 얻습니다. 주소가 만료되면 새로 받아 이어서 재생합니다. 실패하면 iOS와 Android VR 클라이언트를 시도하지만, 이 둘은 현재 파일 앞부분만 내주기 때문에 검사에서 걸러집니다.
+
+Android에서는 같은 코드를 WebView에서 실행하고, `/stream/VIDEO_ID` 요청을 Java 쪽이 받아 중계합니다. 다른 앱이 접근할 수 있는 포트는 열지 않습니다.
 
 ## 계정과 같이 듣기
 
@@ -63,11 +67,21 @@ Firebase를 씁니다. 계정 데이터는 Firestore, 같이 듣기 방은 Realt
 npm install
 npm run dev      # 개발 모드 (Vite + Electron)
 npm run dist     # Windows 설치 파일 생성 → release/
+npm run android  # Android APK 생성 → release/ (Android SDK와 JDK 필요, Gradle은 쓰지 않음)
+```
+
+Android 릴리즈 서명 키는 처음 빌드할 때 `android/release.keystore`로 만들어지고 암호는 `android/keystore.properties`에 저장됩니다. 둘 다 저장소에 올리지 않습니다. 잃어버리면 이미 설치된 앱을 업데이트할 수 없으니 따로 백업해 두세요.
+
+Android 릴리즈는 `android-vX.Y.Z` 태그에 `--latest=false`로 올립니다. Windows 앱은 저장소의 최신 릴리즈를 보고 업데이트하기 때문에, 최신으로 표시되면 Windows 앱 업데이트가 깨집니다.
+
+```bash
+gh release create android-vX.Y.Z release/T-Music-Android-X.Y.Z.apk --latest=false --target main
 ```
 
 ## 구조
 
 ```
+android/                Android 앱 (WebView, 스트림 중계, 재생 알림, 다운로드, 업데이트)
 build/                  설치 프로그램 리소스 (아이콘, 설치 화면 이미지, NSIS 확장)
 electron/
   main.js               창, IPC
@@ -91,7 +105,9 @@ electron/
 src/
   assets/               로고
   components/           공용 컴포넌트 (트랙 목록, 카드, 커버플로우, 비주얼라이저 등)
+  android/              Android에서 Electron 메인 프로세스 역할을 하는 코드
   components/layout/    사이드바, 상단바, 플레이어 독, 지금 재생 패널, 가사, 턴테이블, 전체 화면 무대
+  components/mobile/    Android 화면 (하단 탭, 미니 플레이어, 전체 화면 플레이어, 바텀시트)
   views/                페이지 (홈, 검색, 아티스트, 앨범·플레이리스트, 보관함, 다운로드, 설정)
   store/                상태 (재생, 보관함, 계정, 같이 듣기, 다운로드, 화면, 내비게이션)
   lib/                  API, Firebase, 보관함 동기화, 모션(anime.js), Web Audio, 유틸

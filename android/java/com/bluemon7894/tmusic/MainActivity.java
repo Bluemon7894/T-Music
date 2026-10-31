@@ -35,6 +35,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         WebView.setWebContentsDebuggingEnabled((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+        setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
 
         Window window = getWindow();
         if (Build.VERSION.SDK_INT >= 30) {
