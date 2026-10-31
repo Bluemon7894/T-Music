@@ -3,7 +3,11 @@ import { useLayoutEffect, useEffect } from 'react';
 import { animate, stagger, spring, createAnimatable, createTimeline, utils } from 'animejs';
 import { IS_ANDROID } from './platform.js';
 
-export const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const systemReduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+export let reduced = systemReduced;
+export function setCalmMotion(on) {
+  reduced = systemReduced || on;
+}
 
 export const ease = {
   soft: spring({ bounce: 0.18, duration: 520 }),

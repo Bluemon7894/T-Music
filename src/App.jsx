@@ -1,7 +1,7 @@
 import { Component, useEffect, useRef } from 'react';
 import { api } from './lib/api.js';
 import { useRoute, useNav } from './store/nav.js';
-import { usePlayer } from './store/player.js';
+import { resumeOnLaunch, usePlayer } from './store/player.js';
 import { toast, useUI } from './store/ui.js';
 import { openSharedPlaylist } from './lib/sharedPlaylists.js';
 import { initDownloads } from './store/downloads.js';
@@ -289,6 +289,9 @@ class CrashScreen extends Component {
 function Root() {
   const status = useAccount((s) => s.status);
   const offline = useAccount((s) => s.offline);
+  useEffect(() => {
+    if (status === 'signedIn' || offline) resumeOnLaunch();
+  }, [status, offline]);
   if (status === 'loading') return <Splash />;
   if (status === 'signedOut' && !offline) return <Login />;
   return <MainApp />;

@@ -3,6 +3,7 @@ import { api, streamUrl } from '../lib/api.js';
 import { attach, setMusicFade, startAudioOnsetDetection } from '../lib/audio.js';
 import { cancelSound, commitEnd, endLead, hasStarted, isEndCommitted, isEnding, isStarting, isWaitingForMusic, playEndSound, playStartSound, setDeckLevel, setStarted, startLength, useDeck } from './deck.js';
 import { useLibrary } from './library.js';
+import { usePrefs } from './prefs.js';
 import { toast } from './ui.js';
 import { IS_ANDROID } from '../lib/platform.js';
 import { tr } from '../lib/i18n.js';
@@ -138,13 +139,13 @@ function playWithDeck() {
   });
 }
 
-// In a room the track runs on the room's clock. A track about to start is held long enough for the sound;
-// one already under way can't wait, so it stays silent until the sound is over.
+// In a room the track runs on the room's clock. The sound only plays when the room is holding the track
+// for it: music already under way can't wait, and it would be silly to talk over it.
 function firstPlayInRoom(secondsUntilMusic) {
   if (hasStarted()) return;
   setStarted(true);
-  if (!soundsOn()) return;
-  playStartSound(riseMusic, Math.max(0, secondsUntilMusic - startLength()));
+  if (!soundsOn() || secondsUntilMusic < startLength()) return;
+  playStartSound(riseMusic, secondsUntilMusic - startLength());
 }
 
 // Nothing plays after this track unless something changes before it ends.
@@ -470,7 +471,9 @@ export const usePlayer = create((set, get) => ({
       room?.onStopped();
       queueFinished();
       active().pause();
-      set({ playing: false, loading: false });
+      active().currentTime = 0;
+      set({ playing: false, loading: false, time: 0 });
+      savePlayerState({ time: 0, wasPlaying: false });
       toast(tr('추천곡을 불러올 수 없습니다 (네트워크 확인)'));
     }
   },
@@ -819,6 +822,16 @@ export const roomPlayer = {
   time: () => active().currentTime || 0,
   isPaused: () => active().paused,
 };
+
+// Once per launch, when the app is ready to be used and the settings ask for it.
+let launchResumeChecked = false;
+export function resumeOnLaunch() {
+  if (launchResumeChecked) return;
+  launchResumeChecked = true;
+  if (!usePrefs.getState().resumeOnLaunch || room) return;
+  const player = usePlayer.getState();
+  if (player.current() && !player.playing) playWithDeck();
+}
 
 // Signing out: what was playing belonged to that account.
 export function resetPlayer() {

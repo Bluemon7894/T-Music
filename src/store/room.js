@@ -30,6 +30,7 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 6;
 const MAX_MEMBERS = 20;
 const START_LEAD_MS = 1500; // everyone gets this long to buffer before a new track starts
+const AT_THE_TOP_S = 0.5;
 const SOUND_LEAD_MS = 5500; // and long enough for the deck's start sound to finish first
 const MARK_ENDING_S = 6; // ahead of the end of the last track, members are told nothing follows it
 const MAX_SHARED_LYRICS = 200000;
@@ -263,11 +264,14 @@ export const useRoom = create((set, get) => {
       pausedAlone = false;
       const pb = get().playback;
       const track = usePlayer.getState().current();
+      const time = roomPlayer.time();
+      // From the very top after a finish, everyone gets the start sound before the music.
+      const from = hooks.soundsOn() && time < AT_THE_TOP_S && (!pb || pb.ending) ? -SOUND_LEAD_MS : time * 1000;
       if (!pb) {
-        if (track) publish({ track, positionMs: roomPlayer.time() * 1000, playing: true });
+        if (track) publish({ track, positionMs: from, playing: true });
         return;
       }
-      publish({ playing: !pb.playing, positionMs: roomPlayer.time() * 1000 });
+      publish(pb.playing ? { playing: false, positionMs: time * 1000 } : { playing: true, positionMs: from });
     },
     seek(t) {
       if (!canControl()) { refuse(); return; }
@@ -275,11 +279,12 @@ export const useRoom = create((set, get) => {
     },
     onLoad(track) {
       pausedAlone = false;
-      const firstSound = hooks.soundsOn() && !get().playback?.playing;
+      const pb = get().playback;
+      const firstSound = hooks.soundsOn() && (!pb || pb.ending);
       publish({ track, positionMs: -(firstSound ? SOUND_LEAD_MS : START_LEAD_MS), playing: true });
     },
     onStopped() {
-      publish({ playing: false, positionMs: roomPlayer.time() * 1000, ending: true });
+      publish({ playing: false, positionMs: 0, ending: true });
     },
     takeQueued() {
       const { code, queue, modes } = get();
