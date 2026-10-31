@@ -44,13 +44,21 @@ let socket = null;
 let nextId = 1;
 const replies = new Map();
 
-async function connect() {
+// The debugging socket shows up a little after the process does.
+async function findPage() {
   const pid = shell('pidof', PACKAGE).trim();
   if (!pid) throw new Error('app is not running');
   adb('forward', `tcp:${CDP_PORT}`, `localabstract:webview_devtools_remote_${pid}`);
   const pages = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json`)).json();
   const page = pages.find((p) => p.url.includes('appassets'));
   if (!page) throw new Error('page not found');
+  return page;
+}
+
+async function connect() {
+  let page = null;
+  await waitFor(async () => { page = await findPage(); return true; }, 40000, 1000);
+  if (!page) page = await findPage();
   socket = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
   socket.onmessage = (m) => {
