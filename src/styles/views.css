@@ -161,8 +161,12 @@
 @container main (max-width: 980px) { .artist-grid { grid-template-columns: 1fr; } }
 .artist-grid section { margin-top: 12px; }
 .about-card { position: relative; border-radius: var(--r-lg); overflow: hidden; background-size: cover; background-position: center; min-height: 260px; display: flex; align-items: flex-end; border: 1px solid var(--line); }
+.about-body { position: relative; min-width: 0; padding: 20px; }
+.about-more { margin: 8px 0 -6px -10px; color: var(--v-200); }
 .about-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(14, 9, 26, 0.3), rgba(14, 9, 26, 0.95)); }
-.about-card p { position: relative; padding: 20px; color: var(--v-50); font-size: 13px; line-height: 1.7; display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+.about-card:has(p.open) .about-shade { background: rgba(14, 9, 26, 0.82); }
+.about-card p.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.about-card p { position: relative; color: var(--v-50); font-size: 13px; line-height: 1.7; display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
 
 /* ---------- library ---------- */
 .liked-banner { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 28px; border-radius: var(--r-lg); background: linear-gradient(120deg, #4c1d95, #7c3aed 45%, #c026d3); overflow: hidden; cursor: pointer; margin-bottom: 22px; box-shadow: 0 24px 50px -24px rgba(192, 38, 211, 0.8); transition: transform 0.4s var(--spring); }

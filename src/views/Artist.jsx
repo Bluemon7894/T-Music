@@ -1,4 +1,4 @@
-import { useRef, useState, useLayoutEffect } from 'react';
+import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { BadgeCheck, Radio, Shuffle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { usePlayer } from '../store/player.js';
@@ -11,6 +11,30 @@ import { Shelf } from '../components/Cards.jsx';
 import { colorFor } from '../lib/util.js';
 import { useEnter, animate } from '../lib/motion.js';
 import { tr } from '../lib/i18n.js';
+
+// Long enough to get cut off, it offers the rest. Short text just shows.
+function AboutText({ text }) {
+  const [open, setOpen] = useState(false);
+  const [cut, setCut] = useState(false);
+  const box = useRef(null);
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el || open) return undefined;
+    const measure = () => setCut(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    const seen = new ResizeObserver(measure);
+    seen.observe(el);
+    return () => seen.disconnect();
+  }, [text, open]);
+
+  return (
+    <div className="about-body">
+      <p ref={box} className={open ? 'open' : ''}>{text}</p>
+      {(cut || open) && <button className="text-btn about-more" onClick={() => setOpen(!open)}>{open ? tr('간단히 보기') : tr('더 보기')}</button>}
+    </div>
+  );
+}
 
 export default function Artist({ id }) {
   const res = useAsync(() => api.artist(id), [id]);
@@ -69,7 +93,7 @@ export default function Artist({ id }) {
               <h2>{tr('소개')}</h2>
               <div className="about-card" style={{ backgroundImage: a.thumb ? `url("${a.thumb}")` : undefined }}>
                 <div className="about-shade" />
-                <p>{a.description}</p>
+                <AboutText text={a.description} />
               </div>
             </section>
           )}

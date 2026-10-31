@@ -316,7 +316,8 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .listeners { font-size: 12.5px; }
 .artist-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .about-card { min-height: 180px; border-radius: 16px; }
-.about-card p { padding: 14px; font-size: 12.5px; }
+.about-body { padding: 14px; }
+.about-card p { font-size: 12.5px; }
 
 /* ---------- library ---------- */
 .liked-banner { padding: 16px; margin-bottom: 14px; gap: 12px; border-radius: 18px; }
