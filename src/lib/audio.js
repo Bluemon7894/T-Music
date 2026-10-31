@@ -1,5 +1,6 @@
 // Web Audio graph for the visualizers and dynamic volume normalization.
 // Each <audio> element is routed through one shared fade, analyser and compressor.
+import { IS_ANDROID } from './platform.js';
 
 let ctx = null;
 let analyser = null;
@@ -27,7 +28,9 @@ let currentSinkId = (() => {
 function setupGraph() {
   if (ctx) return;
   try {
-    ctx = new AudioContext();
+    // Phones can send low-latency audio past their own sound processing, which leaves music thin and dull.
+    // Nothing here needs low latency, and the lyrics already allow for however late the sound is.
+    ctx = new AudioContext(IS_ANDROID ? { latencyHint: 'playback' } : undefined);
     analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
     analyser.smoothingTimeConstant = 0.8;
