@@ -14,6 +14,12 @@ export default function SharePanel({ playlist }) {
   const copy = async (id) => {
     await api.copyText(shareLink(id));
     toast('공유 링크를 복사했습니다');
+  };
+
+  // Sharing for the first time: on a phone the link goes straight to the share sheet as well.
+  const startSharing = async () => {
+    const id = await sharePlaylist(playlist.id);
+    await copy(id);
     if (IS_ANDROID) api.shareText(shareLink(id));
   };
 
@@ -34,7 +40,7 @@ export default function SharePanel({ playlist }) {
   if (!share) {
     return (
       <div className="share-panel">
-        <button className="btn" disabled={busy} onClick={() => run(async () => copy(await sharePlaylist(playlist.id)), '공유하지 못했습니다')}>
+        <button className="btn" disabled={busy} onClick={() => run(startSharing, '공유하지 못했습니다')}>
           <Share2 size={15} /> 링크로 공유
         </button>
       </div>

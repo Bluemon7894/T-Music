@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { api: 34, gpu: swangle_indirect, target: google_apis, device: 'Nexus 5' }
+          - { api: 34, gpu: swangle_indirect, target: google_apis, device: pixel_6 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

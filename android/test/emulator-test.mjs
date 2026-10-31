@@ -173,12 +173,12 @@ async function main() {
   await tapText('.m-tab', '검색');
   await sleep(500);
   await tap('.searchbox input');
-  await sleep(1500);
+  await waitFor(() => js(`document.documentElement.classList.contains('kb-open')`), 8000);
+  await sleep(800);
   shot('04-keyboard');
   const box = await js(`(() => { const r = document.querySelector('.m-tabs')?.getBoundingClientRect(); return { tabsHeight: r?.height, height: innerHeight, open: document.documentElement.classList.contains('kb-open') }; })()`);
   note(`with keyboard: ${JSON.stringify(box)}`);
   check('the tab bar steps aside for the keyboard', box.open && !box.tabsHeight, JSON.stringify(box));
-  // Another app taking the audio pauses the music by itself, without any help from this app.
   await js(`(() => { const i = document.querySelector('.searchbox input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i, '아이유 라일락'); i.dispatchEvent(new Event('input',{bubbles:true})); i.closest('form').requestSubmit(); i.blur(); })()`);
   await waitFor(() => has('.search-songs .tl-row'), 30000);
   await sleep(1200);
@@ -267,11 +267,6 @@ async function main() {
   shell('cmd', 'media_session', 'dispatch', 'previous');
   await sleep(1000);
 
-  // ---- a call or another music app takes the audio ----
-  const focusBefore = !(await pos()).paused;
-  note(`audio focus holders: ${shell('dumpsys', 'audio').split('\n').filter((l) => /source:.*(pack|com\.)/.test(l) && /tmusic|android/.test(l)).slice(-3).join(' | ').slice(0, 240)}`);
-  check('music was playing before the focus test', focusBefore);
-
   // ---- back button at the top level leaves the app running ----
   await js(`(async () => { for (let i = 0; i < 12; i++) { window.__tm.onNative({ type: 'noop' }); } })()`);
   for (let i = 0; i < 8; i++) {
@@ -284,6 +279,28 @@ async function main() {
   check('music survives leaving with back', !(await pos()).paused);
   shell('am', 'start', '-n', `${PACKAGE}/.MainActivity`);
   await sleep(1500);
+
+  // ---- swiping the app away from recent apps ----
+  await js('window.__sameRun = true');
+  const taskId = new RegExp(`taskId=(\\d+): ${PACKAGE}`).exec(shell('am', 'stack', 'list'))?.[1];
+  note(`task ${taskId}`);
+  const beforeSwipe = await pos();
+  shell('am', 'stack', 'remove', String(taskId));
+  await sleep(10000);
+  const afterSwipe = await pos();
+  check('music keeps playing after swiping the app away', !afterSwipe.paused && (afterSwipe.t > beforeSwipe.t + 5 || afterSwipe.id !== beforeSwipe.id), `${beforeSwipe.t?.toFixed?.(1)} -> ${afterSwipe.t?.toFixed?.(1)}`);
+  check('the notification stays after swiping the app away', shell('dumpsys', 'activity', 'services', PACKAGE).includes('isForeground=true'));
+  shell('am', 'start', '-n', `${PACKAGE}/.MainActivity`);
+  await sleep(2500);
+  check('opening it again shows the same running page', (await js('window.__sameRun === true')) && (await has('.m-tabs')) && !(await pos()).paused);
+  shot('10b-reopened');
+
+  // ---- the player's stop button ----
+  shell('cmd', 'media_session', 'dispatch', 'stop');
+  check('stop pauses the music', await waitFor(async () => (await pos()).paused, 6000));
+  check('stop removes the notification', await waitFor(() => !shell('dumpsys', 'activity', 'services', PACKAGE).includes('isForeground=true'), 6000));
+  await tap('.m-mini .play-btn');
+  check('playing again from the app brings the notification back', await waitFor(() => shell('dumpsys', 'activity', 'services', PACKAGE).includes('isForeground=true'), 10000));
 
   // ---- links ----
   shell('am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'tmusic://join/ABC234');
@@ -310,6 +327,22 @@ async function main() {
   check('the phone saves a downloaded file', done.status === 'done' && done.size > 0, JSON.stringify(done));
   check('a downloaded file is served by range', await js(`fetch('/stream/${id}', { headers: { Range: 'bytes=0-99' } }).then(async (r) => r.status === 206 && (await r.arrayBuffer()).byteLength === 100)`));
   await js(`window.TMusicNative.downloadRemove('${id}')`);
+
+  // ---- an app update reaches the system installer ----
+  const updated = js(`new Promise((resolve) => { const old = window.__tm.onNative; window.__tm.onNative = (e) => { old(e); if (e.type === 'update' && e.status !== 'downloading') resolve(e); }; setTimeout(() => resolve({ status: 'timeout' }), 40000); })`);
+  await js(`window.TMusicNative.updateDownload(${JSON.stringify(SAMPLE_AUDIO)})`);
+  const update = await updated;
+  check('the phone downloads an update', update.status === 'completed', JSON.stringify(update));
+  await js('window.TMusicNative.updateInstall()');
+  const installer = await waitFor(() => /topResumedActivity=.*packageinstaller/i.test(shell('dumpsys', 'activity', 'activities')), 10000);
+  check('the system installer opens', installer !== null);
+  await sleep(800);
+  shot('11b-installer');
+  shell('input', 'keyevent', 'KEYCODE_BACK');
+  await sleep(600);
+  shell('input', 'keyevent', 'KEYCODE_BACK');
+  shell('am', 'start', '-n', `${PACKAGE}/.MainActivity`);
+  await sleep(1200);
 
   // ---- local files stay inside the app ----
   check('file access can not leave app storage', !(await js(`window.TMusicNative.fsWrite('../../evil.txt', 'x')`)));
