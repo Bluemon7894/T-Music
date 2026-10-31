@@ -5,6 +5,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.content.res.AssetManager;
+import android.content.res.Resources;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -35,6 +37,20 @@ public class MainActivity extends Activity {
     private boolean started;
     private ValueCallback<Uri[]> fileCallback;
     private String pendingSave;
+
+    // WebView adds its own resources to the application's and looks them up through whichever context
+    // it was given. Sharing the application's keeps the two from disagreeing.
+    @Override
+    public Resources getResources() {
+        Context app = getApplicationContext();
+        return app != null ? app.getResources() : super.getResources();
+    }
+
+    @Override
+    public AssetManager getAssets() {
+        Context app = getApplicationContext();
+        return app != null ? app.getAssets() : super.getAssets();
+    }
 
     @Override
     protected void onCreate(Bundle state) {
