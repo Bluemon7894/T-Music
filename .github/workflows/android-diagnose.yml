@@ -27,6 +27,8 @@ jobs:
           cp release/T-Music-Android-debug.apk /tmp/linux-debug.apk
           node scripts/build-android.mjs
           cp release/T-Music-Android-1.0.0.apk /tmp/linux-release.apk
+          mkdir -p android/test/out
+          cp release/T-Music-Android-1.0.0.apk android/test/out/linux-release.apk
       - name: Get the published APK
         run: gh release download android-v1.0.0 --pattern '*.apk' --dir /tmp/published --repo ${{ github.repository }}
         env:
@@ -47,7 +49,7 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           emulator-options: -no-window -gpu swangle_indirect -no-boot-anim -camera-back none
-          script: node android/test/diagnose.mjs '[["published","/tmp/published/T-Music-Android-1.0.0.apk"],["linux-release","/tmp/linux-release.apk"],["linux-debug","/tmp/linux-debug.apk"]]'
+          script: node android/test/diagnose.mjs '[["linux-release","/tmp/linux-release.apk"],["windows-new","/tmp/published/T-Music-Android-windows-test.apk"],["published","/tmp/published/T-Music-Android-1.0.0.apk"]]'
       - name: Keep results
         if: always()
         uses: actions/upload-artifact@v4
