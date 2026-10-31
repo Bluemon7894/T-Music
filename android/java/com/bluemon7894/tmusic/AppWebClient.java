@@ -58,6 +58,7 @@ final class AppWebClient extends WebViewClient {
             String mime = MIME.get(dot < 0 ? "" : clean.substring(dot + 1).toLowerCase());
             return new WebResourceResponse(mime == null ? "application/octet-stream" : mime, "UTF-8", in);
         } catch (IOException e) {
+            android.util.Log.e("TMusic", "missing app file " + clean, e);
             return empty(404, "Not Found");
         }
     }
