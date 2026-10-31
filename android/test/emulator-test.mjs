@@ -173,7 +173,11 @@ async function main() {
   await tapText('.m-tab', '검색');
   await sleep(500);
   await tap('.searchbox input');
-  await waitFor(() => js(`document.documentElement.classList.contains('kb-open')`), 8000);
+  // On a slow machine a tap can arrive as a long press, which opens a menu and not the keyboard.
+  if (await waitFor(() => js(`document.documentElement.classList.contains('kb-open')`), 5000) === null) {
+    await tap('.searchbox input');
+    await waitFor(() => js(`document.documentElement.classList.contains('kb-open')`), 8000);
+  }
   await sleep(800);
   shot('04-keyboard');
   const box = await js(`(() => { const r = document.querySelector('.m-tabs')?.getBoundingClientRect(); return { tabsHeight: r?.height, height: innerHeight, open: document.documentElement.classList.contains('kb-open') }; })()`);
