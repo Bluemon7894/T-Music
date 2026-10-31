@@ -72,11 +72,11 @@ final class AuthServer {
     }
 
     private static String page(boolean signedIn) {
-        String title = signedIn ? "로그인되었습니다" : "로그인이 취소되었습니다";
+        String title = signedIn ? Lang.say("로그인되었습니다", "Signed in") : Lang.say("로그인이 취소되었습니다", "Sign-in cancelled");
         return "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + title + "</title></head>"
             + "<body style=\"margin:0;height:100vh;display:grid;place-content:center;text-align:center;background:#0a0712;color:#f5f3ff;font-family:system-ui,sans-serif\">"
             + "<h1 style=\"font-size:24px;margin:0 0 20px\">" + title + "</h1>"
-            + "<a href=\"tmusic://open\" style=\"display:block;padding:14px 24px;border-radius:14px;background:#7c3aed;color:#fff;font-weight:700;text-decoration:none\">T-Music으로 돌아가기</a>"
+            + "<a href=\"tmusic://open\" style=\"display:block;padding:14px 24px;border-radius:14px;background:#7c3aed;color:#fff;font-weight:700;text-decoration:none\">" + Lang.say("T-Music으로 돌아가기", "Back to T-Music") + "</a>"
             + "<script>location.href='tmusic://open'</script></body></html>";
     }
 }

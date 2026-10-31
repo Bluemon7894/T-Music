@@ -5,6 +5,7 @@ import { useUpdater } from '../store/updater.js';
 import { api } from '../lib/api.js';
 import { fmtBytes } from '../lib/util.js';
 import { IS_ANDROID } from '../lib/platform.js';
+import { LANGUAGE, tr } from '../lib/i18n.js';
 
 export default function UpdateModal() {
   const modalOpen = useUpdater((s) => s.modalOpen);
@@ -38,7 +39,7 @@ export default function UpdateModal() {
   return (
     <div className="update-modal-backdrop" onClick={closeModal}>
       <div className="update-modal-box" onClick={(e) => e.stopPropagation()}>
-        <button className="icon-btn update-modal-close" onClick={closeModal} aria-label="닫기">
+        <button className="icon-btn update-modal-close" onClick={closeModal} aria-label={tr('닫기')}>
           <X size={18} />
         </button>
 
@@ -47,7 +48,7 @@ export default function UpdateModal() {
             <Sparkles size={24} />
           </div>
           <div>
-            <h2 className="update-modal-title">새로운 버전이 준비되었습니다</h2>
+            <h2 className="update-modal-title">{tr('새로운 버전이 준비되었습니다')}</h2>
             <div className="update-modal-versions">
               <span className="v-tag cur">v{currentVersion}</span>
               <ArrowRight size={14} className="v-arrow" />
@@ -62,7 +63,7 @@ export default function UpdateModal() {
 
         {releaseNotes && (
           <div className="update-modal-notes-wrapper">
-            <div className="update-modal-notes-title">업데이트 내용</div>
+            <div className="update-modal-notes-title">{tr('업데이트 내용')}</div>
             <div
               className="update-modal-notes markdown-body"
               dangerouslySetInnerHTML={{ __html: renderedNotes }}
@@ -80,7 +81,7 @@ export default function UpdateModal() {
         {downloading && (
           <div className="update-progress-section">
             <div className="update-progress-labels">
-              <span>다운로드 중...</span>
+              <span>{tr('다운로드 중...')}</span>
               <span>{progress.percent}% {progress.total > 0 && `(${fmtBytes(progress.received)} / ${fmtBytes(progress.total)})`}</span>
             </div>
             <div className="update-progress-bar-bg">
@@ -95,7 +96,7 @@ export default function UpdateModal() {
         {downloaded && (
           <div className="update-completed-msg">
             <CheckCircle2 size={18} className="text-success" />
-            <span>{IS_ANDROID ? '다운로드가 끝났습니다. 설치를 누르면 Android 설치 화면으로 넘어갑니다.' : '설치 파일 다운로드가 완료되었습니다. 지금 재시작하여 설치할 수 있습니다.'}</span>
+            <span>{IS_ANDROID ? tr('다운로드가 끝났습니다. 설치를 누르면 Android 설치 화면으로 넘어갑니다.') : tr('설치 파일 다운로드가 완료되었습니다. 지금 재시작하여 설치할 수 있습니다.')}</span>
           </div>
         )}
 
@@ -119,33 +120,26 @@ export default function UpdateModal() {
                   textAlign: 'left',
                 }}
                 onClick={openReleasePage}
-              >
-                웹 브라우저에서 직접 설치 파일({IS_ANDROID ? '.apk' : '.exe'}) 다운로드하기 →
-              </button>
+              >{tr('웹 브라우저에서 직접 설치 파일(')}{IS_ANDROID ? '.apk' : '.exe'}{tr(') 다운로드하기 →')}</button>
             </div>
           </div>
         )}
 
         <div className="update-modal-actions">
-          <button className="btn-ghost" onClick={openReleasePage} title="GitHub 릴리즈 페이지 열기">
-            <ExternalLink size={14} /> 릴리즈 노트
-          </button>
+          <button className="btn-ghost" onClick={openReleasePage} title={tr('GitHub 릴리즈 페이지 열기')}>
+            <ExternalLink size={14} />{' '}{tr('릴리즈 노트')}</button>
           <div style={{ flex: 1 }} />
-          <button className="btn-secondary" onClick={closeModal}>
-            나가기
-          </button>
+          <button className="btn-secondary" onClick={closeModal}>{LANGUAGE === 'en' ? 'Close' : '나가기'}</button>
           {downloaded ? (
             <button className="btn-primary" onClick={install}>
-              <CheckCircle2 size={16} /> {IS_ANDROID ? '설치' : '지금 설치 및 재시작'}
+              <CheckCircle2 size={16} /> {IS_ANDROID ? tr('설치') : tr('지금 설치 및 재시작')}
             </button>
           ) : downloading ? (
             <button className="btn-primary" disabled>
-              <Download size={16} className="spin" /> 다운로드 중 ({progress.percent}%)
-            </button>
+              <Download size={16} className="spin" />{' '}{tr('다운로드 중 ({0}%)', progress.percent)}</button>
           ) : (
             <button className="btn-primary" onClick={download}>
-              <Download size={16} /> 업데이트하기
-            </button>
+              <Download size={16} />{' '}{tr('업데이트하기')}</button>
           )}
         </div>
       </div>

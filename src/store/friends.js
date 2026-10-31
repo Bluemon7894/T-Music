@@ -22,6 +22,7 @@ import { useNav } from './nav.js';
 import { usePlayer } from './player.js';
 import { useRoom } from './room.js';
 import { toast, useUI } from './ui.js';
+import { tr } from '../lib/i18n.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 8;
@@ -44,7 +45,7 @@ function myProfile() {
   const user = auth.currentUser;
   const google = user.providerData.find((p) => p.providerId === 'google.com');
   return {
-    name: (user.displayName || google?.displayName || `게스트 ${user.uid.slice(0, 4).toUpperCase()}`).slice(0, 40),
+    name: (user.displayName || google?.displayName || tr('게스트 {0}', user.uid.slice(0, 4).toUpperCase())).slice(0, 40),
     photo: (user.photoURL || google?.photoURL || '').slice(0, 500) || null,
   };
 }
@@ -99,7 +100,7 @@ export const useFriends = create((set, get) => {
     const stops = [
       onValue(dbRef('profiles', uid), (snap) => {
         const p = snap.val() || {};
-        patchFriend(uid, { name: p.name || '알 수 없음', photo: safePhoto(p.photo) });
+        patchFriend(uid, { name: p.name || tr('알 수 없음'), photo: safePhoto(p.photo) });
       }),
       onValue(dbRef('presence', uid), (snap) => {
         const p = snap.val();
@@ -137,10 +138,10 @@ export const useFriends = create((set, get) => {
   };
 
   const onRequests = (snap) => {
-    const requests = Object.entries(snap.val() || {}).map(([uid, r]) => ({ uid, name: r.name || '알 수 없음', photo: safePhoto(r.photo) })).sort((a, b) => (a.uid < b.uid ? -1 : 1));
+    const requests = Object.entries(snap.val() || {}).map(([uid, r]) => ({ uid, name: r.name || tr('알 수 없음'), photo: safePhoto(r.photo) })).sort((a, b) => (a.uid < b.uid ? -1 : 1));
     for (const r of requests) {
-      if (!announced.has(`request:${r.uid}`)) toast(`${r.name}님이 친구 요청을 보냈어요`);
-      notify(`request:${r.uid}`, '친구 요청', `${r.name}님이 친구 요청을 보냈어요`, () => useNav.getState().go('friends', {}));
+      if (!announced.has(`request:${r.uid}`)) toast(tr('{0}님이 친구 요청을 보냈어요', r.name));
+      notify(`request:${r.uid}`, tr('친구 요청'), tr('{0}님이 친구 요청을 보냈어요', r.name), () => useNav.getState().go('friends', {}));
     }
     set({ requests });
   };
@@ -154,7 +155,7 @@ export const useFriends = create((set, get) => {
         continue;
       }
       invites.push({ id, ...invite, fromPhoto: safePhoto(invite.fromPhoto) });
-      notify(`invite:${id}`, '같이 듣기 초대', `${invite.fromName || '친구'}님이 같이 듣자고 해요`, () => useUI.getState().setMini(false));
+      notify(`invite:${id}`, tr('같이 듣기 초대'), tr('{0}님이 같이 듣자고 해요', invite.fromName || tr('친구')), () => useUI.getState().setMini(false));
     }
     set({ invites });
   };
@@ -238,25 +239,25 @@ export const useFriends = create((set, get) => {
     },
 
     setSharing(patch) {
-      update(dbRef('profiles', myUid(), 'sharing'), patch).catch(() => toast('설정을 저장하지 못했습니다'));
+      update(dbRef('profiles', myUid(), 'sharing'), patch).catch(() => toast(tr('설정을 저장하지 못했습니다')));
     },
 
     // Returns an error message, or null if the request went out.
     async addFriend(text) {
       const code = normalizeFriendCode(text);
-      if (code.length !== CODE_LENGTH) return `친구 코드는 ${CODE_LENGTH}자리입니다.`;
-      if (code === get().friendCode) return '내 코드는 추가할 수 없어요.';
+      if (code.length !== CODE_LENGTH) return tr('친구 코드는 {0}자리입니다.', CODE_LENGTH);
+      if (code === get().friendCode) return tr('내 코드는 추가할 수 없어요.');
       try {
         await waitForConnection();
         const target = (await dbGet(dbRef('friendCodes', code))).val();
-        if (!target) return '이 코드의 사용자를 찾을 수 없어요.';
-        if (get().friends[target]) return '이미 친구예요.';
+        if (!target) return tr('이 코드의 사용자를 찾을 수 없어요.');
+        if (get().friends[target]) return tr('이미 친구예요.');
         if (get().requests.some((r) => r.uid === target)) {
           await get().acceptRequest(target);
           return null;
         }
         await dbSet(dbRef('friendRequests', target, myUid()), myProfile());
-        toast('친구 요청을 보냈어요');
+        toast(tr('친구 요청을 보냈어요'));
         return null;
       } catch (e) {
         console.warn('[friends]', e);
@@ -275,7 +276,7 @@ export const useFriends = create((set, get) => {
       try {
         await waitForConnection();
         await dbSet(dbRef('friendRequests', uid, myUid()), myProfile());
-        toast('친구 요청을 보냈어요');
+        toast(tr('친구 요청을 보냈어요'));
       } catch (e) {
         console.warn('[friends]', e);
         const { [uid]: _, ...rest } = get().sentRequests;
@@ -293,16 +294,16 @@ export const useFriends = create((set, get) => {
         [`friends/${uid}/${me}`]: { since },
         [`friendRequests/${me}/${uid}`]: null,
       });
-      toast('친구가 되었어요');
+      toast(tr('친구가 되었어요'));
     },
 
     declineRequest(uid) {
-      remove(dbRef('friendRequests', myUid(), uid)).catch(() => toast('처리하지 못했습니다'));
+      remove(dbRef('friendRequests', myUid(), uid)).catch(() => toast(tr('처리하지 못했습니다')));
     },
 
     removeFriend(uid) {
       const me = myUid();
-      update(ref(rtdb), { [`friends/${me}/${uid}`]: null, [`friends/${uid}/${me}`]: null }).catch(() => toast('삭제하지 못했습니다'));
+      update(ref(rtdb), { [`friends/${me}/${uid}`]: null, [`friends/${uid}/${me}`]: null }).catch(() => toast(tr('삭제하지 못했습니다')));
     },
 
     // Invites into the room we're in, opening one first if we aren't in any.
@@ -312,7 +313,7 @@ export const useFriends = create((set, get) => {
       else if (!room.attached) await room.follow();
       const { code, meta } = useRoom.getState();
       if (!code) {
-        toast('방을 만들지 못했습니다');
+        toast(tr('방을 만들지 못했습니다'));
         return;
       }
       useRoom.getState().pardon(uid);
@@ -320,10 +321,10 @@ export const useFriends = create((set, get) => {
         await waitForConnection();
         const { name, photo } = myProfile();
         await dbSet(push(dbRef('invites', uid)), { from: myUid(), fromName: name, ...(photo ? { fromPhoto: photo } : {}), code, roomName: String(meta?.name || '').slice(0, 40), at: serverTimestamp() });
-        toast(`${get().friends[uid]?.name || '친구'}님을 초대했어요`);
+        toast(tr('{0}님을 초대했어요', get().friends[uid]?.name || tr('친구')));
       } catch (e) {
         console.warn('[friends]', e);
-        toast('초대를 보내지 못했습니다');
+        toast(tr('초대를 보내지 못했습니다'));
       }
     },
 

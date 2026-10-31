@@ -24,6 +24,7 @@ import { useDeck } from './deck.js';
 import { saveAlignment } from './lyricAlignments.js';
 import { bindRoom, roomPlayer, usePlayer } from './player.js';
 import { toast } from './ui.js';
+import { tr } from '../lib/i18n.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 6;
@@ -60,7 +61,7 @@ export const inviteLink = (code) => `tmusic://join/${code}`;
 function myProfile() {
   const user = auth.currentUser;
   const google = user.providerData.find((p) => p.providerId === 'google.com');
-  const name = user.displayName || google?.displayName || `게스트 ${user.uid.slice(0, 4).toUpperCase()}`;
+  const name = user.displayName || google?.displayName || tr('게스트 {0}', user.uid.slice(0, 4).toUpperCase());
   const photo = user.photoURL || google?.photoURL || null;
   return { name: name.slice(0, 40), ...(photo ? { photo: photo.slice(0, 500) } : {}) };
 }
@@ -108,7 +109,7 @@ export const useRoom = create((set, get) => {
   const positionOf = (pb) => (pb.positionMs + (pb.playing ? serverNow() - pb.updatedAt : 0)) / 1000;
   const othersListening = () => Object.entries(get().members).some(([uid, m]) => uid !== myUid() && m.listening);
 
-  const refuse = () => { toast('방장만 곡을 추가하고 재생을 조작할 수 있어요.'); return false; };
+  const refuse = () => { toast(tr('방장만 곡을 추가하고 재생을 조작할 수 있어요.')); return false; };
 
   // The host's choice is what the whole room goes by.
   const syncSounds = () => {
@@ -130,7 +131,7 @@ export const useRoom = create((set, get) => {
       rev: (pb?.rev || 0) + 1,
       by: myUid(),
       ...(patch.ending ? { ending: true } : {}),
-    }).catch(() => toast('같이듣기 상태를 보내지 못했습니다'));
+    }).catch(() => toast(tr('같이듣기 상태를 보내지 못했습니다')));
   };
 
   // Where a stopped room's clock would be makes no sense after hours away: stay inside the track.
@@ -228,6 +229,23 @@ export const useRoom = create((set, get) => {
     following: () => !canControl(),
     soundsOn: () => get().meta?.sounds === true,
     hasQueued: () => get().queue.length > 0,
+    setModes(patch) {
+      if (!canControl()) { refuse(); return; }
+      update(dbRef(get().code, 'modes'), patch).catch(() => toast(tr('변경하지 못했습니다')));
+    },
+    // Put at the back of the shared queue, after anything already in it.
+    loopQueue(current, waiting) {
+      const { code, queue } = get();
+      const list = [...waiting, current].map(safeTrack).filter(Boolean).slice(-MAX_ADD_AT_ONCE);
+      if (!list.length) return;
+      const { name } = myProfile();
+      let order = Math.max(0, ...queue.map((q) => q.order).filter(Number.isFinite));
+      const items = {};
+      for (const track of list) items[push(dbRef(code, 'queue')).key] = { track, by: myUid(), byName: name, order: ++order };
+      update(dbRef(code, 'queue'), items).catch(() => toast(tr('같이듣기 대기열에 넣지 못했습니다')));
+      const added = Object.entries(items).map(([key, item]) => ({ key, ...item }));
+      if (!get().queue.some((q) => q.key === added[0].key)) set({ queue: [...get().queue, ...added] });
+    },
     // Only the host knows nothing follows this track, since the next one would come from its queue.
     endingSoon(left, stopsHere) {
       const pb = get().playback;
@@ -264,12 +282,15 @@ export const useRoom = create((set, get) => {
       publish({ playing: false, positionMs: roomPlayer.time() * 1000, ending: true });
     },
     takeQueued() {
-      const { code, queue } = get();
+      const { code, queue, modes } = get();
       if (!queue.length) return null;
-      const [first] = queue;
-      remove(dbRef(code, 'queue', first.key)).catch(() => {});
-      set({ queue: queue.slice(1) });
-      return safeTrack(first.track);
+      // Shuffling ignores the order on screen. When going round, the track that just ended sits last
+      // and doesn't come straight back unless it's the only one.
+      const choices = modes?.repeat === 'all' && queue.length > 1 ? queue.slice(0, -1) : queue;
+      const next = modes?.shuffle ? choices[Math.floor(Math.random() * choices.length)] : queue[0];
+      remove(dbRef(code, 'queue', next.key)).catch(() => {});
+      set({ queue: get().queue.filter((q) => q.key !== next.key) });
+      return safeTrack(next.track);
     },
     // Written together so a long album arrives in one piece and in order.
     enqueue(tracks, { next = false } = {}) {
@@ -286,10 +307,10 @@ export const useRoom = create((set, get) => {
       list.forEach((track, i) => {
         items[push(dbRef(code, 'queue')).key] = { track, by: myUid(), byName: name, order: first + i };
       });
-      update(dbRef(code, 'queue'), items).catch(() => toast('대기열에 추가하지 못했습니다'));
-      if (safe.length > list.length) toast(`한 번에 ${MAX_ADD_AT_ONCE}곡까지 추가할 수 있어요. 앞의 ${MAX_ADD_AT_ONCE}곡만 넣었습니다.`);
-      else if (next) toast('같이듣기 대기열 맨 앞에 추가했습니다');
-      else toast(list.length > 1 ? `같이듣기 대기열에 ${list.length}곡을 추가했습니다` : '같이듣기 대기열에 추가했습니다');
+      update(dbRef(code, 'queue'), items).catch(() => toast(tr('대기열에 추가하지 못했습니다')));
+      if (safe.length > list.length) toast(tr('한 번에 {0}곡까지 추가할 수 있어요. 앞의 {1}곡만 넣었습니다.', MAX_ADD_AT_ONCE, MAX_ADD_AT_ONCE));
+      else if (next) toast(tr('같이듣기 대기열 맨 앞에 추가했습니다'));
+      else toast(list.length > 1 ? tr('같이듣기 대기열에 {0}곡을 추가했습니다', list.length) : tr('같이듣기 대기열에 추가했습니다'));
     },
   };
 
@@ -332,7 +353,7 @@ export const useRoom = create((set, get) => {
     stopFollowing();
     for (const stop of stopListening) stop();
     stopListening = [];
-    set({ code: null, meta: null, members: {}, playback: null, queue: [] });
+    set({ code: null, meta: null, members: {}, playback: null, queue: [], modes: null });
   };
 
   // Someone in the room resynced the lyrics or picked different ones.
@@ -343,7 +364,7 @@ export const useRoom = create((set, get) => {
     saveAlignment(trackId, lyrics, Number.isFinite(entry.offset) ? entry.offset : null);
     window.dispatchEvent(new CustomEvent('t-music:lyrics-changed', { detail: { trackId, lyrics } }));
     if (announce && usePlayer.getState().current()?.id === trackId) {
-      toast(`${get().members[entry.by]?.name || '멤버'}님이 가사를 다시 맞췄어요`);
+      toast(tr('{0}님이 가사를 다시 맞췄어요', get().members[entry.by]?.name || tr('멤버')));
     }
   };
 
@@ -355,7 +376,7 @@ export const useRoom = create((set, get) => {
       onValue(ref(rtdb, '.info/serverTimeOffset'), (snap) => { serverOffset = snap.val() || 0; }),
       onValue(dbRef(code, 'meta'), (snap) => {
         if (!snap.exists()) {
-          toast('같이듣기 방이 닫혔습니다');
+          toast(tr('같이듣기 방이 닫혔습니다'));
           stopRoom();
           deleteDoc(myRoomDoc()).catch(() => {});
           return;
@@ -373,10 +394,14 @@ export const useRoom = create((set, get) => {
         set({ members: realMembers(snap.val()) });
         watchHost();
       }),
+      onValue(dbRef(code, 'modes'), (snap) => {
+        set({ modes: snap.val() });
+        if (get().attached) roomPlayer.setModes(snap.val());
+      }),
       onValue(dbRef(code, 'kicked', myUid()), (snap) => {
         if (snap.val() !== true) return;
         onDisconnect(dbRef(code, 'members', myUid())).cancel().catch(() => {});
-        toast('방장이 이 방에서 내보냈어요');
+        toast(tr('방장이 이 방에서 내보냈어요'));
         stopRoom();
         deleteDoc(myRoomDoc()).catch(() => {});
       }),
@@ -413,17 +438,19 @@ export const useRoom = create((set, get) => {
     let freshMeta;
     let freshMembers;
     let freshPlayback;
+    let freshModes;
     try {
       await waitForConnection();
-      [freshMeta, freshMembers, freshPlayback] = await Promise.all(['meta', 'members', 'playback'].map((part) => dbGet(dbRef(code, part))));
+      [freshMeta, freshMembers, freshPlayback, freshModes] = await Promise.all(['meta', 'members', 'playback', 'modes'].map((part) => dbGet(dbRef(code, part))));
     } catch (e) {
       console.warn('[room]', e);
-      toast('같이 듣기에 합류하지 못했습니다. 인터넷 연결을 확인해 주세요.');
+      toast(tr('같이 듣기에 합류하지 못했습니다. 인터넷 연결을 확인해 주세요.'));
       return;
     }
     if (get().code !== code || get().attached) return;
-    set({ meta: freshMeta.val(), members: realMembers(freshMembers.val()), playback: freshPlayback.val(), attached: true });
+    set({ meta: freshMeta.val(), members: realMembers(freshMembers.val()), playback: freshPlayback.val(), modes: freshModes.val(), attached: true });
     bindRoom(hooks);
+    roomPlayer.setModes(freshModes.val());
     startPresence(code);
     tick = setInterval(followTick, SYNC_TICK_MS);
     const { meta, playback } = get();
@@ -447,6 +474,7 @@ export const useRoom = create((set, get) => {
     members: {},
     playback: null,
     queue: [],
+    modes: null, // the room's shuffle and repeat, the same for everyone
     attached: false, // following the room's playback right now
     connected: false,
     driftMs: null, // how far behind the room we are, in milliseconds
@@ -461,7 +489,7 @@ export const useRoom = create((set, get) => {
         const uid = myUid();
         for (let attempt = 0; attempt < 5; attempt++) {
           const code = randomCode();
-          const meta = { hostUid: uid, ownerUid: uid, name: String(name || '').slice(0, 40) || `${myProfile().name}의 방`, controlMode: 'everyone', sounds: useDeck.getState().sounds, createdAt: Date.now() };
+          const meta = { hostUid: uid, ownerUid: uid, name: String(name || '').slice(0, 40) || tr('{0}의 방', myProfile().name), controlMode: 'everyone', sounds: useDeck.getState().sounds, createdAt: Date.now() };
           const { committed } = await runTransaction(dbRef(code, 'meta'), (current) => (current ? undefined : meta));
           if (!committed) continue;
           const player = usePlayer.getState();
@@ -478,7 +506,7 @@ export const useRoom = create((set, get) => {
         throw new Error('no free code');
       } catch (e) {
         console.warn('[room]', e);
-        set({ error: e.message === OFFLINE_MESSAGE ? OFFLINE_MESSAGE : '방을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.' });
+        set({ error: e.message === OFFLINE_MESSAGE ? OFFLINE_MESSAGE : tr('방을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.') });
       } finally {
         set({ busy: false });
       }
@@ -488,7 +516,7 @@ export const useRoom = create((set, get) => {
       const code = normalizeCode(rawCode);
       if (!myUid()) return;
       if (code.length !== CODE_LENGTH) {
-        set({ error: `초대 코드는 ${CODE_LENGTH}자리입니다.` });
+        set({ error: tr('초대 코드는 {0}자리입니다.', CODE_LENGTH) });
         return;
       }
       if (get().code === code) {
@@ -501,21 +529,21 @@ export const useRoom = create((set, get) => {
         const snap = await dbGet(dbRef(code));
         const room = snap.val();
         if (!room?.meta) {
-          set({ error: '방을 찾을 수 없습니다. 코드를 확인해 주세요.' });
+          set({ error: tr('방을 찾을 수 없습니다. 코드를 확인해 주세요.') });
           return;
         }
         // Whoever left last was interrupted before closing it.
         if (!room.members) {
           await remove(dbRef(code)).catch(() => {});
-          set({ error: '방을 찾을 수 없습니다. 코드를 확인해 주세요.' });
+          set({ error: tr('방을 찾을 수 없습니다. 코드를 확인해 주세요.') });
           return;
         }
         if (room.kicked?.[myUid()]) {
-          set({ error: '방장이 내보낸 방이에요. 방장이 다시 초대하면 들어올 수 있어요.' });
+          set({ error: tr('방장이 내보낸 방이에요. 방장이 다시 초대하면 들어올 수 있어요.') });
           return;
         }
         if (!room.members[myUid()] && Object.keys(room.members).length >= MAX_MEMBERS) {
-          set({ error: '방이 가득 찼습니다.' });
+          set({ error: tr('방이 가득 찼습니다.') });
           return;
         }
         await get().leave();
@@ -597,15 +625,15 @@ export const useRoom = create((set, get) => {
     },
 
     setControlMode(mode) {
-      if (isHost()) update(dbRef(get().code, 'meta'), { controlMode: mode }).catch(() => toast('변경하지 못했습니다'));
+      if (isHost()) update(dbRef(get().code, 'meta'), { controlMode: mode }).catch(() => toast(tr('변경하지 못했습니다')));
     },
     makeHost(uid) {
-      if (isHost()) update(dbRef(get().code, 'meta'), { hostUid: uid, ownerUid: uid }).catch(() => toast('변경하지 못했습니다'));
+      if (isHost()) update(dbRef(get().code, 'meta'), { hostUid: uid, ownerUid: uid }).catch(() => toast(tr('변경하지 못했습니다')));
     },
     kick(uid) {
       const { code, meta } = get();
       if (!isHost() || uid === myUid() || uid === meta?.ownerUid) return;
-      update(dbRef(code), { [`members/${uid}`]: null, [`kicked/${uid}`]: true }).catch(() => toast('내보내지 못했습니다'));
+      update(dbRef(code), { [`members/${uid}`]: null, [`kicked/${uid}`]: true }).catch(() => toast(tr('내보내지 못했습니다')));
     },
     // Inviting someone back is how the host takes it back.
     pardon(uid) {
@@ -622,7 +650,7 @@ export const useRoom = create((set, get) => {
         ...(Number.isFinite(offset) ? { offset } : {}),
         by: myUid(),
         at: serverTimestamp(),
-      }).catch(() => toast('가사를 방에 공유하지 못했습니다'));
+      }).catch(() => toast(tr('가사를 방에 공유하지 못했습니다')));
     },
     moveInQueue(from, to) {
       const { code, queue } = get();
@@ -634,11 +662,11 @@ export const useRoom = create((set, get) => {
       set({ queue: next });
       const orders = {};
       next.forEach((item, i) => { orders[`${item.key}/order`] = i; });
-      update(dbRef(code, 'queue'), orders).catch(() => toast('순서를 바꾸지 못했습니다'));
+      update(dbRef(code, 'queue'), orders).catch(() => toast(tr('순서를 바꾸지 못했습니다')));
     },
     removeFromQueue(key) {
       if (!canControl()) { refuse(); return; }
-      remove(dbRef(get().code, 'queue', key)).catch(() => toast('삭제하지 못했습니다'));
+      remove(dbRef(get().code, 'queue', key)).catch(() => toast(tr('삭제하지 못했습니다')));
     },
     clearError() { set({ error: null }); },
   };

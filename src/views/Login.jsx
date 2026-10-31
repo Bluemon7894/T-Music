@@ -4,6 +4,7 @@ import { useAccount } from '../store/account.js';
 import { api } from '../lib/api.js';
 import { animate, ease, stagger, useTilt } from '../lib/motion.js';
 import logo from '../assets/logo-mark.png';
+import { tr } from '../lib/i18n.js';
 
 export function GoogleMark({ size = 18 }) {
   return (
@@ -54,30 +55,28 @@ export default function Login() {
       <main className="login-card" ref={card}>
         <div className="login-mark" ref={mark}><img src={logo} alt="" draggable={false} /></div>
         <h1>T-Music</h1>
-        <p className="login-lead">내 플레이리스트와 좋아요, 청취 기록을 계정에 담아 두세요.</p>
+        <p className="login-lead">{tr('내 플레이리스트와 좋아요, 청취 기록을 계정에 담아 두세요.')}</p>
 
         <div className="login-actions">
           {waitingForBrowser ? (
             <div className="login-waiting">
               <RefreshCw size={16} className="spin" />
-              <span>브라우저에서 로그인을 마쳐 주세요</span>
-              <button className="text-btn" onClick={cancelGoogle}>취소</button>
+              <span>{tr('브라우저에서 로그인을 마쳐 주세요')}</span>
+              <button className="text-btn" onClick={cancelGoogle}>{tr('취소')}</button>
             </div>
           ) : (
             <button className="login-btn google" onClick={signInWithGoogle} disabled={Boolean(busy) || !googleReady}>
-              <GoogleMark /> Google로 계속하기
-            </button>
+              <GoogleMark />{' '}{tr('Google로 계속하기')}</button>
           )}
           <button className="login-btn guest" onClick={signInAsGuest} disabled={Boolean(busy)}>
-            {busy === 'guest' ? <RefreshCw size={17} className="spin" /> : <UserRound size={17} />} 게스트로 시작하기
-          </button>
+            {busy === 'guest' ? <RefreshCw size={17} className="spin" /> : <UserRound size={17} />}{' '}{tr('게스트로 시작하기')}</button>
         </div>
 
-        {!googleReady && <p className="login-note">구글 로그인이 아직 설정되지 않았습니다.</p>}
+        {!googleReady && <p className="login-note">{tr('구글 로그인이 아직 설정되지 않았습니다.')}</p>}
         {error && <p className="login-error" role="alert">{error}</p>}
-        {canContinueOffline && <button className="text-btn" onClick={continueOffline}>오프라인으로 계속 (다운로드한 곡만 재생)</button>}
+        {canContinueOffline && <button className="text-btn" onClick={continueOffline}>{tr('오프라인으로 계속 (다운로드한 곡만 재생)')}</button>}
 
-        <p className="login-note">게스트로 쓴 기록은 나중에 구글 계정을 연결하면 그대로 이어져요. 연결하지 않고 로그아웃하면 사라져요.</p>
+        <p className="login-note">{tr('게스트로 쓴 기록은 나중에 구글 계정을 연결하면 그대로 이어져요. 연결하지 않고 로그아웃하면 사라져요.')}</p>
       </main>
     </div>
   );

@@ -15,6 +15,7 @@ import { auth } from '../../lib/firebase.js';
 import { useTilt, animate, ease } from '../../lib/motion.js';
 import { IS_ANDROID } from '../../lib/platform.js';
 import logo from '../../assets/logo-mark.png';
+import { tr } from '../../lib/i18n.js';
 
 function QueueRow({ track, onPlay, current, menu, index }) {
   const openMenu = useUI((s) => s.openMenu);
@@ -28,7 +29,7 @@ function QueueRow({ track, onPlay, current, menu, index }) {
         <ArtistLinks artists={track.artists} className="q-artist" />
       </div>
       <span className="q-dur">{fmtTime(track.duration)}</span>
-      {IS_ANDROID && <button className="icon-btn q-more" onClick={(e) => openMenu(e, menu)} aria-label="더 보기"><MoreHorizontal size={18} /></button>}
+      {IS_ANDROID && <button className="icon-btn q-more" onClick={(e) => openMenu(e, menu)} aria-label={tr('더 보기')}><MoreHorizontal size={18} /></button>}
     </div>
   );
 }
@@ -48,7 +49,7 @@ function NowCard({ track }) {
       <div className="now-art" ref={art} onClick={() => setStage(true)}>
         <Thumb src={track.thumb} />
         <span className="glare" />
-        <span className="now-art-hint"><Maximize2 size={16} /> 크게 보기</span>
+        <span className="now-art-hint"><Maximize2 size={16} />{' '}{tr('크게 보기')}</span>
       </div>
       <div className="now-meta">
         <div className="now-text">
@@ -68,12 +69,12 @@ function Idle() {
   return (
     <div className="now-idle">
       <div className="idle-orb"><img src={logo} alt="" /></div>
-      <h3>{recent ? '다시 들어볼까요?' : '음악을 시작해 보세요'}</h3>
-      <p>곡을 더블클릭하거나 카드의 재생 버튼을 누르면 여기에서 앨범 아트, 비주얼라이저, 다음 곡을 볼 수 있어요.</p>
+      <h3>{recent ? tr('다시 들어볼까요?') : tr('음악을 시작해 보세요')}</h3>
+      <p>{tr('곡을 더블클릭하거나 카드의 재생 버튼을 누르면 여기에서 앨범 아트, 비주얼라이저, 다음 곡을 볼 수 있어요.')}</p>
       <ul className="idle-tips">
-        <li><kbd>Space</kbd> 재생 / 일시정지</li>
-        <li><kbd>Ctrl</kbd> <kbd>K</kbd> 검색</li>
-        <li><kbd>Ctrl</kbd> <kbd>→</kbd> 다음 곡</li>
+        <li><kbd>Space</kbd>{' '}{tr('재생 / 일시정지')}</li>
+        <li><kbd>Ctrl</kbd> <kbd>K</kbd>{' '}{tr('검색')}</li>
+        <li><kbd>Ctrl</kbd> <kbd>→</kbd>{' '}{tr('다음 곡')}</li>
       </ul>
     </div>
   );
@@ -87,19 +88,19 @@ function RoomQueueSection() {
   const { removeFromQueue, moveInQueue } = useRoom.getState();
   return (
     <>
-      <div className="np-section"><span>같이듣기 대기열</span><small>{queue.length}곡</small></div>
+      <div className="np-section"><span>{tr('같이듣기 대기열')}</span><small>{tr('{0}곡', queue.length)}</small></div>
       {queue.map((item, i) => {
         const track = safeTrack(item.track);
         if (!track) return null;
         const extra = [
-          ...(canReorder && i > 0 ? [{ label: '맨 위로', icon: ChevronsUp, onClick: () => moveInQueue(i, 0) }, { label: '위로', icon: ChevronUp, onClick: () => moveInQueue(i, i - 1) }] : []),
-          ...(canReorder && i < queue.length - 1 ? [{ label: '아래로', icon: ChevronDown, onClick: () => moveInQueue(i, i + 1) }] : []),
-          ...(canReorder ? [{ divider: true }, { label: '대기열에서 삭제', icon: X, onClick: () => removeFromQueue(item.key) }] : []),
+          ...(canReorder && i > 0 ? [{ label: tr('맨 위로'), icon: ChevronsUp, onClick: () => moveInQueue(i, 0) }, { label: tr('위로'), icon: ChevronUp, onClick: () => moveInQueue(i, i - 1) }] : []),
+          ...(canReorder && i < queue.length - 1 ? [{ label: tr('아래로'), icon: ChevronDown, onClick: () => moveInQueue(i, i + 1) }] : []),
+          ...(canReorder ? [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeFromQueue(item.key) }] : []),
         ];
         return <QueueRow key={item.key} index={i + 1} track={track} menu={trackMenuItems(track, extra)} />;
       })}
-      {!queue.length && !canReorder && <p className="np-hint">지금은 방장만 곡을 추가할 수 있어요.</p>}
-      {!queue.length && canReorder && <p className="np-hint">{IS_ANDROID ? '곡의 ⋯ 버튼으로 대기열에 추가하면 멤버 모두의 다음 곡이 돼요.' : '곡을 우클릭해서 대기열에 추가하면 멤버 모두의 다음 곡이 돼요.'}</p>}
+      {!queue.length && !canReorder && <p className="np-hint">{tr('지금은 방장만 곡을 추가할 수 있어요.')}</p>}
+      {!queue.length && canReorder && <p className="np-hint">{IS_ANDROID ? tr('곡의 ⋯ 버튼으로 대기열에 추가하면 멤버 모두의 다음 곡이 돼요.') : tr('곡을 우클릭해서 대기열에 추가하면 멤버 모두의 다음 곡이 돼요.')}</p>}
     </>
   );
 }
@@ -119,14 +120,14 @@ export function QueueList() {
 
   return (
     <>
-      <div className="np-section"><span>지금 재생 중</span></div>
+      <div className="np-section"><span>{tr('지금 재생 중')}</span></div>
       <QueueRow track={cur} current index={1} menu={trackMenuItems(cur)} />
       {inRoom && <RoomQueueSection />}
       {manualUpcoming.length > 0 && (
         <>
-          <div className="np-section"><span>다음 곡</span><small>{manualUpcoming.length}곡</small></div>
+          <div className="np-section"><span>{tr('다음 곡')}</span><small>{tr('{0}곡', manualUpcoming.length)}</small></div>
           {manualUpcoming.map(({ t, i }) => (
-            <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: '대기열에서 삭제', icon: X, onClick: () => removeAt(i) }])} />
+            <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeAt(i) }])} />
           ))}
         </>
       )}
@@ -134,19 +135,18 @@ export function QueueList() {
         <>
           <div className="np-section auto-section">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <Sparkles size={13} style={{ color: 'var(--accent)' }} /> 추천곡 자동 재생
-            </span>
-            <small>{autoUpcoming.length}곡</small>
+              <Sparkles size={13} style={{ color: 'var(--accent)' }} />{' '}{tr('추천곡 자동 재생')}</span>
+            <small>{tr('{0}곡', autoUpcoming.length)}</small>
           </div>
           {autoUpcoming.map(({ t, i }) => (
-            <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: '대기열에서 삭제', icon: X, onClick: () => removeAt(i) }])} />
+            <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeAt(i) }])} />
           ))}
         </>
       )}
-      {!inRoom && !upcoming.length && <p className="np-hint">{autoplay ? '이 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 마지막 곡입니다. (자동 재생 꺼짐)'}</p>}
+      {!inRoom && !upcoming.length && <p className="np-hint">{autoplay ? tr('이 곡이 끝나면 비슷한 곡을 이어서 재생해요.') : tr('대기열의 마지막 곡입니다. (자동 재생 꺼짐)')}</p>}
       {manualUpcoming.length > 0 && !autoUpcoming.length && (
         <p className="np-hint" style={{ fontSize: '11.5px', marginTop: 8 }}>
-          {autoplay ? '대기열의 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 곡이 끝나면 재생이 정지됩니다.'}
+          {autoplay ? tr('대기열의 곡이 끝나면 비슷한 곡을 이어서 재생해요.') : tr('대기열의 곡이 끝나면 재생이 정지됩니다.')}
         </p>
       )}
     </>
@@ -161,10 +161,10 @@ export function AutoplayToggle() {
       type="button"
       className={`autoplay ${autoplay ? 'on' : ''}`}
       onClick={toggleAutoplay}
-      title={autoplay ? '추천곡 자동 재생 끄기' : '추천곡 자동 재생 켜기'}
+      title={autoplay ? tr('추천곡 자동 재생 끄기') : tr('추천곡 자동 재생 켜기')}
     >
       <Radio size={16} />
-      <span><b>자동 재생</b><small>대기열이 끝나면 비슷한 곡 이어 듣기</small></span>
+      <span><b>{tr('자동 재생')}</b><small>{tr('대기열이 끝나면 비슷한 곡 이어 듣기')}</small></span>
       <i className="switch" />
     </button>
   );
@@ -189,11 +189,11 @@ export default function NowPanel() {
     <aside className="now-panel">
       <div className="np-head">
         <div className="seg">
-          <button className={panelTab === 'next' ? 'on' : ''} onClick={() => setPanelTab('next')}><Sparkles size={14} /> 지금 재생</button>
-          <button className={panelTab === 'queue' ? 'on' : ''} onClick={() => setPanelTab('queue')}><ListMusic size={14} /> 대기열</button>
-          <button className={panelTab === 'lyrics' ? 'on' : ''} onClick={() => setPanelTab('lyrics')}><Mic2 size={14} /> 가사</button>
+          <button className={panelTab === 'next' ? 'on' : ''} onClick={() => setPanelTab('next')}><Sparkles size={14} />{' '}{tr('지금 재생')}</button>
+          <button className={panelTab === 'queue' ? 'on' : ''} onClick={() => setPanelTab('queue')}><ListMusic size={14} />{' '}{tr('대기열')}</button>
+          <button className={panelTab === 'lyrics' ? 'on' : ''} onClick={() => setPanelTab('lyrics')}><Mic2 size={14} />{' '}{tr('가사')}</button>
         </div>
-        <button className="icon-btn circle" onClick={togglePanel} aria-label="패널 닫기"><X size={16} /></button>
+        <button className="icon-btn circle" onClick={togglePanel} aria-label={tr('패널 닫기')}><X size={16} /></button>
       </div>
 
       <div className="np-body">
@@ -206,7 +206,7 @@ export default function NowPanel() {
             {manualUpcoming.length > 0 && (
               <>
                 <div className="np-section">
-                  <span>다음 곡</span>
+                  <span>{tr('다음 곡')}</span>
                   {contextName && <small>{contextName}</small>}
                 </div>
                 {manualUpcoming.slice(0, 6).map(({ t, i }) => (
@@ -218,20 +218,19 @@ export default function NowPanel() {
               <>
                 <div className="np-section auto-section">
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <Sparkles size={13} style={{ color: 'var(--accent)' }} /> 추천곡 자동 재생
-                  </span>
-                  <small>{autoUpcoming.length}곡</small>
+                    <Sparkles size={13} style={{ color: 'var(--accent)' }} />{' '}{tr('추천곡 자동 재생')}</span>
+                  <small>{tr('{0}곡', autoUpcoming.length)}</small>
                 </div>
                 {autoUpcoming.slice(0, manualUpcoming.length > 0 ? Math.max(2, 6 - manualUpcoming.length) : 6).map(({ t, i }) => (
                   <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
                 ))}
               </>
             )}
-            {upcoming.length > 6 && <button className="text-btn block" onClick={() => setPanelTab('queue')}>대기열 전체 보기 ({upcoming.length}곡)</button>}
-            {!inRoom && !upcoming.length && <p className="np-hint">{autoplay ? '이 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 마지막 곡입니다. (자동 재생 꺼짐)'}</p>}
+            {upcoming.length > 6 && <button className="text-btn block" onClick={() => setPanelTab('queue')}>{tr('대기열 전체 보기 ({0}곡)', upcoming.length)}</button>}
+            {!inRoom && !upcoming.length && <p className="np-hint">{autoplay ? tr('이 곡이 끝나면 비슷한 곡을 이어서 재생해요.') : tr('대기열의 마지막 곡입니다. (자동 재생 꺼짐)')}</p>}
             {manualUpcoming.length > 0 && !autoUpcoming.length && (
               <p className="np-hint" style={{ fontSize: '11.5px', marginTop: 8 }}>
-                {autoplay ? '대기열의 곡이 끝나면 비슷한 곡을 이어서 재생해요.' : '대기열의 곡이 끝나면 재생이 정지됩니다.'}
+                {autoplay ? tr('대기열의 곡이 끝나면 비슷한 곡을 이어서 재생해요.') : tr('대기열의 곡이 끝나면 재생이 정지됩니다.')}
               </p>
             )}
           </>

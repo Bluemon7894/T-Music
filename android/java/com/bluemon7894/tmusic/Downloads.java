@@ -96,7 +96,7 @@ final class Downloads {
                         }
                     }
                     if (total == 0) break; // the server didn't say how long it is, so this was all of it
-                    if (received == before) throw new IOException("다운로드가 중단되었습니다");
+                    if (received == before) throw new IOException(Lang.say("다운로드가 중단되었습니다", "The download stopped"));
                 } finally {
                     c.disconnect();
                 }
@@ -124,7 +124,7 @@ final class Downloads {
             bridge.emit("download", "id", id, "status", "done", "size", target.length(), "mime", ext.equals(".webm") ? "audio/webm" : "audio/mp4");
         } else {
             part.delete();
-            bridge.emit("download", "id", id, "status", "error", "error", "저장하지 못했습니다");
+            bridge.emit("download", "id", id, "status", "error", "error", Lang.say("저장하지 못했습니다", "Couldn't save"));
         }
     }
 

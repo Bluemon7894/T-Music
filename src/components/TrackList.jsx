@@ -12,15 +12,16 @@ import { IS_ANDROID } from '../lib/platform.js';
 import { burst, useEnter } from '../lib/motion.js';
 import { Thumb, ArtistLinks, Equalizer } from './common.jsx';
 import DownloadButton from './DownloadButton.jsx';
+import { tr } from '../lib/i18n.js';
 
 export async function startRadio(track) {
   try {
     const more = await api.related(track.id);
     const count = more.length;
-    usePlayer.getState().playList([track, ...more], 0, { name: `${track.title} 라디오` });
-    toast(count > 0 ? `'${track.title}' 기반 라디오 시작 (+${count}곡 편성)` : `'${track.title}' 라디오를 시작했습니다`);
+    usePlayer.getState().playList([track, ...more], 0, { name: tr('{0} 라디오', track.title) });
+    toast(count > 0 ? tr('\'{0}\' 기반 라디오 시작 (+{1}곡 편성)', track.title, count) : tr('\'{0}\' 라디오를 시작했습니다', track.title));
   } catch {
-    toast('라디오를 시작할 수 없습니다');
+    toast(tr('라디오를 시작할 수 없습니다'));
   }
 }
 
@@ -32,19 +33,19 @@ export function trackMenuItems(track, extra = []) {
   const downloaded = useDownloads.getState().done.has(track.id);
   const artist = track.artists?.find((a) => a.id);
   return [
-    { label: '다음에 재생', icon: ListPlus, onClick: () => p.playNext(track) },
-    { label: '대기열에 추가', icon: ListEnd, onClick: () => p.addToQueue(track) },
-    { label: '이 곡으로 라디오 시작', icon: Radio, onClick: () => startRadio(track) },
+    { label: tr('다음에 재생'), icon: ListPlus, onClick: () => p.playNext(track) },
+    { label: tr('대기열에 추가'), icon: ListEnd, onClick: () => p.addToQueue(track) },
+    { label: tr('이 곡으로 라디오 시작'), icon: Radio, onClick: () => startRadio(track) },
     { divider: true },
     {
-      label: '플레이리스트에 추가', icon: Plus,
+      label: tr('플레이리스트에 추가'), icon: Plus,
       submenu: [
         {
-          label: '새 플레이리스트',
+          label: tr('새 플레이리스트'),
           icon: Plus,
           onClick: () => {
             lib.createPlaylist(track.title, [track]);
-            toast('새 플레이리스트를 만들었습니다');
+            toast(tr('새 플레이리스트를 만들었습니다'));
           },
         },
         ...lib.playlists.filter(canEditPlaylist).map((pl) => ({
@@ -52,29 +53,29 @@ export function trackMenuItems(track, extra = []) {
           onClick: () => {
             const added = lib.addToPlaylist(pl.id, track);
             if (added > 0) {
-              toast(`'${pl.name}'에 추가했습니다`);
+              toast(tr('\'{0}\'에 추가했습니다', pl.name));
             } else {
-              toast(`'${pl.name}'에 이미 있는 곡입니다`);
+              toast(tr('\'{0}\'에 이미 있는 곡입니다', pl.name));
             }
           },
         })),
       ],
     },
-    { label: liked ? '좋아요 취소' : '좋아요', icon: Heart, onClick: () => lib.toggleLike(track) },
+    { label: liked ? tr('좋아요 취소') : tr('좋아요'), icon: Heart, onClick: () => lib.toggleLike(track) },
     downloaded
-      ? { label: '다운로드 삭제', icon: Trash2, onClick: () => removeDownload(track.id) }
-      : { label: '다운로드', icon: ArrowDownToLine, onClick: () => download(track) },
+      ? { label: tr('다운로드 삭제'), icon: Trash2, onClick: () => removeDownload(track.id) }
+      : { label: tr('다운로드'), icon: ArrowDownToLine, onClick: () => download(track) },
     lib.recent.some((t) => t.id === track.id) && {
-      label: '최근 들은 곡에서 삭제',
+      label: tr('최근 들은 곡에서 삭제'),
       icon: Trash2,
       onClick: () => {
         lib.removeRecent(track.id);
-        toast('최근 들은 곡에서 삭제했습니다');
+        toast(tr('최근 들은 곡에서 삭제했습니다'));
       },
     },
     { divider: true },
-    artist && { label: '아티스트로 이동', icon: User, onClick: () => nav.go('artist', { id: artist.id }) },
-    track.album?.id && { label: '앨범으로 이동', icon: Disc3, onClick: () => nav.go('album', { id: track.album.id }) },
+    artist && { label: tr('아티스트로 이동'), icon: User, onClick: () => nav.go('artist', { id: artist.id }) },
+    track.album?.id && { label: tr('앨범으로 이동'), icon: Disc3, onClick: () => nav.go('album', { id: track.album.id }) },
     ...extra,
   ].filter(Boolean);
 }
@@ -91,9 +92,9 @@ export function LikeButton({ track, size = 16, className = '' }) {
         e.stopPropagation();
         if (!liked) burst(ref.current);
         toggle(track);
-        toast(liked ? '좋아요 표시한 곡에서 삭제했습니다' : '좋아요 표시한 곡에 추가했습니다');
+        toast(liked ? tr('좋아요 표시한 곡에서 삭제했습니다') : tr('좋아요 표시한 곡에 추가했습니다'));
       }}
-      aria-label="좋아요"
+      aria-label={tr('좋아요')}
     >
       <Heart size={size} fill={liked ? 'currentColor' : 'none'} />
     </button>
@@ -126,9 +127,9 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
     <div ref={ref} className={`tracklist ${compact ? 'compact' : ''} ${hasAlbum ? '' : 'no-album'}`}>
       {!compact && (
         <div className="tl-head">
-          <span className="c-num">{onReorder ? <GripVertical size={14} title="드래그하여 순서 변경" /> : '#'}</span>
-          <span>제목</span>
-          {hasAlbum && <span className="c-album">앨범</span>}
+          <span className="c-num">{onReorder ? <GripVertical size={14} title={tr('드래그하여 순서 변경')} /> : '#'}</span>
+          <span>{tr('제목')}</span>
+          {hasAlbum && <span className="c-album">{tr('앨범')}</span>}
           <span className="c-dur"><Clock3 size={15} /></span>
         </div>
       )}
@@ -137,14 +138,14 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
         const reorderMenu = onReorder
           ? [
               { divider: true },
-              i > 0 && { label: '위로 이동', icon: ChevronUp, onClick: () => onReorder(i, i - 1) },
-              i < tracks.length - 1 && { label: '아래로 이동', icon: ChevronDown, onClick: () => onReorder(i, i + 1) },
-              i > 0 && { label: '맨 위로 이동', icon: ChevronsUp, onClick: () => onReorder(i, 0) },
-              i < tracks.length - 1 && { label: '맨 아래로 이동', icon: ChevronsDown, onClick: () => onReorder(i, tracks.length - 1) },
+              i > 0 && { label: tr('위로 이동'), icon: ChevronUp, onClick: () => onReorder(i, i - 1) },
+              i < tracks.length - 1 && { label: tr('아래로 이동'), icon: ChevronDown, onClick: () => onReorder(i, i + 1) },
+              i > 0 && { label: tr('맨 위로 이동'), icon: ChevronsUp, onClick: () => onReorder(i, 0) },
+              i < tracks.length - 1 && { label: tr('맨 아래로 이동'), icon: ChevronsDown, onClick: () => onReorder(i, tracks.length - 1) },
             ].filter(Boolean)
           : [];
         const extra = [
-          ...(onRemove ? [{ divider: true }, { label: '이 플레이리스트에서 삭제', icon: Trash2, onClick: () => onRemove(i) }] : []),
+          ...(onRemove ? [{ divider: true }, { label: tr('이 플레이리스트에서 삭제'), icon: Trash2, onClick: () => onRemove(i) }] : []),
           ...reorderMenu,
         ];
         return (
@@ -187,9 +188,9 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
             onContextMenu={(e) => openMenu(e, trackMenuItems(t, extra))}
           >
             <span className="c-num">
-              {onReorder && <GripVertical size={13} className="drag-handle" title="끌어서 순서 변경" />}
+              {onReorder && <GripVertical size={13} className="drag-handle" title={tr('끌어서 순서 변경')} />}
               {numbered ? <span className="num">{isCur ? <Equalizer playing={playing} /> : i + 1}</span> : isCur && <span className="num"><Equalizer playing={playing} /></span>}
-              <button className="row-play" onClick={() => play(i)} aria-label="재생">
+              <button className="row-play" onClick={() => play(i)} aria-label={tr('재생')}>
                 {isCur && playing ? <span className="pause-glyph" /> : <Play size={14} fill="currentColor" />}
               </button>
             </span>
@@ -209,7 +210,7 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
               <LikeButton track={t} className="hover-show" />
               <DownloadButton track={t} className="hover-show" size={16} />
               <span className="dur">{fmtTime(t.duration)}</span>
-              <button className="icon-btn hover-show" onClick={(e) => openMenu(e, trackMenuItems(t, extra))} aria-label="더 보기"><MoreHorizontal size={18} /></button>
+              <button className="icon-btn hover-show" onClick={(e) => openMenu(e, trackMenuItems(t, extra))} aria-label={tr('더 보기')}><MoreHorizontal size={18} /></button>
             </span>
           </div>
         );

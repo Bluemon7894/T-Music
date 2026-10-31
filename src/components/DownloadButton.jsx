@@ -1,5 +1,6 @@
 import { ArrowDownToLine, CircleCheck, X, RotateCw } from 'lucide-react';
 import { useDownloads, download, cancelDownload, retryDownload, removeDownload } from '../store/downloads.js';
+import { tr } from '../lib/i18n.js';
 
 export function ProgressRing({ value = 0, size = 18, stroke = 2.4 }) {
   const r = (size - stroke) / 2;
@@ -19,14 +20,14 @@ export default function DownloadButton({ track, size = 17, className = '' }) {
 
   if (done) {
     return (
-      <button className={`icon-btn dl done ${className}`} title="다운로드됨 · 클릭하면 삭제" onClick={(e) => { e.stopPropagation(); removeDownload(track.id); }}>
+      <button className={`icon-btn dl done ${className}`} title={tr('다운로드됨 · 클릭하면 삭제')} onClick={(e) => { e.stopPropagation(); removeDownload(track.id); }}>
         <CircleCheck size={size} />
       </button>
     );
   }
   if (job?.status === 'error') {
     return (
-      <button className={`icon-btn dl err ${className}`} title={`실패: ${job.error} · 다시 시도`} onClick={(e) => { e.stopPropagation(); retryDownload(track.id); }}>
+      <button className={`icon-btn dl err ${className}`} title={tr('실패: {0} · 다시 시도', job.error)} onClick={(e) => { e.stopPropagation(); retryDownload(track.id); }}>
         <RotateCw size={size} />
       </button>
     );
@@ -34,14 +35,14 @@ export default function DownloadButton({ track, size = 17, className = '' }) {
   if (job) {
     const pct = job.total ? job.received / job.total : 0;
     return (
-      <button className={`icon-btn dl busy ${className}`} title={`다운로드 중 ${Math.round(pct * 100)}% · 클릭하면 취소`} onClick={(e) => { e.stopPropagation(); cancelDownload(track.id); }}>
+      <button className={`icon-btn dl busy ${className}`} title={tr('다운로드 중 {0}% · 클릭하면 취소', Math.round(pct * 100))} onClick={(e) => { e.stopPropagation(); cancelDownload(track.id); }}>
         <ProgressRing value={pct} size={size + 2} />
         <X size={9} className="dl-x" />
       </button>
     );
   }
   return (
-    <button className={`icon-btn dl ${className}`} title="다운로드" onClick={(e) => { e.stopPropagation(); download(track); }}>
+    <button className={`icon-btn dl ${className}`} title={tr('다운로드')} onClick={(e) => { e.stopPropagation(); download(track); }}>
       <ArrowDownToLine size={size} />
     </button>
   );
@@ -56,17 +57,17 @@ export function DownloadAllButton({ tracks }) {
   const busy = tracks.filter((t) => active[t.id] && active[t.id].status !== 'error').length;
   if (!total) return null;
   if (have === total) {
-    return <button className="icon-btn big on" title="모두 다운로드됨"><CircleCheck size={28} /></button>;
+    return <button className="icon-btn big on" title={tr('모두 다운로드됨')}><CircleCheck size={28} /></button>;
   }
   if (busy) {
     return (
-      <button className="icon-btn big busy" title={`${have}/${total}곡 완료`}>
+      <button className="icon-btn big busy" title={tr('{0}/{1}곡 완료', have, total)}>
         <ProgressRing value={have / total} size={28} stroke={3} />
       </button>
     );
   }
   return (
-    <button className="icon-btn big" title={have ? `나머지 ${total - have}곡 다운로드` : `${total}곡 모두 다운로드`} onClick={() => download(tracks.filter((t) => !done.has(t.id)))}>
+    <button className="icon-btn big" title={have ? tr('나머지 {0}곡 다운로드', total - have) : tr('{0}곡 모두 다운로드', total)} onClick={() => download(tracks.filter((t) => !done.has(t.id)))}>
       <ArrowDownToLine size={26} />
     </button>
   );

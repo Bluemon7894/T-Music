@@ -1,7 +1,7 @@
 // Catalog: search, album/artist/playlist pages, related tracks, home feed.
 // Logged-out YT Music in Korea omits songs, home and radio, so those parts are
 // filled from regular YouTube.
-import { call } from './client.js';
+import { call, setMarket } from './client.js';
 import * as P from './parse.js';
 import { relevance, trackRelevance, albumRelevance, playlistRelevance, artistRelevance, keepRelevant } from './relevance.js';
 
@@ -18,6 +18,7 @@ async function cached(key, ttlMs, fn) {
 const MIN = 60 * 1000;
 const VIDEOS_ONLY = 'EgIQAQ%3D%3D';
 const FEW_PLAYLIST_TRACKS = 20;
+let homeShelves = null;
 const MAX_PLAYLIST_PAGES = 5;
 const INSTRUMENTAL = /\binst\b|instrumental|\bMR\b|반주/i;
 
@@ -364,6 +365,26 @@ export function related(videoId) {
   });
 }
 
+// Results follow the app's language: a different market gets different rankings and shelves.
+export function setLanguage(language) {
+  if (!setMarket(language)) return;
+  homeShelves = language === 'en' ? HOME_SHELVES_EN : HOME_SHELVES;
+  memo.clear();
+}
+
+const HOME_SHELVES_EN = [
+  { title: 'Top hits', query: 'top hits playlist' },
+  { title: 'New music', query: 'new music playlist' },
+  { title: 'Pop favorites', query: 'pop hits playlist' },
+  { title: 'Hip-hop & R&B', query: 'hip hop r&b playlist' },
+  { title: 'Rock classics', query: 'rock classics playlist' },
+  { title: 'Indie & acoustic', query: 'indie acoustic playlist' },
+  { title: 'Movie soundtracks', query: 'movie soundtrack playlist' },
+  { title: 'Music for focus', query: 'study focus music playlist' },
+  { title: 'K-POP', query: 'kpop hits playlist' },
+  { title: 'Late night', query: 'late night chill playlist' },
+];
+
 const HOME_SHELVES = [
   { title: '지금 뜨는 K-POP', query: 'K-POP 인기곡 플레이리스트' },
   { title: '새로 나온 음악', query: '최신 가요 플레이리스트' },
@@ -379,7 +400,7 @@ const HOME_SHELVES = [
 
 export function home() {
   return cached('home', 60 * MIN, async () => {
-    const shelves = await Promise.all(HOME_SHELVES.map(async (s) => {
+    const shelves = await Promise.all((homeShelves ?? HOME_SHELVES).map(async (s) => {
       try {
         const d = await call('/search', { client: 'YTMUSIC', query: s.query });
         const items = P.findAll(d, 'musicResponsiveListItemRenderer').map((r) => P.parseResponsive(r)).filter((i) => i && (i.kind === 'playlist' || i.kind === 'album'));

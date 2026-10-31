@@ -18,19 +18,20 @@ import { useFriends } from './friends.js';
 import { forgetLibrary, libraryData, setLibraryOwner } from './library.js';
 import { resetPlayer } from './player.js';
 import { useRoom } from './room.js';
+import { tr } from '../lib/i18n.js';
 
 const AUTH_ERRORS = {
-  'auth/network-request-failed': '인터넷 연결을 확인해 주세요.',
-  'auth/configuration-not-found': '로그인 서비스가 아직 설정되지 않았습니다.',
-  'auth/operation-not-allowed': '이 로그인 방식이 아직 켜져 있지 않습니다.',
-  'auth/admin-restricted-operation': '이 로그인 방식이 아직 켜져 있지 않습니다.',
-  'auth/too-many-requests': '시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
-  'auth/user-disabled': '사용이 중지된 계정입니다.',
-  'auth/invalid-credential': '구글 로그인에 실패했습니다. 다시 시도해 주세요.',
-  'auth/user-mismatch': '이 계정과 다른 구글 계정으로 로그인했습니다.',
+  'auth/network-request-failed': tr('인터넷 연결을 확인해 주세요.'),
+  'auth/configuration-not-found': tr('로그인 서비스가 아직 설정되지 않았습니다.'),
+  'auth/operation-not-allowed': tr('이 로그인 방식이 아직 켜져 있지 않습니다.'),
+  'auth/admin-restricted-operation': tr('이 로그인 방식이 아직 켜져 있지 않습니다.'),
+  'auth/too-many-requests': tr('시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.'),
+  'auth/user-disabled': tr('사용이 중지된 계정입니다.'),
+  'auth/invalid-credential': tr('구글 로그인에 실패했습니다. 다시 시도해 주세요.'),
+  'auth/user-mismatch': tr('이 계정과 다른 구글 계정으로 로그인했습니다.'),
 };
 
-const describe = (e) => AUTH_ERRORS[e?.code] || (e?.code ? '로그인에 실패했습니다.' : errorText(e));
+const describe = (e) => AUTH_ERRORS[e?.code] || (e?.code ? tr('로그인에 실패했습니다.') : errorText(e));
 const isOffline = (e) => e?.code === 'auth/network-request-failed';
 
 function toAccount(user) {
@@ -39,7 +40,7 @@ function toAccount(user) {
   return {
     uid: user.uid,
     isGuest: user.isAnonymous,
-    name: user.displayName || google?.displayName || '게스트',
+    name: user.displayName || google?.displayName || tr('게스트'),
     email: user.email || google?.email || null,
     photo: user.photoURL || google?.photoURL || null,
   };

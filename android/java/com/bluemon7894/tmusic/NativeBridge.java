@@ -89,6 +89,11 @@ final class NativeBridge {
     }
 
     @JavascriptInterface
+    public void setLanguage(String language) {
+        Lang.set(host.app, language);
+    }
+
+    @JavascriptInterface
     public void streamResolved(int request, String json) {
         Waiting wait = waiting.get(request);
         if (wait == null) return;
@@ -260,7 +265,7 @@ final class NativeBridge {
     @JavascriptInterface
     public void share(String text) {
         Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text);
-        startActivity(Intent.createChooser(send, "공유"));
+        startActivity(Intent.createChooser(send, Lang.say("공유", "Share")));
     }
 
     void startActivity(Intent intent) {
@@ -303,7 +308,7 @@ final class NativeBridge {
     @JavascriptInterface
     public void notify(String id, String title, String body) {
         NotificationManager manager = (NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE);
-        manager.createNotificationChannel(new NotificationChannel(SOCIAL_CHANNEL, "친구와 초대", NotificationManager.IMPORTANCE_HIGH));
+        manager.createNotificationChannel(new NotificationChannel(SOCIAL_CHANNEL, Lang.say("친구와 초대", "Friends and invites"), NotificationManager.IMPORTANCE_HIGH));
         Intent open = new Intent(app, MainActivity.class).putExtra(EXTRA_NOTIFICATION, id).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(app, id.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(app, SOCIAL_CHANNEL)

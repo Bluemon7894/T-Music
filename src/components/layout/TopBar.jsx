@@ -9,6 +9,7 @@ import { ProgressRing } from '../DownloadButton.jsx';
 import { AccountButton } from '../Account.jsx';
 import { useLibrary } from '../../store/library.js';
 import { IS_ANDROID } from '../../lib/platform.js';
+import { tr } from '../../lib/i18n.js';
 
 export function UpdatePill() {
   const hasUpdate = useUpdater((s) => s.hasUpdate);
@@ -18,9 +19,9 @@ export function UpdatePill() {
   if (!hasUpdate) return null;
 
   return (
-    <button className="update-pill" onClick={openModal} title="새로운 업데이트가 있습니다">
+    <button className="update-pill" onClick={openModal} title={tr('새로운 업데이트가 있습니다')}>
       <Sparkles size={14} />
-      <span>v{latestVersion} 업데이트</span>
+      <span>{tr('v{0} 업데이트', latestVersion)}</span>
     </button>
   );
 }
@@ -33,9 +34,9 @@ export function DownloadPill() {
   const received = jobs.reduce((n, j) => n + j.received, 0);
   const total = jobs.reduce((n, j) => n + (j.total || 0), 0);
   return (
-    <button className="dl-pill" onClick={() => go('downloads')} title="다운로드 진행 상황">
+    <button className="dl-pill" onClick={() => go('downloads')} title={tr('다운로드 진행 상황')}>
       <ProgressRing value={total ? received / total : 0} size={18} />
-      <span>{jobs.length}곡 받는 중</span>
+      <span>{tr('{0}곡 받는 중', jobs.length)}</span>
     </button>
   );
 }
@@ -99,7 +100,7 @@ export function SearchBox() {
     <input
       ref={inputRef}
       value={text}
-      placeholder="노래, 아티스트, 앨범 검색"
+      placeholder={tr('노래, 아티스트, 앨범 검색')}
       onChange={(e) => { setText(e.target.value); setHi(-1); }}
       onFocus={() => { setFocus(true); if (route.name !== 'search' && !text) go('search', {}); }}
       onBlur={() => setTimeout(() => setFocus(false), 150)}
@@ -115,14 +116,14 @@ export function SearchBox() {
         {/* Phone keyboards composing Korean don't always report the Enter key, but they do submit forms. */}
         {IS_ANDROID ? <form style={{ display: 'contents' }} onSubmit={(e) => { e.preventDefault(); submit(text); }}>{input}</form> : input}
         {text ? (
-          <button className="icon-btn sb-clear" onClick={() => { setText(''); inputRef.current?.focus(); }} aria-label="지우기"><X size={16} /></button>
+          <button className="icon-btn sb-clear" onClick={() => { setText(''); inputRef.current?.focus(); }} aria-label={tr('지우기')}><X size={16} /></button>
         ) : (
           <kbd className="sb-kbd">Ctrl K</kbd>
         )}
         {focus && !text.trim() && history.length > 0 && (
           <ul className="suggestions">
             <li className="sug-header" onMouseDown={(e) => e.preventDefault()}>
-              <span>최근 검색</span>
+              <span>{tr('최근 검색')}</span>
               <button
                 type="button"
                 className="text-btn"
@@ -132,9 +133,7 @@ export function SearchBox() {
                   e.stopPropagation();
                   clearAllHistory();
                 }}
-              >
-                모두 지우기
-              </button>
+              >{tr('모두 지우기')}</button>
             </li>
             {history.map((h, i) => (
               <li key={h} className={i === hi ? 'hi' : ''} onMouseDown={() => submit(h)}>
@@ -143,8 +142,8 @@ export function SearchBox() {
                 <button
                   type="button"
                   className="sug-del"
-                  title={`'${h}' 검색 기록 삭제`}
-                  aria-label="삭제"
+                  title={tr('\'{0}\' 검색 기록 삭제', h)}
+                  aria-label={tr('삭제')}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -182,15 +181,15 @@ export default function TopBar() {
   return (
     <header className="topbar">
       <div className="tb-nav">
-        <button className="icon-btn circle glass" disabled={!canBack} onClick={back} aria-label="뒤로"><ChevronLeft size={19} /></button>
-        <button className="icon-btn circle glass" disabled={!canFwd} onClick={forward} aria-label="앞으로"><ChevronRight size={19} /></button>
+        <button className="icon-btn circle glass" disabled={!canBack} onClick={back} aria-label={tr('뒤로')}><ChevronLeft size={19} /></button>
+        <button className="icon-btn circle glass" disabled={!canFwd} onClick={forward} aria-label={tr('앞으로')}><ChevronRight size={19} /></button>
       </div>
       <SearchBox />
       <div className="tb-right">
         <UpdatePill />
         <DownloadPill />
-        <button className={`icon-btn circle glass ${panelOpen ? 'on' : ''}`} onClick={togglePanel} title="지금 재생 중 패널"><PanelRight size={17} /></button>
-        <button className={`icon-btn circle glass ${route.name === 'settings' ? 'on' : ''}`} onClick={() => go('settings')} title="설정"><Settings size={17} /></button>
+        <button className={`icon-btn circle glass ${panelOpen ? 'on' : ''}`} onClick={togglePanel} title={tr('지금 재생 중 패널')}><PanelRight size={17} /></button>
+        <button className={`icon-btn circle glass ${route.name === 'settings' ? 'on' : ''}`} onClick={() => go('settings')} title={tr('설정')}><Settings size={17} /></button>
         <AccountButton />
       </div>
     </header>

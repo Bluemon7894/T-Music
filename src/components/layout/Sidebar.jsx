@@ -11,14 +11,15 @@ import { useRoom } from '../../store/room.js';
 import { animate, ease } from '../../lib/motion.js';
 import { Thumb, Equalizer } from '../common.jsx';
 import logo from '../../assets/logo-mark.png';
+import { tr } from '../../lib/i18n.js';
 
 const NAV = [
-  { id: 'home', label: '홈', icon: Home },
-  { id: 'search', label: '검색', icon: Search },
-  { id: 'library', label: '보관함', icon: Library },
-  { id: 'downloads', label: '다운로드', icon: ArrowDownToLine },
-  { id: 'room', label: '같이 듣기', icon: Users },
-  { id: 'friends', label: '친구', icon: UserRoundPlus },
+  { id: 'home', label: tr('홈'), icon: Home },
+  { id: 'search', label: tr('검색'), icon: Search },
+  { id: 'library', label: tr('보관함'), icon: Library },
+  { id: 'downloads', label: tr('다운로드'), icon: ArrowDownToLine },
+  { id: 'room', label: tr('같이 듣기'), icon: Users },
+  { id: 'friends', label: tr('친구'), icon: UserRoundPlus },
 ];
 
 function NavList() {
@@ -95,8 +96,8 @@ export default function Sidebar() {
   const newPlaylist = () => go('local', { id: lib.createPlaylist() });
 
   const playlistMenu = (e, p) => openMenu(e, [
-    ...(canEditPlaylist(p) ? [{ label: '이름 바꾸기', icon: Pencil, onClick: () => prompt({ title: '플레이리스트 이름 바꾸기', value: p.name, submitLabel: '저장', onSubmit: (v) => v.trim() && lib.renamePlaylist(p.id, v.trim()) }) }] : []),
-    { label: '삭제', icon: Trash2, onClick: () => confirmDeletePlaylist(p, () => { if (isActive('local', p.id)) go('home'); }) },
+    ...(canEditPlaylist(p) ? [{ label: tr('이름 바꾸기'), icon: Pencil, onClick: () => prompt({ title: tr('플레이리스트 이름 바꾸기'), value: p.name, submitLabel: tr('저장'), onSubmit: (v) => v.trim() && lib.renamePlaylist(p.id, v.trim()) }) }] : []),
+    { label: tr('삭제'), icon: Trash2, onClick: () => confirmDeletePlaylist(p, () => { if (isActive('local', p.id)) go('home'); }) },
   ]);
 
   return (
@@ -109,13 +110,13 @@ export default function Sidebar() {
 
       <div className="lib-head">
         <div className="seg">
-          <button className={tab === 'playlists' ? 'on' : ''} onClick={() => setTab('playlists')}>플레이리스트</button>
-          <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>저장됨</button>
+          <button className={tab === 'playlists' ? 'on' : ''} onClick={() => setTab('playlists')}>{tr('플레이리스트')}</button>
+          <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>{tr('저장됨')}</button>
         </div>
         <div className="lib-actions">
           <button
             className={`icon-btn circle accent ${dragOverId === 'new-pl' ? 'drag-over' : ''}`}
-            title="새 플레이리스트"
+            title={tr('새 플레이리스트')}
             onClick={newPlaylist}
             onDragOver={(e) => {
               e.preventDefault();
@@ -135,7 +136,7 @@ export default function Sidebar() {
                   if (track?.id) {
                     const id = lib.createPlaylist(track.title, [track]);
                     go('local', { id });
-                    toast(`새 플레이리스트에 '${track.title}'을(를) 추가했습니다`);
+                    toast(tr('새 플레이리스트에 \'{0}\'을(를) 추가했습니다', track.title));
                   }
                 }
               } catch {}
@@ -152,8 +153,8 @@ export default function Sidebar() {
             <Row
               active={isActive('liked')}
               onClick={() => go('liked')}
-              name="좋아요 표시한 곡"
-              sub={`${lib.liked.length}곡`}
+              name={tr('좋아요 표시한 곡')}
+              sub={tr('{0}곡', lib.liked.length)}
               art={<div className="lib-art liked-art"><Heart size={18} fill="#fff" /></div>}
               isDragOver={dragOverId === 'liked'}
               onDragOver={(e) => {
@@ -174,9 +175,9 @@ export default function Sidebar() {
                     if (track?.id) {
                       if (!lib.isLiked(track.id)) {
                         lib.toggleLike(track);
-                        toast(`'좋아요 표시한 곡'에 '${track.title}'을(를) 추가했습니다`);
+                        toast(tr('\'좋아요 표시한 곡\'에 \'{0}\'을(를) 추가했습니다', track.title));
                       } else {
-                        toast(`'좋아요 표시한 곡'에 이미 있는 곡입니다`);
+                        toast(tr('\'좋아요 표시한 곡\'에 이미 있는 곡입니다'));
                       }
                     }
                   }
@@ -190,7 +191,7 @@ export default function Sidebar() {
                 onClick={() => go('local', { id: p.id })}
                 onContextMenu={(e) => playlistMenu(e, p)}
                 name={p.name}
-                sub={`플레이리스트 · ${p.tracks.length}곡`}
+                sub={tr('플레이리스트 · {0}곡', p.tracks.length)}
                 art={p.thumb || p.tracks[0]?.thumb ? <Thumb src={p.thumb || p.tracks[0]?.thumb} className="lib-art" /> : <div className="lib-art"><ListMusic size={18} /></div>}
                 isDragOver={dragOverId === p.id}
                 onDragOver={(e) => {
@@ -212,9 +213,9 @@ export default function Sidebar() {
                       if (track?.id) {
                         const added = lib.addToPlaylist(p.id, track);
                         if (added > 0) {
-                          toast(`'${p.name}'에 '${track.title}'을(를) 추가했습니다`);
+                          toast(tr('\'{0}\'에 \'{1}\'을(를) 추가했습니다', p.name, track.title));
                         } else {
-                          toast(`'${p.name}'에 이미 있는 곡입니다`);
+                          toast(tr('\'{0}\'에 이미 있는 곡입니다', p.name));
                         }
                       }
                     }
@@ -226,23 +227,23 @@ export default function Sidebar() {
             ))}
             {!lib.playlists.length && (
               <div className="lib-cta">
-                <p>나만의 플레이리스트를 만들어 보세요</p>
-                <button className="btn sm grad" onClick={newPlaylist}><Plus size={14} /> 새로 만들기</button>
+                <p>{tr('나만의 플레이리스트를 만들어 보세요')}</p>
+                <button className="btn sm grad" onClick={newPlaylist}><Plus size={14} />{' '}{tr('새로 만들기')}</button>
               </div>
             )}
           </>
         ) : (
           <>
             {lib.savedAlbums.map((a) => (
-              <Row key={'al' + a.id} active={isActive('album', a.id)} onClick={() => go('album', { id: a.id })} name={a.title} sub={`${a.type || '앨범'} · ${a.artists?.map((x) => x.name).join(', ')}`} art={<Thumb src={a.thumb} className="lib-art" />} />
+              <Row key={'al' + a.id} active={isActive('album', a.id)} onClick={() => go('album', { id: a.id })} name={a.title} sub={`${a.type || tr('앨범')} · ${a.artists?.map((x) => x.name).join(', ')}`} art={<Thumb src={a.thumb} className="lib-art" />} />
             ))}
             {lib.followed.map((a) => (
-              <Row key={'ar' + a.id} active={isActive('artist', a.id)} onClick={() => go('artist', { id: a.id })} name={a.name} sub="아티스트" art={<Thumb src={a.thumb} round className="lib-art" />} />
+              <Row key={'ar' + a.id} active={isActive('artist', a.id)} onClick={() => go('artist', { id: a.id })} name={a.name} sub={tr('아티스트')} art={<Thumb src={a.thumb} round className="lib-art" />} />
             ))}
             {!lib.savedAlbums.length && !lib.followed.length && (
               <div className="lib-cta">
                 <Disc3 size={26} />
-                <p>앨범을 저장하거나 아티스트를 팔로우하면 여기에 모입니다</p>
+                <p>{tr('앨범을 저장하거나 아티스트를 팔로우하면 여기에 모입니다')}</p>
               </div>
             )}
           </>

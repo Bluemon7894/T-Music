@@ -1,3 +1,4 @@
+import { tr } from './i18n.js';
 import { IS_ANDROID } from './platform.js';
 
 const call = (method, ...args) => window.api.call(method, ...args);
@@ -12,6 +13,7 @@ export const api = {
   home: () => call('home'),
   lyrics: (track) => call('lyrics', track),
   refreshLyrics: (track) => call('refreshLyrics', track),
+  setLanguage: (language) => call('setLanguage', language),
   lyricsCandidates: (track, query) => call('lyricsCandidates', track, query),
   cleanLyricsQuery: (track) => call('cleanLyricsQuery', track),
   setCustomLyrics: (trackId, lyricsData) => call('setCustomLyrics', trackId, lyricsData),
@@ -59,5 +61,5 @@ export const streamUrl = (id) => (IS_ANDROID ? `/stream/${id}` : `ytm://stream/$
 
 // IPC errors arrive as "Error invoking remote method 'api': Error: <message>".
 export function errorText(e) {
-  return String(e?.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  return tr(String(e?.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));
 }

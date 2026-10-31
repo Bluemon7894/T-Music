@@ -8,6 +8,7 @@ import { Thumb, ArtistLinks, PlayButton } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
 import logo from '../../assets/logo-mark.png';
+import { tr } from '../../lib/i18n.js';
 
 export function Slider({ value, max, onChange, onCommit, buffered = 0, className = '' }) {
   const ref = useRef(null);
@@ -87,7 +88,7 @@ export default function PlayerDock() {
       <div className="dock-left">
         {track ? (
           <>
-            <button className="dock-art" onClick={() => setStage(true)} title="크게 보기">
+            <button className="dock-art" onClick={() => setStage(true)} title={tr('크게 보기')}>
               <Thumb src={track.thumb} />
               <span className="dock-art-hint"><Maximize2 size={16} /></span>
             </button>
@@ -105,7 +106,7 @@ export default function PlayerDock() {
             </div>
             <div className="dock-text">
               <div className="dock-title" style={{ cursor: 'default' }}>T-Music</div>
-              <div className="dock-artist"><span className="dock-empty-dot" /> 재생할 곡을 골라보세요</div>
+              <div className="dock-artist"><span className="dock-empty-dot" />{' '}{tr('재생할 곡을 골라보세요')}</div>
             </div>
           </div>
         )}
@@ -113,11 +114,11 @@ export default function PlayerDock() {
 
       <div className="dock-center">
         <div className="dock-controls">
-          <button className={`icon-btn toggle ${p.shuffle ? 'on' : ''}`} onClick={p.toggleShuffle} title="셔플"><Shuffle size={17} /></button>
-          <button className="icon-btn" onClick={p.prev} title="이전"><SkipBack size={20} fill="currentColor" /></button>
+          <button className={`icon-btn toggle ${p.shuffle ? 'on' : ''}`} onClick={p.toggleShuffle} title={tr('셔플')}><Shuffle size={17} /></button>
+          <button className="icon-btn" onClick={p.prev} title={tr('이전')}><SkipBack size={20} fill="currentColor" /></button>
           <PlayButton size={42} playing={p.playing} onClick={p.toggle} className={`dock-play ${p.loading && p.playing ? 'loading' : ''}`} />
-          <button className="icon-btn" onClick={() => p.next()} title="다음"><SkipForward size={20} fill="currentColor" /></button>
-          <button className={`icon-btn toggle ${p.repeat !== 'off' ? 'on' : ''}`} onClick={p.cycleRepeat} title={{ off: '반복 안 함', all: '전체 반복', one: '한 곡 반복' }[p.repeat]}>
+          <button className="icon-btn" onClick={() => p.next()} title={tr('다음')}><SkipForward size={20} fill="currentColor" /></button>
+          <button className={`icon-btn toggle ${p.repeat !== 'off' ? 'on' : ''}`} onClick={p.cycleRepeat} title={{ off: tr('반복 안 함'), all: tr('전체 반복'), one: tr('한 곡 반복') }[p.repeat]}>
             {p.repeat === 'one' ? <Repeat1 size={17} /> : <Repeat size={17} />}
           </button>
         </div>
@@ -129,11 +130,11 @@ export default function PlayerDock() {
       </div>
 
       <div className="dock-right">
-        <button className={`icon-btn toggle ${lyricsOn ? 'on' : ''}`} onClick={() => (lyricsOn ? useUI.getState().togglePanel() : setPanelTab('lyrics'))} title="가사" disabled={!track}><Mic2 size={18} /></button>
-        <button className={`icon-btn toggle ${queueOn ? 'on' : ''}`} onClick={() => (queueOn ? useUI.getState().togglePanel() : setPanelTab('queue'))} title="대기열"><ListMusic size={18} /></button>
-        <button className="icon-btn" onClick={() => useUI.getState().setMini(true)} title="미니 플레이어"><PictureInPicture2 size={17} /></button>
-        <button className="icon-btn" onClick={() => setStage(true)} title="전체 화면" disabled={!track}><Maximize2 size={16} /></button>
-        <button className="icon-btn" onClick={p.toggleMute} title="음소거"><VolIcon size={18} /></button>
+        <button className={`icon-btn toggle ${lyricsOn ? 'on' : ''}`} onClick={() => (lyricsOn ? useUI.getState().togglePanel() : setPanelTab('lyrics'))} title={tr('가사')} disabled={!track}><Mic2 size={18} /></button>
+        <button className={`icon-btn toggle ${queueOn ? 'on' : ''}`} onClick={() => (queueOn ? useUI.getState().togglePanel() : setPanelTab('queue'))} title={tr('대기열')}><ListMusic size={18} /></button>
+        <button className="icon-btn" onClick={() => useUI.getState().setMini(true)} title={tr('미니 플레이어')}><PictureInPicture2 size={17} /></button>
+        <button className="icon-btn" onClick={() => setStage(true)} title={tr('전체 화면')} disabled={!track}><Maximize2 size={16} /></button>
+        <button className="icon-btn" onClick={p.toggleMute} title={tr('음소거')}><VolIcon size={18} /></button>
         <Slider className="volume" value={p.muted ? 0 : p.volume} max={1} onChange={p.setVolume} />
       </div>
     </footer>

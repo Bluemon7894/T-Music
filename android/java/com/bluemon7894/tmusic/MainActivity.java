@@ -78,11 +78,12 @@ public class MainActivity extends Activity {
 
     private void askToUpdateWebView() {
         String provider = WebView.getCurrentWebViewPackage().packageName;
+        Lang.load(this);
         new AlertDialog.Builder(this)
-            .setTitle("Android 시스템 WebView를 업데이트해 주세요")
-            .setMessage("T-Music은 WebView " + MIN_WEBVIEW_VERSION + " 이상에서 실행됩니다. Play 스토어에서 업데이트한 뒤 다시 열어 주세요.")
+            .setTitle(Lang.say("Android 시스템 WebView를 업데이트해 주세요", "Please update Android System WebView"))
+            .setMessage(Lang.say("T-Music은 WebView " + MIN_WEBVIEW_VERSION + " 이상에서 실행됩니다. Play 스토어에서 업데이트한 뒤 다시 열어 주세요.", "T-Music needs WebView " + MIN_WEBVIEW_VERSION + " or newer. Update it in the Play Store, then open the app again."))
             .setCancelable(false)
-            .setPositiveButton("Play 스토어 열기", (dialog, which) -> {
+            .setPositiveButton(Lang.say("Play 스토어 열기", "Open Play Store"), (dialog, which) -> {
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + provider)));
                 } catch (Exception e) {
@@ -90,7 +91,7 @@ public class MainActivity extends Activity {
                 }
                 finish();
             })
-            .setNegativeButton("닫기", (dialog, which) -> finish())
+            .setNegativeButton(Lang.say("닫기", "Close"), (dialog, which) -> finish())
             .show();
     }
 

@@ -1,6 +1,7 @@
 // App updates from GitHub. Android releases are tagged android-vX.Y.Z and are never marked as the
 // repository's latest release, because that one is what the desktop app updates from.
 import { Native, onNative } from './native.js';
+import { tr } from '../lib/i18n.js';
 
 const RELEASES = 'https://api.github.com/repos/Bluemon7894/T-Music/releases?per_page=50';
 const TAG = /^android-v(\d+(\.\d+)*)$/;
@@ -23,7 +24,7 @@ function isNewer(next, base) {
 
 export async function checkUpdate() {
   const res = await fetch(RELEASES, { headers: { Accept: 'application/vnd.github.v3+json', 'User-Agent': 'T-Music-App' } });
-  if (!res.ok) throw new Error(`GitHub 응답 오류 (${res.status})`);
+  if (!res.ok) throw new Error(tr('GitHub 응답 오류 ({0})', res.status));
   const releases = await res.json();
   const release = releases.find((r) => !r.draft && TAG.test(r.tag_name) && r.assets?.some((a) => a.name.endsWith('.apk')));
   if (!release) return { hasUpdate: false, currentVersion: current };
@@ -44,7 +45,7 @@ export async function checkUpdate() {
 }
 
 export function downloadUpdate() {
-  if (!downloadUrl) throw new Error('업데이트를 먼저 확인해 주세요');
+  if (!downloadUrl) throw new Error(tr('업데이트를 먼저 확인해 주세요'));
   Native.updateDownload(downloadUrl);
 }
 

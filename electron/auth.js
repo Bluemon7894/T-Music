@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
+import { say } from './lang.js';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -52,8 +53,8 @@ function waitForCode(config, verifier) {
       const code = url.searchParams.get('code');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(code
-        ? resultPage('로그인되었습니다', '이 창을 닫고 T-Music으로 돌아가세요.')
-        : resultPage('로그인이 취소되었습니다', '이 창을 닫아도 됩니다.'));
+        ? resultPage(say('로그인되었습니다', 'Signed in'), say('이 창을 닫고 T-Music으로 돌아가세요.', 'Close this window and go back to T-Music.'))
+        : resultPage(say('로그인이 취소되었습니다', 'Sign-in cancelled'), say('이 창을 닫아도 됩니다.', 'You can close this window.')));
       finish(code ? { code, redirectUri: redirectUri() } : null);
     });
     const redirectUri = () => `http://127.0.0.1:${server.address().port}/callback`;

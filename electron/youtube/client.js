@@ -7,15 +7,31 @@ Log.setLevel(Log.Level.NONE);
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
 
+const MARKETS = {
+  ko: { lang: 'ko', location: 'KR', accept: 'ko-KR,ko;q=0.9' },
+  en: { lang: 'en', location: 'US', accept: 'en-US,en;q=0.9' },
+};
+
+let market = MARKETS.ko;
 let client = null;
 let creating = null;
+
+// What YouTube ranks and names things for. A new market needs a new session.
+export function setMarket(language) {
+  const next = MARKETS[language] || MARKETS.ko;
+  if (next === market) return false;
+  market = next;
+  client = null;
+  creating = null;
+  return true;
+}
 
 // youtubei.js ships a hard-coded YT Music client version that goes stale; an old
 // version gets degraded search results, so pick up the live one when we can.
 async function refreshMusicClientVersion() {
   try {
     const res = await fetch('https://music.youtube.com/', {
-      headers: { 'User-Agent': UA, 'Accept-Language': 'ko-KR,ko;q=0.9' },
+      headers: { 'User-Agent': UA, 'Accept-Language': market.accept },
       signal: AbortSignal.timeout(4000),
     });
     const m = (await res.text()).match(/"INNERTUBE_CLIENT_VERSION":"([\d.]+)"/);
@@ -27,12 +43,15 @@ async function refreshMusicClientVersion() {
 
 export async function getClient() {
   if (client) return client;
-  creating ??= (async () => {
+  const wanted = market;
+  const started = creating ?? (async () => {
     await refreshMusicClientVersion();
-    client = await Innertube.create({ lang: 'ko', location: 'KR', retrieve_player: false });
-    return client;
-  })().finally(() => { creating = null; });
-  return creating;
+    const made = await Innertube.create({ lang: wanted.lang, location: wanted.location, retrieve_player: false });
+    if (wanted === market) client = made;
+    return made;
+  })().finally(() => { if (creating === started) creating = null; });
+  creating = started;
+  return started;
 }
 
 export function resetClient() {

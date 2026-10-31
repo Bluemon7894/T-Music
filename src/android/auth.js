@@ -1,6 +1,7 @@
 // Google sign-in, the Android counterpart of electron/auth.js: the user signs in from their browser
 // and the answer comes back to a one-time server on the phone (AuthServer.java).
 import { Native, onNative } from './native.js';
+import { tr } from '../lib/i18n.js';
 
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -48,13 +49,13 @@ function waitForCode() {
 // Returns { idToken, accessToken } for Firebase, or null if the user didn't finish signing in.
 export async function googleSignIn() {
   const config = await loadConfig();
-  if (!config) throw new Error('구글 로그인이 아직 설정되지 않았습니다');
+  if (!config) throw new Error(tr('구글 로그인이 아직 설정되지 않았습니다'));
   cancelGoogleSignIn();
 
   const verifier = randomString(48);
   const state = randomString(24);
   const port = Native.authListen(state);
-  if (port < 0) throw new Error('구글 로그인을 시작하지 못했습니다');
+  if (port < 0) throw new Error(tr('구글 로그인을 시작하지 못했습니다'));
   const redirectUri = `http://127.0.0.1:${port}/callback`;
   const challenge = base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
   const params = new URLSearchParams({
@@ -85,6 +86,6 @@ export async function googleSignIn() {
     }),
   });
   const tokens = await res.json().catch(() => ({}));
-  if (!res.ok || !tokens.id_token) throw new Error('구글 로그인에 실패했습니다');
+  if (!res.ok || !tokens.id_token) throw new Error(tr('구글 로그인에 실패했습니다'));
   return { idToken: tokens.id_token, accessToken: tokens.access_token };
 }

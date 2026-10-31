@@ -10,6 +10,7 @@ import { DownloadAllButton } from '../components/DownloadButton.jsx';
 import { Shelf } from '../components/Cards.jsx';
 import { colorFor } from '../lib/util.js';
 import { useEnter, animate } from '../lib/motion.js';
+import { tr } from '../lib/i18n.js';
 
 export default function Artist({ id }) {
   const res = useAsync(() => api.artist(id), [id]);
@@ -40,32 +41,32 @@ export default function Artist({ id }) {
         <div className="artist-hero-img" style={{ backgroundImage: a.thumb ? `url("${a.thumb}")` : undefined }} />
         <div className="artist-hero-shade" />
         <div className="artist-hero-text">
-          <span className="verified" data-enter><BadgeCheck size={18} /> 아티스트</span>
+          <span className="verified" data-enter><BadgeCheck size={18} />{' '}{tr('아티스트')}</span>
           <h1 className={a.name.length > 14 ? 'long' : ''} data-enter>{a.name}</h1>
-          {a.subscribers && <span className="listeners" data-enter>구독자 {a.subscribers}명</span>}
+          {a.subscribers && <span className="listeners" data-enter>{tr('구독자 {0}명', a.subscribers)}</span>}
         </div>
       </div>
       <div className="page-body">
         <div className="action-bar" data-enter>
           <PlayButton size={58} playing={isThis && playing} onClick={() => (isThis ? usePlayer.getState().toggle() : usePlayer.getState().playList(a.songs, 0, context))} />
-          <button className="icon-btn big" title="셔플 재생" onClick={() => { const p = usePlayer.getState(); if (!p.shuffle) p.toggleShuffle(); p.playList(a.songs, Math.floor(Math.random() * a.songs.length), context); }}><Shuffle size={24} /></button>
-          {a.songs[0] && <button className="icon-btn big" title="아티스트 라디오" onClick={() => startRadio(a.songs[0])}><Radio size={24} /></button>}
+          <button className="icon-btn big" title={tr('셔플 재생')} onClick={() => { const p = usePlayer.getState(); if (!p.shuffle) p.toggleShuffle(); p.playList(a.songs, Math.floor(Math.random() * a.songs.length), context); }}><Shuffle size={24} /></button>
+          {a.songs[0] && <button className="icon-btn big" title={tr('아티스트 라디오')} onClick={() => startRadio(a.songs[0])}><Radio size={24} /></button>}
           <DownloadAllButton tracks={a.songs} />
-          <button className={`btn outline ${following ? 'on' : ''}`} onClick={() => { toggleFollow(a); toast(following ? '팔로우를 취소했습니다' : '팔로우했습니다'); }}>
-            {following ? '팔로잉' : '팔로우'}
+          <button className={`btn outline ${following ? 'on' : ''}`} onClick={() => { toggleFollow(a); toast(following ? tr('팔로우를 취소했습니다') : tr('팔로우했습니다')); }}>
+            {following ? tr('팔로잉') : tr('팔로우')}
           </button>
         </div>
         <div className="artist-grid">
           {a.songs.length > 0 && (
             <section className="artist-top" data-enter>
-              <h2>인기 곡</h2>
+              <h2>{tr('인기 곡')}</h2>
               <TrackList tracks={more ? a.songs : a.songs.slice(0, 5)} context={context} showAlbum={false} compact animate={false} />
-              {a.songs.length > 5 && <button className="text-btn" onClick={() => setMore(!more)}>{more ? '간단히 보기' : '더 보기'}</button>}
+              {a.songs.length > 5 && <button className="text-btn" onClick={() => setMore(!more)}>{more ? tr('간단히 보기') : tr('더 보기')}</button>}
             </section>
           )}
           {a.description && (
             <section className="about" data-enter>
-              <h2>소개</h2>
+              <h2>{tr('소개')}</h2>
               <div className="about-card" style={{ backgroundImage: a.thumb ? `url("${a.thumb}")` : undefined }}>
                 <div className="about-shade" />
                 <p>{a.description}</p>

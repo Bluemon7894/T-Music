@@ -9,6 +9,7 @@ import { artistNames, fmtTime } from '../../lib/util.js';
 import { PlayButton, Thumb } from '../common.jsx';
 import { Slider } from './PlayerDock.jsx';
 import logo from '../../assets/logo-mark.png';
+import { tr } from '../../lib/i18n.js';
 
 export default function MiniPlayer() {
   const track = usePlayer((s) => s.queue[s.index]);
@@ -33,17 +34,17 @@ export default function MiniPlayer() {
       <div className="mini-body">
         <div className="mini-text">
           <b title={track?.title}>{track?.title || 'T-Music'}</b>
-          <small>{track ? artistNames(track) : '재생할 곡을 골라보세요'}</small>
+          <small>{track ? artistNames(track) : tr('재생할 곡을 골라보세요')}</small>
         </div>
         <div className="mini-controls">
-          <button className="icon-btn" onClick={prev} aria-label="이전 곡"><SkipBack size={18} fill="currentColor" /></button>
+          <button className="icon-btn" onClick={prev} aria-label={tr('이전 곡')}><SkipBack size={18} fill="currentColor" /></button>
           <PlayButton size={36} playing={playing} onClick={toggle} />
-          <button className="icon-btn" onClick={() => next()} aria-label="다음 곡"><SkipForward size={18} fill="currentColor" /></button>
+          <button className="icon-btn" onClick={() => next()} aria-label={tr('다음 곡')}><SkipForward size={18} fill="currentColor" /></button>
           <div className="mini-volume">
-            <button className="icon-btn" onClick={toggleMute} aria-label={muted ? '음소거 해제' : '음소거'}><VolumeIcon size={16} /></button>
+            <button className="icon-btn" onClick={toggleMute} aria-label={muted ? tr('음소거 해제') : tr('음소거')}><VolumeIcon size={16} /></button>
             <Slider className="volume" value={muted ? 0 : volume} max={1} onChange={setVolume} />
           </div>
-          <button className="icon-btn mini-expand" onClick={() => setMini(false)} title="큰 화면으로" aria-label="큰 화면으로"><Maximize2 size={16} /></button>
+          <button className="icon-btn mini-expand" onClick={() => setMini(false)} title={tr('큰 화면으로')} aria-label={tr('큰 화면으로')}><Maximize2 size={16} /></button>
         </div>
         <div className="mini-seek">
           <span>{fmtTime(time)}</span>

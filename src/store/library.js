@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { tr } from '../lib/i18n.js';
 
 // The signed-in account's saved data. It's kept on this computer per account for instant loading,
 // and lib/librarySync.js mirrors it to the account. No YouTube account is involved.
@@ -73,7 +74,7 @@ export const useLibrary = create(
 
       createPlaylist(name, tracks = [], extra = {}) {
         const id = newId();
-        set({ playlists: [{ id, name: name || `내 플레이리스트 #${get().playlists.length + 1}`, tracks: tracks.map(slim), created: Date.now(), ...extra }, ...get().playlists] });
+        set({ playlists: [{ id, name: name || tr('내 플레이리스트 #{0}', get().playlists.length + 1), tracks: tracks.map(slim), created: Date.now(), ...extra }, ...get().playlists] });
         return id;
       },
       renamePlaylist(id, name) {
@@ -233,7 +234,7 @@ export function weeklyStats(listens) {
   const days = Array.from({ length: 7 }, (_, i) => {
     const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (6 - i));
     const end = start.getTime() + DAY;
-    return { label: '일월화수목금토'[start.getDay()], min: Math.round(week.filter((l) => l.at >= start.getTime() && l.at < end).reduce((n, l) => n + l.sec, 0) / 60) };
+    return { label: tr('일월화수목금토')[start.getDay()], min: Math.round(week.filter((l) => l.at >= start.getTime() && l.at < end).reduce((n, l) => n + l.sec, 0) / 60) };
   });
   return { minutes, hours, mins, plays: week.length, topArtist, topTracks, days };
 }

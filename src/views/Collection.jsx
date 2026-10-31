@@ -17,6 +17,7 @@ import { useAsync, Thumb, PlayButton, ArtistLinks, PageSkeleton, ErrorMsg, Empty
 import TrackList, { startRadio } from '../components/TrackList.jsx';
 import { DownloadAllButton } from '../components/DownloadButton.jsx';
 import { Shelf } from '../components/Cards.jsx';
+import { tr } from '../lib/i18n.js';
 
 function Header({ kind, title, thumb, art, color, meta, description }) {
   const artRef = useRef(null);
@@ -55,9 +56,9 @@ function ActionBar({ tracks, context, children }) {
   return (
     <div className="action-bar" data-enter>
       <PlayButton size={58} playing={isThis && playing} onClick={playAll} />
-      <button className="icon-btn big" title="셔플 재생" onClick={shuffleAll}><Shuffle size={24} /></button>
-      {tracks[0] && <button className="icon-btn big" title="비슷한 곡 라디오" onClick={() => startRadio(tracks[0])}><Radio size={24} /></button>}
-      {tracks.length > 0 && <button className="icon-btn big" title="전체를 대기열에 추가" onClick={() => usePlayer.getState().addToQueue(tracks)}><ListEnd size={24} /></button>}
+      <button className="icon-btn big" title={tr('셔플 재생')} onClick={shuffleAll}><Shuffle size={24} /></button>
+      {tracks[0] && <button className="icon-btn big" title={tr('비슷한 곡 라디오')} onClick={() => startRadio(tracks[0])}><Radio size={24} /></button>}
+      {tracks.length > 0 && <button className="icon-btn big" title={tr('전체를 대기열에 추가')} onClick={() => usePlayer.getState().addToQueue(tracks)}><ListEnd size={24} /></button>}
       <DownloadAllButton tracks={tracks} />
       {children}
     </div>
@@ -72,7 +73,7 @@ function Filterable({ tracks, children }) {
       {tracks.length > 8 && (
         <div className="filter-box">
           <SearchIcon size={15} />
-          <input value={q} placeholder="목록에서 찾기" onChange={(e) => setQ(e.target.value)} />
+          <input value={q} placeholder={tr('목록에서 찾기')} onChange={(e) => setQ(e.target.value)} />
         </div>
       )}
       {children(shown, !!q)}
@@ -102,11 +103,11 @@ export function Album({ id }) {
         title={a.title}
         thumb={a.thumb}
         color={colorFor(a.id)}
-        meta={<><ArtistLinks artists={a.artists} className="strong" />{a.year && <span> · {a.year}</span>}<span> · {a.tracks.length}곡, {totalTime(a.tracks)}</span></>}
+        meta={<><ArtistLinks artists={a.artists} className="strong" />{a.year && <span> · {a.year}</span>}<span>{tr('· {0}곡, {1}', a.tracks.length, totalTime(a.tracks))}</span></>}
       />
       <div className="page-body">
         <ActionBar tracks={a.tracks} context={context}>
-          <button className={`icon-btn big ${saved ? 'on' : ''}`} title={saved ? '보관함에서 삭제' : '보관함에 저장'} onClick={() => { toggleSaved(a); toast(saved ? '보관함에서 삭제했습니다' : '보관함에 저장했습니다'); }}>
+          <button className={`icon-btn big ${saved ? 'on' : ''}`} title={saved ? tr('보관함에서 삭제') : tr('보관함에 저장')} onClick={() => { toggleSaved(a); toast(saved ? tr('보관함에서 삭제했습니다') : tr('보관함에 저장했습니다')); }}>
             {saved ? <CheckCircle2 size={28} /> : <PlusCircle size={28} />}
           </button>
         </ActionBar>
@@ -130,16 +131,16 @@ export function Playlist({ id }) {
   return (
     <div className="page collection" ref={ref}>
       <Header
-        kind="플레이리스트"
+        kind={tr('플레이리스트')}
         title={pl.title}
         thumb={pl.thumb}
         color={colorFor(pl.id)}
         description={pl.description?.slice(0, 160)}
-        meta={<>{pl.author && <b>{pl.author} · </b>}<span>{pl.tracks.length}곡, {totalTime(pl.tracks)}</span></>}
+        meta={<>{pl.author && <b>{pl.author} · </b>}<span>{tr('{0}곡, {1}', pl.tracks.length, totalTime(pl.tracks))}</span></>}
       />
       <div className="page-body">
         <ActionBar tracks={pl.tracks} context={context}>
-          <button className="icon-btn big" title="내 보관함에 복사" onClick={() => { const nid = createPlaylist(pl.title, pl.tracks, { source: pl.id, thumb: pl.thumb }); toast('내 플레이리스트로 저장했습니다'); go('local', { id: nid }); }}>
+          <button className="icon-btn big" title={tr('내 보관함에 복사')} onClick={() => { const nid = createPlaylist(pl.title, pl.tracks, { source: pl.id, thumb: pl.thumb }); toast(tr('내 플레이리스트로 저장했습니다')); go('local', { id: nid }); }}>
             <PlusCircle size={28} />
           </button>
         </ActionBar>
@@ -153,15 +154,15 @@ export function Liked() {
   const liked = useLibrary((s) => s.liked);
   const go = useNav((s) => s.go);
   const ref = usePage([]);
-  const context = { name: '좋아요 표시한 곡' };
+  const context = { name: tr('좋아요 표시한 곡') };
   return (
     <div className="page collection" ref={ref}>
       <Header
-        kind="플레이리스트"
-        title="좋아요 표시한 곡"
+        kind={tr('플레이리스트')}
+        title={tr('좋아요 표시한 곡')}
         color="hsl(262 60% 45%)"
         art={<div className="ph-art liked-art big"><Heart size={76} fill="#fff" /></div>}
-        meta={<span>{liked.length}곡{liked.length ? `, ${totalTime(liked)}` : ''}</span>}
+        meta={<span>{tr('{0}곡', liked.length)}{liked.length ? `, ${totalTime(liked)}` : ''}</span>}
       />
       <div className="page-body">
         {liked.length ? (
@@ -170,8 +171,8 @@ export function Liked() {
             <Filterable tracks={liked}>{(shown) => <TrackList tracks={shown} context={context} />}</Filterable>
           </>
         ) : (
-          <Empty icon={Heart} title="좋아하는 곡을 모아보세요" text="곡 옆의 하트를 누르면 여기에 저장돼요.">
-            <button className="btn grad" onClick={() => go('search', {})}>곡 찾아보기</button>
+          <Empty icon={Heart} title={tr('좋아하는 곡을 모아보세요')} text={tr('곡 옆의 하트를 누르면 여기에 저장돼요.')}>
+            <button className="btn grad" onClick={() => go('search', {})}>{tr('곡 찾아보기')}</button>
           </Empty>
         )}
       </div>
@@ -188,10 +189,10 @@ export function LocalPlaylist({ id }) {
   const go = useNav((s) => s.go);
   const ref = usePage([id]);
   const [dragOver, setDragOver] = useState(false);
-  if (!pl) return <ErrorMsg error="플레이리스트를 찾을 수 없습니다." />;
+  if (!pl) return <ErrorMsg error={tr('플레이리스트를 찾을 수 없습니다.')} />;
   const context = { name: pl.name };
   const editable = canEditPlaylist(pl);
-  const rename = () => prompt({ title: '플레이리스트 이름 바꾸기', value: pl.name, submitLabel: '저장', onSubmit: (v) => v.trim() && renamePlaylist(pl.id, v.trim()) });
+  const rename = () => prompt({ title: tr('플레이리스트 이름 바꾸기'), value: pl.name, submitLabel: tr('저장'), onSubmit: (v) => v.trim() && renamePlaylist(pl.id, v.trim()) });
   const cover = pl.thumb || pl.tracks[0]?.thumb;
   return (
     <div
@@ -217,9 +218,9 @@ export function LocalPlaylist({ id }) {
             if (track?.id) {
               const added = addToPlaylist(pl.id, track);
               if (added > 0) {
-                toast(`'${pl.name}'에 '${track.title}'을(를) 추가했습니다`);
+                toast(tr('\'{0}\'에 \'{1}\'을(를) 추가했습니다', pl.name, track.title));
               } else {
-                toast(`'${pl.name}'에 이미 있는 곡입니다`);
+                toast(tr('\'{0}\'에 이미 있는 곡입니다', pl.name));
               }
             }
           }
@@ -227,17 +228,17 @@ export function LocalPlaylist({ id }) {
       }}
     >
       <Header
-        kind={pl.share ? '공유 플레이리스트' : '내 플레이리스트'}
+        kind={pl.share ? tr('공유 플레이리스트') : tr('내 플레이리스트')}
         title={pl.name}
         thumb={cover}
         color={colorFor(pl.id)}
         art={cover ? undefined : <div className="ph-art empty-art" onClick={editable ? rename : undefined}><ListMusic size={64} /></div>}
-        meta={<span>{pl.tracks.length}곡{pl.tracks.length ? `, ${totalTime(pl.tracks)}` : ''}</span>}
+        meta={<span>{tr('{0}곡', pl.tracks.length)}{pl.tracks.length ? `, ${totalTime(pl.tracks)}` : ''}</span>}
       />
       <div className="page-body">
         <ActionBar tracks={pl.tracks} context={context}>
-          {editable && <button className="icon-btn big" title="이름 바꾸기" onClick={rename}><Pencil size={21} /></button>}
-          <button className="icon-btn big" title={pl.share && !isOwnShare(pl) ? '내 보관함에서 빼기' : '삭제'} onClick={() => confirmDeletePlaylist(pl, () => go('home'))}><Trash2 size={21} /></button>
+          {editable && <button className="icon-btn big" title={tr('이름 바꾸기')} onClick={rename}><Pencil size={21} /></button>}
+          <button className="icon-btn big" title={pl.share && !isOwnShare(pl) ? tr('내 보관함에서 빼기') : tr('삭제')} onClick={() => confirmDeletePlaylist(pl, () => go('home'))}><Trash2 size={21} /></button>
         </ActionBar>
         <SharePanel playlist={pl} />
         {pl.tracks.length ? (
@@ -252,8 +253,8 @@ export function LocalPlaylist({ id }) {
             )}
           </Filterable>
         ) : (
-          <Empty icon={ListMusic} title="아직 비어 있어요" text={IS_ANDROID ? "곡의 ⋯ 버튼에서 '플레이리스트에 추가'를 눌러 담아보세요." : "곡을 우클릭하고 '플레이리스트에 추가'를 눌러 담아보세요."}>
-            <button className="btn grad" onClick={() => go('search', {})}>곡 찾아보기</button>
+          <Empty icon={ListMusic} title={tr('아직 비어 있어요')} text={IS_ANDROID ? tr('곡의 ⋯ 버튼에서 \'플레이리스트에 추가\'를 눌러 담아보세요.') : tr('곡을 우클릭하고 \'플레이리스트에 추가\'를 눌러 담아보세요.')}>
+            <button className="btn grad" onClick={() => go('search', {})}>{tr('곡 찾아보기')}</button>
           </Empty>
         )}
       </div>

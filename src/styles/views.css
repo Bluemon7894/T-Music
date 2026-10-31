@@ -582,6 +582,7 @@
 .stage-upnext { display: flex; align-items: center; gap: 10px; width: 100%; max-width: min(340px, 90%); padding: 7px 12px 7px 7px; border-radius: 14px; background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line); color: var(--sub); text-align: left; transition: background 0.2s; }
 .stage-upnext:hover { background: rgba(255, 255, 255, 0.13); color: #fff; }
 .stage-upnext .thumb { width: 38px; height: 38px; flex: none; border-radius: 8px; }
+.stage-upnext .stage-upnext-random { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 8px; background: rgba(167, 139, 250, 0.2); color: var(--v-200); }
 .stage-upnext span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .stage-upnext small { font-size: 11px; font-weight: 700; color: var(--dim); letter-spacing: 0.02em; }
 .stage-upnext b { font-size: 13px; color: var(--text, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

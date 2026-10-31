@@ -16,13 +16,14 @@ import UpdateModal from '../UpdateModal.jsx';
 import { SearchBox, UpdatePill, DownloadPill } from '../layout/TopBar.jsx';
 import MobileStage from './MobileStage.jsx';
 import logo from '../../assets/logo-mark.png';
+import { tr } from '../../lib/i18n.js';
 
 const TABS = [
-  { id: 'home', label: '홈', icon: Home },
-  { id: 'search', label: '검색', icon: Search },
-  { id: 'library', label: '보관함', icon: Library },
-  { id: 'room', label: '같이 듣기', icon: Users },
-  { id: 'friends', label: '친구', icon: UserRoundPlus },
+  { id: 'home', label: tr('홈'), icon: Home },
+  { id: 'search', label: tr('검색'), icon: Search },
+  { id: 'library', label: tr('보관함'), icon: Library },
+  { id: 'room', label: tr('같이 듣기'), icon: Users },
+  { id: 'friends', label: tr('친구'), icon: UserRoundPlus },
 ];
 
 const isTab = (name) => TABS.some((t) => t.id === name);
@@ -38,13 +39,13 @@ function MobileTop() {
       {isTab(route.name) ? (
         <div className="m-brand"><img src={logo} alt="" draggable={false} /><span>T-Music</span></div>
       ) : (
-        <button className="icon-btn circle glass" onClick={back} aria-label="뒤로"><ChevronLeft size={20} /></button>
+        <button className="icon-btn circle glass" onClick={back} aria-label={tr('뒤로')}><ChevronLeft size={20} /></button>
       )}
       <div className="m-top-right">
         <UpdatePill />
         <DownloadPill />
-        <button className={`icon-btn circle glass ${route.name === 'downloads' ? 'on' : ''}`} onClick={() => go('downloads')} aria-label="다운로드"><ArrowDownToLine size={17} /></button>
-        <button className={`icon-btn circle glass ${route.name === 'settings' ? 'on' : ''}`} onClick={() => go('settings')} aria-label="설정"><Settings size={17} /></button>
+        <button className={`icon-btn circle glass ${route.name === 'downloads' ? 'on' : ''}`} onClick={() => go('downloads')} aria-label={tr('다운로드')}><ArrowDownToLine size={17} /></button>
+        <button className={`icon-btn circle glass ${route.name === 'settings' ? 'on' : ''}`} onClick={() => go('settings')} aria-label={tr('설정')}><Settings size={17} /></button>
         <AccountButton />
       </div>
     </header>
@@ -67,7 +68,7 @@ function MiniBar({ track }) {
       </div>
       <LikeButton track={track} size={20} />
       <PlayButton size={40} playing={playing} onClick={toggle} className={`dock-play ${loading && playing ? 'loading' : ''}`} />
-      <button className="icon-btn m-mini-next" onClick={(e) => { e.stopPropagation(); next(); }} aria-label="다음 곡"><SkipForward size={22} fill="currentColor" /></button>
+      <button className="icon-btn m-mini-next" onClick={(e) => { e.stopPropagation(); next(); }} aria-label={tr('다음 곡')}><SkipForward size={22} fill="currentColor" /></button>
       <i className="m-mini-progress" style={{ width: `${duration ? Math.min(100, (time / duration) * 100) : 0}%` }} />
     </div>
   );

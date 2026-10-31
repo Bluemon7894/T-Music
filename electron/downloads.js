@@ -3,6 +3,7 @@
 import { app, net, shell, BrowserWindow, dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { say } from './lang.js';
 import { Readable, Transform } from 'stream';
 import { pipeline } from 'stream/promises';
 import * as stream from './youtube/stream.js';
@@ -211,7 +212,7 @@ export function openFolder() {
 export async function chooseFolder() {
   const [win] = BrowserWindow.getAllWindows();
   const res = await dialog.showOpenDialog(win, {
-    title: '다운로드 저장 폴더 선택',
+    title: say('다운로드 저장 폴더 선택', 'Choose a download folder'),
     defaultPath: dir(),
     properties: ['openDirectory', 'createDirectory'],
   });

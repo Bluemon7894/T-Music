@@ -79,6 +79,10 @@ const api = {
   home: () => catalog.home(),
   lyrics: (track) => lyrics.getLyrics(track),
   refreshLyrics: (track) => lyrics.refreshLyrics(track),
+  setLanguage: (language) => {
+    catalog.setLanguage(language);
+    window.TMusicNative.setLanguage(language);
+  },
   lyricsCandidates: (track, query) => lyrics.getCandidates(track, query),
   cleanLyricsQuery: (track) => lyrics.getCleanSearchTerm(track),
   setCustomLyrics: (trackId, data) => lyrics.setCustom(trackId, data),

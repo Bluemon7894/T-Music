@@ -4,6 +4,7 @@ import { X, Search, Mic2, Check, Music2, RefreshCw } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useRoom } from '../../store/room.js';
 import { fmtTime } from '../../lib/util.js';
+import { tr } from '../../lib/i18n.js';
 
 export default function LyricsPickerModal({ track, currentData, onClose }) {
   const [query, setQuery] = useState(() => {
@@ -89,13 +90,13 @@ export default function LyricsPickerModal({ track, currentData, onClose }) {
           <div className="lyrics-picker-title">
             <Mic2 size={20} className="lyrics-picker-icon" />
             <div>
-              <h3>가사 직접 찾기</h3>
+              <h3>{tr('가사 직접 찾기')}</h3>
               <p className="lyrics-picker-subtitle">
                 {track?.title} · {track?.artists?.map((a) => a.name).join(', ')}
               </p>
             </div>
           </div>
-          <button className="icon-btn circle glass lyrics-picker-close" onClick={onClose} title="닫기 (Esc)">
+          <button className="icon-btn circle glass lyrics-picker-close" onClick={onClose} title={tr('닫기 (Esc)')}>
             <X size={18} />
           </button>
         </div>
@@ -108,7 +109,7 @@ export default function LyricsPickerModal({ track, currentData, onClose }) {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="곡명 또는 가수명을 검색해 보세요..."
+              placeholder={tr('곡명 또는 가수명을 검색해 보세요...')}
               className="lyrics-picker-input"
             />
             {query && (
@@ -116,14 +117,14 @@ export default function LyricsPickerModal({ track, currentData, onClose }) {
                 type="button"
                 className="lyrics-picker-clear-btn"
                 onClick={() => { setQuery(''); inputRef.current?.focus(); }}
-                title="지우기"
+                title={tr('지우기')}
               >
                 <X size={14} />
               </button>
             )}
           </div>
           <button type="submit" className="lyrics-picker-submit-btn" disabled={loading}>
-            {loading ? <RefreshCw size={15} className="spin" /> : '검색'}
+            {loading ? <RefreshCw size={15} className="spin" /> : tr('검색')}
           </button>
         </form>
 
@@ -141,8 +142,8 @@ export default function LyricsPickerModal({ track, currentData, onClose }) {
           ) : candidates.length === 0 ? (
             <div className="lyrics-picker-empty">
               <Music2 size={38} opacity={0.35} />
-              <p>검색된 다른 가사가 없습니다.</p>
-              <small>곡 제목이나 아티스트명을 직접 입력하여 검색해 보세요.</small>
+              <p>{tr('검색된 다른 가사가 없습니다.')}</p>
+              <small>{tr('곡 제목이나 아티스트명을 직접 입력하여 검색해 보세요.')}</small>
             </div>
           ) : (
             <div className="lyrics-picker-list">
@@ -162,9 +163,7 @@ export default function LyricsPickerModal({ track, currentData, onClose }) {
                           </span>
                         )}
                         {cand.lineCount > 0 && (
-                          <span className="lyrics-cand-lines">
-                            {cand.lineCount}줄
-                          </span>
+                          <span className="lyrics-cand-lines">{tr('{0}줄', cand.lineCount)}</span>
                         )}
                       </div>
                       <div className="lyrics-cand-title">
@@ -181,15 +180,14 @@ export default function LyricsPickerModal({ track, currentData, onClose }) {
                     <div className="lyrics-cand-action">
                       {current ? (
                         <span className="lyrics-cand-active-badge">
-                          <Check size={14} /> 현재 적용됨
-                        </span>
+                          <Check size={14} />{' '}{tr('현재 적용됨')}</span>
                       ) : (
                         <button
                           className="lyrics-cand-apply-btn"
                           onClick={() => handleApply(cand)}
                           disabled={applyingId === cand.id}
                         >
-                          {applyingId === cand.id ? <RefreshCw size={14} className="spin" /> : '적용'}
+                          {applyingId === cand.id ? <RefreshCw size={14} className="spin" /> : tr('적용')}
                         </button>
                       )}
                     </div>

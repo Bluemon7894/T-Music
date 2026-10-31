@@ -29,6 +29,7 @@ import InvitePrompt from './components/InvitePrompt.jsx';
 import MobileShell from './components/mobile/MobileShell.jsx';
 import { IS_ANDROID } from './lib/platform.js';
 import { Album, Playlist, Liked, LocalPlaylist } from './views/Collection.jsx';
+import { tr } from './lib/i18n.js';
 
 function View({ route }) {
   const p = route.params;
@@ -178,7 +179,7 @@ function MainApp() {
         }
         const id = await openSharedPlaylist(invite.code).catch(() => null);
         if (id) useNav.getState().go('local', { id });
-        else toast('공유 플레이리스트를 찾을 수 없습니다');
+        else toast(tr('공유 플레이리스트를 찾을 수 없습니다'));
       }).catch(() => {});
     };
     openInvite();
@@ -204,7 +205,7 @@ function MainApp() {
       const artist = currentTrack.artists?.map((a) => a.name).join(', ') || currentTrack.artist || '';
       api.updateTrayTooltip(`T-Music | ${currentTrack.title}${artist ? ` - ${artist}` : ''}`).catch(() => {});
     } else {
-      api.updateTrayTooltip('T-Music - 음악 플레이어').catch(() => {});
+      api.updateTrayTooltip(tr('T-Music - 음악 플레이어')).catch(() => {});
     }
   }, [currentTrack?.id, currentTrack?.title]);
 
@@ -274,10 +275,10 @@ class CrashScreen extends Component {
       <div className="login">
         <div className="login-drag" />
         <main className="login-card">
-          <h1>문제가 생겼어요</h1>
-          <p className="login-lead">화면을 그리다 오류가 났어요. 보관함과 계정은 그대로예요.</p>
+          <h1>{tr('문제가 생겼어요')}</h1>
+          <p className="login-lead">{tr('화면을 그리다 오류가 났어요. 보관함과 계정은 그대로예요.')}</p>
           <div className="login-actions">
-            <button className="login-btn google" onClick={() => window.location.reload()}>다시 시작</button>
+            <button className="login-btn google" onClick={() => window.location.reload()}>{tr('다시 시작')}</button>
           </div>
         </main>
       </div>

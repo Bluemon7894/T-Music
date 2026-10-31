@@ -14,11 +14,12 @@ import LyricsView from '../layout/LyricsView.jsx';
 import Deck from '../layout/Deck.jsx';
 import { QueueList, AutoplayToggle } from '../layout/NowPanel.jsx';
 import { NextTrack, StageProgress } from '../layout/Stage.jsx';
+import { tr } from '../../lib/i18n.js';
 
 const TABS = [
-  { id: 'now', label: '지금 재생', icon: Sparkles },
-  { id: 'lyrics', label: '가사', icon: Mic2 },
-  { id: 'queue', label: '대기열', icon: ListMusic },
+  { id: 'now', label: tr('지금 재생'), icon: Sparkles },
+  { id: 'lyrics', label: tr('가사'), icon: Mic2 },
+  { id: 'queue', label: tr('대기열'), icon: ListMusic },
 ];
 
 const savedTab = () => {
@@ -33,11 +34,11 @@ function Controls() {
   const { toggle, next, prev, toggleShuffle, cycleRepeat } = usePlayer.getState();
   return (
     <div className="stage-controls m-stage-controls">
-      <button className={`icon-btn toggle ${shuffle ? 'on' : ''}`} onClick={toggleShuffle} aria-label="셔플"><Shuffle size={22} /></button>
-      <button className="icon-btn" onClick={prev} aria-label="이전 곡"><SkipBack size={30} fill="currentColor" /></button>
+      <button className={`icon-btn toggle ${shuffle ? 'on' : ''}`} onClick={toggleShuffle} aria-label={tr('셔플')}><Shuffle size={22} /></button>
+      <button className="icon-btn" onClick={prev} aria-label={tr('이전 곡')}><SkipBack size={30} fill="currentColor" /></button>
       <PlayButton size={68} playing={playing} onClick={toggle} className={loading && playing ? 'dock-play loading' : ''} />
-      <button className="icon-btn" onClick={() => next()} aria-label="다음 곡"><SkipForward size={30} fill="currentColor" /></button>
-      <button className={`icon-btn toggle ${repeat !== 'off' ? 'on' : ''}`} onClick={cycleRepeat} aria-label="반복">{repeat === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}</button>
+      <button className="icon-btn" onClick={() => next()} aria-label={tr('다음 곡')}><SkipForward size={30} fill="currentColor" /></button>
+      <button className={`icon-btn toggle ${repeat !== 'off' ? 'on' : ''}`} onClick={cycleRepeat} aria-label={tr('반복')}>{repeat === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}</button>
     </div>
   );
 }
@@ -75,13 +76,13 @@ function StageView({ track }) {
       <div className="stage-shade" />
 
       <header className="m-stage-top">
-        <button className="icon-btn circle glass" onClick={close} aria-label="닫기"><ChevronDown size={22} /></button>
+        <button className="icon-btn circle glass" onClick={close} aria-label={tr('닫기')}><ChevronDown size={22} /></button>
         <div className="seg">
           {TABS.map((t) => (
             <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => choose(t.id)}><t.icon size={14} /> {t.label}</button>
           ))}
         </div>
-        <button className="icon-btn circle glass" onClick={(e) => openMenu(e, trackMenuItems(track))} aria-label="더 보기"><MoreHorizontal size={20} /></button>
+        <button className="icon-btn circle glass" onClick={(e) => openMenu(e, trackMenuItems(track))} aria-label={tr('더 보기')}><MoreHorizontal size={20} /></button>
       </header>
 
       <div className={`m-stage-body tab-${tab}`}>

@@ -3,6 +3,7 @@ import { Music, Play, Pause, RotateCw } from 'lucide-react';
 import { useNav } from '../store/nav.js';
 import { errorText } from '../lib/api.js';
 import { pop } from '../lib/motion.js';
+import { tr } from '../lib/i18n.js';
 
 export function useAsync(fn, deps) {
   const [state, setState] = useState({ loading: true, data: null, error: null });
@@ -71,7 +72,7 @@ export function PlayButton({ playing, onClick, size = 48, className = '', label 
       className={`play-btn ${className}`}
       style={{ width: size, height: size }}
       onClick={(e) => { e.stopPropagation(); pop(ref.current, 0.86); onClick(); }}
-      aria-label={label || (playing ? '일시정지' : '재생')}
+      aria-label={label || (playing ? tr('일시정지') : tr('재생'))}
     >
       {playing ? <Pause size={size * 0.4} fill="currentColor" /> : <Play size={size * 0.4} fill="currentColor" style={{ marginLeft: size * 0.05 }} />}
     </button>
@@ -120,7 +121,7 @@ export function ErrorMsg({ error, onRetry }) {
     <div className="center-msg">
       <div className="err-orb" />
       <p>{error}</p>
-      {onRetry && <button className="btn" onClick={onRetry}><RotateCw size={15} /> 다시 시도</button>}
+      {onRetry && <button className="btn" onClick={onRetry}><RotateCw size={15} />{' '}{tr('다시 시도')}</button>}
     </div>
   );
 }

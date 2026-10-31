@@ -5,6 +5,7 @@ import { useUI } from '../store/ui.js';
 import { animate, ease } from '../lib/motion.js';
 import { IS_ANDROID } from '../lib/platform.js';
 import MobileSheet from './mobile/MobileSheet.jsx';
+import { tr } from '../lib/i18n.js';
 
 function MenuItem({ it, index, parentRef, open, setOpen, onClose }) {
   const itemRef = useRef(null);
@@ -199,8 +200,8 @@ export function Dialog() {
           ? <p className="modal-msg">{dialog.message}</p>
           : <input autoFocus value={value} placeholder={dialog.placeholder} onChange={(e) => setValue(e.target.value)} />}
         <div className="modal-actions">
-          <button type="button" className="pill" autoFocus={Boolean(dialog.message) && !IS_ANDROID} onClick={close}>취소</button>
-          <button type="submit" className="pill white">{dialog.submitLabel || '확인'}</button>
+          <button type="button" className="pill" autoFocus={Boolean(dialog.message) && !IS_ANDROID} onClick={close}>{tr('취소')}</button>
+          <button type="submit" className="pill white">{dialog.submitLabel || tr('확인')}</button>
         </div>
       </form>
     </div>

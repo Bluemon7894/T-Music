@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../lib/api.js';
 import { toast } from './ui.js';
+import { tr } from '../lib/i18n.js';
 
 export const useUpdater = create((set, get) => ({
   checking: false,
@@ -37,10 +38,10 @@ export const useUpdater = create((set, get) => ({
           downloaded: true,
           progress: { percent: 100, received: data.total || 0, total: data.total || 0 },
         });
-        toast('업데이트 다운로드가 완료되었습니다!');
+        toast(tr('업데이트 다운로드가 완료되었습니다!'));
       } else if (data.status === 'error') {
         set({ downloading: false, error: data.error });
-        toast(`업데이트 다운로드 실패: ${data.error || '오류 발생'}`);
+        toast(tr('업데이트 다운로드 실패: {0}', data.error || tr('오류 발생')));
       }
     });
 
@@ -72,12 +73,12 @@ export const useUpdater = create((set, get) => ({
       if (res.hasUpdate) {
         set({ modalOpen: true });
       } else if (!silent) {
-        toast(`현재 최신 버전(v${res.currentVersion})을 사용하고 있습니다.`);
+        toast(tr('현재 최신 버전(v{0})을 사용하고 있습니다.', res.currentVersion));
       }
     } catch (err) {
       set({ checking: false, error: err.message });
       if (!silent) {
-        toast('업데이트 확인 실패: ' + err.message);
+        toast(tr('업데이트 확인 실패: ') + err.message);
       }
     }
   },
@@ -93,7 +94,7 @@ export const useUpdater = create((set, get) => ({
       await api.downloadUpdate();
     } catch (err) {
       set({ downloading: false, error: err.message });
-      toast('업데이트 다운로드 실패: ' + err.message);
+      toast(tr('업데이트 다운로드 실패: ') + err.message);
     }
   },
 
@@ -101,7 +102,7 @@ export const useUpdater = create((set, get) => ({
     try {
       await api.installUpdate();
     } catch (err) {
-      toast('업데이트 설치 실패: ' + err.message);
+      toast(tr('업데이트 설치 실패: ') + err.message);
     }
   },
 

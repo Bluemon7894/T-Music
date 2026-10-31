@@ -56,6 +56,18 @@
             }
           }
         },
+        "modes": {
+          ".write": "auth != null && (root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid || (root.child('rooms').child($code).child('meta/controlMode').val() === 'everyone' && root.child('rooms').child($code).child('members').child(auth.uid).exists()))",
+          "repeat": {
+            ".validate": "newData.val() === 'off' || newData.val() === 'all' || newData.val() === 'one'"
+          },
+          "shuffle": {
+            ".validate": "newData.isBoolean()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
         "kicked": {
           "$uid": {
             ".write": "auth != null && root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid",

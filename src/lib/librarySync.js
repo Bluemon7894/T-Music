@@ -6,6 +6,7 @@ import { collection, doc, documentId, getDocs, onSnapshot, query, where, writeBa
 import { db } from './firebase.js';
 import { LISTEN_RETENTION_DAYS, RECENT_LIMIT, SEARCH_LIMIT, dayKey, needsFullMerge, normalizeListens, syncedFlag, uniqueStrings, useLibrary } from '../store/library.js';
 import { toast } from '../store/ui.js';
+import { tr } from './i18n.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const BATCH_LIMIT = 400;
@@ -72,7 +73,7 @@ function createSession(uid) {
 
   const fitsInDoc = (item) => {
     if (JSON.stringify(item).length <= MAX_DOC_CHARS) return true;
-    if (!tooLargeWarned) toast('플레이리스트가 너무 커서 계정에 저장하지 못했습니다');
+    if (!tooLargeWarned) toast(tr('플레이리스트가 너무 커서 계정에 저장하지 못했습니다'));
     tooLargeWarned = true;
     return false;
   };

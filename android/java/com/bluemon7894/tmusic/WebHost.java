@@ -39,6 +39,7 @@ final class WebHost {
 
     private WebHost(Context app) {
         this.app = app;
+        Lang.load(app);
         context = new MutableContextWrapper(app);
         bridge = new NativeBridge(this);
         web = createWebView();

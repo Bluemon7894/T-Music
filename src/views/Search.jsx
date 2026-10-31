@@ -9,10 +9,11 @@ import { useAsync, Thumb, PlayButton, ArtistLinks, SkeletonRows, SkeletonCards, 
 import TrackList from '../components/TrackList.jsx';
 import { Shelf, Grid, openItem, playItem } from '../components/Cards.jsx';
 import { useEnter, useTilt } from '../lib/motion.js';
+import { tr } from '../lib/i18n.js';
 
 const BROWSE_CATEGORIES = [
   {
-    label: 'K-POP', query: 'K-POP 히트곡', c1: '#8b5cf6', c2: '#ec4899',
+    label: 'K-POP', query: tr('K-POP 히트곡'), c1: '#8b5cf6', c2: '#ec4899',
     tracks: [
       { id: '11cta61wi0g', title: 'Hype Boy', artist: 'NewJeans' },
       { id: '6ZUIwj3FgUY', title: 'I AM', artist: 'IVE' },
@@ -21,52 +22,52 @@ const BROWSE_CATEGORIES = [
     ],
   },
   {
-    label: '발라드', query: '발라드 명곡', c1: '#6366f1', c2: '#a78bfa',
+    label: tr('발라드'), query: tr('발라드 명곡'), c1: '#6366f1', c2: '#a78bfa',
     tracks: [
-      { id: 'BBdC1rl5sKY', title: '사건의 지평선', artist: '윤하' },
-      { id: 'YBzJ0jmHv-4', title: '너를 만나', artist: '폴킴' },
-      { id: 'yFlxYHjHYAw', title: '헤어지자 말해요', artist: '박재정' },
-      { id: '6744glqD6lk', title: '밤편지', artist: '아이유' },
+      { id: 'BBdC1rl5sKY', title: tr('사건의 지평선'), artist: tr('윤하') },
+      { id: 'YBzJ0jmHv-4', title: tr('너를 만나'), artist: tr('폴킴') },
+      { id: 'yFlxYHjHYAw', title: tr('헤어지자 말해요'), artist: tr('박재정') },
+      { id: '6744glqD6lk', title: tr('밤편지'), artist: tr('아이유') },
     ],
   },
   {
-    label: '힙합', query: '국내 힙합', c1: '#f97316', c2: '#be185d',
+    label: tr('힙합'), query: tr('국내 힙합'), c1: '#f97316', c2: '#be185d',
     tracks: [
-      { id: 'lOrU0MH0bMk', title: 'METEOR', artist: '창모' },
+      { id: 'lOrU0MH0bMk', title: 'METEOR', artist: tr('창모') },
       { id: 'fXFNFM80iMI', title: 'Better Than Yesterday', artist: 'MC Sniper' },
-      { id: 'azaZt7eccnc', title: '새삥', artist: '지코' },
-      { id: 'FbcUhXIhi1c', title: 'Smoke', artist: '다이나믹 듀오' },
+      { id: 'azaZt7eccnc', title: tr('새삥'), artist: tr('지코') },
+      { id: 'FbcUhXIhi1c', title: 'Smoke', artist: tr('다이나믹 듀오') },
     ],
   },
   {
-    label: 'R&B', query: 'R&B 감성', c1: '#a855f7', c2: '#4f46e5',
+    label: 'R&B', query: tr('R&B 감성'), c1: '#a855f7', c2: '#4f46e5',
     tracks: [
       { id: 'eelfrHtmk68', title: 'D (Half Moon)', artist: 'DEAN' },
-      { id: 'PS0qkO5qty0', title: 'Rush Hour', artist: '크러쉬' },
-      { id: 'aYDs3T-r__4', title: '비도 오고 그래서', artist: '헤이즈' },
+      { id: 'PS0qkO5qty0', title: 'Rush Hour', artist: tr('크러쉬') },
+      { id: 'aYDs3T-r__4', title: tr('비도 오고 그래서'), artist: tr('헤이즈') },
       { id: '2yqYAsUpdSc', title: 'Out of Time', artist: 'The Weeknd' },
     ],
   },
   {
-    label: '인디', query: '인디 음악', c1: '#14b8a6', c2: '#6366f1',
+    label: tr('인디'), query: tr('인디 음악'), c1: '#14b8a6', c2: '#6366f1',
     tracks: [
-      { id: 'GpQ222I1ULc', title: '주저하는 연인들을 위해', artist: '잔나비' },
-      { id: 'VQZXXciZb_c', title: '그라데이션', artist: '10CM' },
-      { id: 'IMWT6937uUs', title: '그대만 있다면', artist: '너드커넥션' },
-      { id: 'BB1v0zPVSdg', title: 'Trying too hard', artist: '치즈' },
+      { id: 'GpQ222I1ULc', title: tr('주저하는 연인들을 위해'), artist: tr('잔나비') },
+      { id: 'VQZXXciZb_c', title: tr('그라데이션'), artist: '10CM' },
+      { id: 'IMWT6937uUs', title: tr('그대만 있다면'), artist: tr('너드커넥션') },
+      { id: 'BB1v0zPVSdg', title: 'Trying too hard', artist: tr('치즈') },
     ],
   },
   {
-    label: '록', query: '록 밴드 명곡', c1: '#ef4444', c2: '#7c3aed',
+    label: tr('록'), query: tr('록 밴드 명곡'), c1: '#ef4444', c2: '#7c3aed',
     tracks: [
-      { id: 'vnS_jn2uibs', title: '한 페이지가 될 수 있게', artist: 'DAY6' },
-      { id: '2I75ion7CAc', title: '가시', artist: '버즈' },
-      { id: 'gsgq3A5i9dc', title: '담배가게 아가씨', artist: 'YB' },
-      { id: 'yb0pYiPLfww', title: '사랑앓이', artist: 'FT아일랜드' },
+      { id: 'vnS_jn2uibs', title: tr('한 페이지가 될 수 있게'), artist: 'DAY6' },
+      { id: '2I75ion7CAc', title: tr('가시'), artist: tr('버즈') },
+      { id: 'gsgq3A5i9dc', title: tr('담배가게 아가씨'), artist: 'YB' },
+      { id: 'yb0pYiPLfww', title: tr('사랑앓이'), artist: tr('FT아일랜드') },
     ],
   },
   {
-    label: '팝', query: 'pop hits', c1: '#ec4899', c2: '#8b5cf6',
+    label: tr('팝'), query: 'pop hits', c1: '#ec4899', c2: '#8b5cf6',
     tracks: [
       { id: '4NRXx6U8ABQ', title: 'Blinding Lights', artist: 'The Weeknd' },
       { id: 'ic8j13piAhQ', title: 'Cruel Summer', artist: 'Taylor Swift' },
@@ -75,25 +76,25 @@ const BROWSE_CATEGORIES = [
     ],
   },
   {
-    label: 'J-POP', query: 'J-POP 인기곡', c1: '#f43f5e', c2: '#f59e0b',
+    label: 'J-POP', query: tr('J-POP 인기곡'), c1: '#f43f5e', c2: '#f59e0b',
     tracks: [
       { id: 'ZRtdQ81jPUQ', title: 'アイドル (Idol)', artist: 'YOASOBI' },
       { id: '3NNhrqHZqlI', title: 'Lemon', artist: 'Kenshi Yonezu' },
       { id: '0t0HtFYjcU8', title: 'NIGHT DANCER', artist: 'imase' },
-      { id: 'gvwpiKtod40', title: '베텔기우스', artist: '유우리' },
+      { id: 'gvwpiKtod40', title: tr('베텔기우스'), artist: tr('유우리') },
     ],
   },
   {
-    label: 'OST', query: '드라마 OST', c1: '#0ea5e9', c2: '#8b5cf6',
+    label: 'OST', query: tr('드라마 OST'), c1: '#0ea5e9', c2: '#8b5cf6',
     tracks: [
-      { id: 'O0StKlRHVeE', title: '시작 (이태원 클라쓰)', artist: '가호' },
-      { id: 'F6ql927-RkI', title: '너였다면', artist: '정승환' },
-      { id: '6rS7OUGXUik', title: '첫눈처럼 너에게 가겠다', artist: '에일리' },
-      { id: 'qKXMZPH6k18', title: '흔들리는 꽃들 속에서', artist: '장범준' },
+      { id: 'O0StKlRHVeE', title: tr('시작 (이태원 클라쓰)'), artist: tr('가호') },
+      { id: 'F6ql927-RkI', title: tr('너였다면'), artist: tr('정승환') },
+      { id: '6rS7OUGXUik', title: tr('첫눈처럼 너에게 가겠다'), artist: tr('에일리') },
+      { id: 'qKXMZPH6k18', title: tr('흔들리는 꽃들 속에서'), artist: tr('장범준') },
     ],
   },
   {
-    label: '재즈', query: '재즈 카페', c1: '#d97706', c2: '#7c2d12',
+    label: tr('재즈'), query: tr('재즈 카페'), c1: '#d97706', c2: '#7c2d12',
     tracks: [
       { id: 'ZEcqHA7dbwM', title: 'Fly Me To The Moon', artist: 'Frank Sinatra' },
       { id: 'wCINvavqFXk', title: 'Waltz for Debby', artist: 'Bill Evans' },
@@ -102,16 +103,16 @@ const BROWSE_CATEGORIES = [
     ],
   },
   {
-    label: '클래식', query: '클래식 명곡', c1: '#64748b', c2: '#6d28d9',
+    label: tr('클래식'), query: tr('클래식 명곡'), c1: '#64748b', c2: '#6d28d9',
     tracks: [
-      { id: 'pyX-lxPkYbE', title: 'G 선상의 아리아', artist: 'J.S. Bach' },
-      { id: 'WNcsUNKlAKw', title: '달빛 (Clair de Lune)', artist: 'Debussy' },
-      { id: '4Tr0otuiQuU', title: '월광 소나타', artist: 'Beethoven' },
-      { id: 'Nu48Z45ibxQ', title: '녹턴 Op.9 No.2', artist: 'Chopin' },
+      { id: 'pyX-lxPkYbE', title: tr('G 선상의 아리아'), artist: 'J.S. Bach' },
+      { id: 'WNcsUNKlAKw', title: tr('달빛 (Clair de Lune)'), artist: 'Debussy' },
+      { id: '4Tr0otuiQuU', title: tr('월광 소나타'), artist: 'Beethoven' },
+      { id: 'Nu48Z45ibxQ', title: tr('녹턴 Op.9 No.2'), artist: 'Chopin' },
     ],
   },
   {
-    label: '로파이', query: 'lofi hip hop', c1: '#7c3aed', c2: '#0f766e',
+    label: tr('로파이'), query: 'lofi hip hop', c1: '#7c3aed', c2: '#0f766e',
     tracks: [
       { id: 'CFGLoQIhmow', title: 'lofi hip hop radio', artist: 'Lofi Girl' },
       { id: '1WM3MHtEjrM', title: 'Lofi Chill Beats', artist: 'Sad Music' },
@@ -120,7 +121,7 @@ const BROWSE_CATEGORIES = [
     ],
   },
   {
-    label: '운동', query: '운동할 때 듣는 노래', c1: '#dc2626', c2: '#9333ea',
+    label: tr('운동'), query: tr('운동할 때 듣는 노래'), c1: '#dc2626', c2: '#9333ea',
     tracks: [
       { id: '9HDEHj2yzew', title: 'Physical', artist: 'Dua Lipa' },
       { id: '_Yhyp-_hX2s', title: 'Lose Yourself', artist: 'Eminem' },
@@ -129,40 +130,40 @@ const BROWSE_CATEGORIES = [
     ],
   },
   {
-    label: '드라이브', query: '드라이브 음악', c1: '#2563eb', c2: '#db2777',
+    label: tr('드라이브'), query: tr('드라이브 음악'), c1: '#2563eb', c2: '#db2777',
     tracks: [
-      { id: 'RmuL-BPFi2Q', title: 'Weekend', artist: '태연' },
-      { id: 'xRbPAVnqtcs', title: '여행', artist: '볼빨간사춘기' },
+      { id: 'RmuL-BPFi2Q', title: 'Weekend', artist: tr('태연') },
+      { id: 'xRbPAVnqtcs', title: tr('여행'), artist: tr('볼빨간사춘기') },
       { id: 'tQ0yjYUFKAE', title: 'Peaches', artist: 'Justin Bieber' },
-      { id: '0-q1KafFCLU', title: 'Celebrity', artist: '아이유' },
+      { id: '0-q1KafFCLU', title: 'Celebrity', artist: tr('아이유') },
     ],
   },
   {
-    label: '잠잘 때', query: '잠잘 때 듣는 음악', c1: '#312e81', c2: '#7c3aed',
+    label: tr('잠잘 때'), query: tr('잠잘 때 듣는 음악'), c1: '#312e81', c2: '#7c3aed',
     tracks: [
-      { id: 'SfeaTW4bcAw', title: '무릎', artist: '아이유' },
-      { id: 'NwI8Qp2txSA', title: '수면 음악 자장가', artist: 'Sweet Dreams' },
-      { id: 'mRIGDXQVU5c', title: '스토커', artist: '10CM' },
-      { id: '62Ztp9A-XO4', title: '초록빛', artist: '폴킴' },
+      { id: 'SfeaTW4bcAw', title: tr('무릎'), artist: tr('아이유') },
+      { id: 'NwI8Qp2txSA', title: tr('수면 음악 자장가'), artist: 'Sweet Dreams' },
+      { id: 'mRIGDXQVU5c', title: tr('스토커'), artist: '10CM' },
+      { id: '62Ztp9A-XO4', title: tr('초록빛'), artist: tr('폴킴') },
     ],
   },
   {
-    label: '공부', query: '공부할 때 듣는 음악', c1: '#0d9488', c2: '#4338ca',
+    label: tr('공부'), query: tr('공부할 때 듣는 음악'), c1: '#0d9488', c2: '#4338ca',
     tracks: [
       { id: '7maJOI3QMu0', title: 'River Flows in You', artist: 'Yiruma' },
       { id: 'l0GN40EL1VU', title: 'Summer', artist: 'Joe Hisaishi' },
-      { id: 'HwIA1t8rmcY', title: '시험 공부할 때 듣는 음악', artist: 'Lofi Paris' },
+      { id: 'HwIA1t8rmcY', title: tr('시험 공부할 때 듣는 음악'), artist: 'Lofi Paris' },
       { id: 'imGaOIm5HOk', title: 'Kiss The Rain', artist: 'Yiruma' },
     ],
   },
 ];
 
 const TABS = [
-  { id: 'all', label: '전체' },
-  { id: 'songs', label: '노래' },
-  { id: 'artists', label: '아티스트' },
-  { id: 'albums', label: '앨범' },
-  { id: 'playlists', label: '플레이리스트' },
+  { id: 'all', label: tr('전체') },
+  { id: 'songs', label: tr('노래') },
+  { id: 'artists', label: tr('아티스트') },
+  { id: 'albums', label: tr('앨범') },
+  { id: 'playlists', label: tr('플레이리스트') },
 ];
 
 export const remember = (q) => useLibrary.getState().rememberSearch(q);
@@ -171,7 +172,7 @@ function TopResult({ item }) {
   const go = useNav((s) => s.go);
   const ref = useRef(null);
   useTilt(ref, { max: 6, scale: 1.01 });
-  const label = { artist: '아티스트', album: item.type || '앨범', track: '노래', playlist: '플레이리스트' }[item.kind];
+  const label = { artist: tr('아티스트'), album: item.type || tr('앨범'), track: tr('노래'), playlist: tr('플레이리스트') }[item.kind];
   return (
     <div className="top-result" ref={ref} onClick={() => openItem(item, go)}>
       <span className="glare" />
@@ -194,11 +195,11 @@ function Results({ q }) {
   if (res.loading) return <div className="search-loading"><SkeletonRows count={5} /><SkeletonCards /></div>;
   if (res.error) return <ErrorMsg error={res.error} onRetry={res.retry} />;
   const { top, songs, artists, albums, playlists } = res.data;
-  const ctx = { name: `'${q}' 검색 결과` };
+  const ctx = { name: tr('\'{0}\' 검색 결과', q) };
   const counts = { songs: songs.length, artists: artists.length, albums: albums.length, playlists: playlists.length };
 
   if (!songs.length && !artists.length && !albums.length && !playlists.length) {
-    return <Empty icon={SearchIcon} title={`'${q}'에 대한 결과가 없어요`} text="철자를 확인하거나 다른 검색어로 찾아보세요." />;
+    return <Empty icon={SearchIcon} title={tr('\'{0}\'에 대한 결과가 없어요', q)} text={tr('철자를 확인하거나 다른 검색어로 찾아보세요.')} />;
   }
 
   return (
@@ -215,23 +216,23 @@ function Results({ q }) {
           <div className="search-top">
             {top && (
               <section data-enter>
-                <h2>상위 결과</h2>
+                <h2>{tr('상위 결과')}</h2>
                 <TopResult item={top} />
               </section>
             )}
             {songs.length > 0 && (
               <section className="search-songs" data-enter>
-                <h2 className="link" onClick={() => setTab('songs')}>노래</h2>
+                <h2 className="link" onClick={() => setTab('songs')}>{tr('노래')}</h2>
                 <TrackList tracks={songs.slice(0, 5)} context={ctx} showAlbum={false} numbered={false} compact animate={false} playSingle />
               </section>
             )}
           </div>
-          <Shelf title="아티스트" items={artists} onMore={() => setTab('artists')} />
-          <Shelf title="앨범" items={albums} onMore={() => setTab('albums')} />
-          <Shelf title="플레이리스트" items={playlists} onMore={() => setTab('playlists')} />
+          <Shelf title={tr('아티스트')} items={artists} onMore={() => setTab('artists')} />
+          <Shelf title={tr('앨범')} items={albums} onMore={() => setTab('albums')} />
+          <Shelf title={tr('플레이리스트')} items={playlists} onMore={() => setTab('playlists')} />
           {songs.length > 5 && (
             <section data-enter>
-              <h2>노래 더 보기</h2>
+              <h2>{tr('노래 더 보기')}</h2>
               <TrackList tracks={songs.slice(5, 15)} context={ctx} showAlbum={false} compact animate={false} playSingle />
             </section>
           )}
@@ -274,7 +275,7 @@ function BrowseTile({ item }) {
       playList(
         [{ id: currentTrack.id, title: currentTrack.title, thumb: thumbUrl, artists: [{ name: currentTrack.artist }] }],
         0,
-        { name: `${item.label} 대표곡` }
+        { name: tr('{0} 대표곡', item.label) }
       );
     }
   };
@@ -334,7 +335,7 @@ function BrowseTile({ item }) {
             onLoad={handleImgLoad}
             onError={onFail}
           />
-          <div className="browse-tile-play" onClick={onPlayTrack} title={`${currentTrack.title} 바로 재생`}>
+          <div className="browse-tile-play" onClick={onPlayTrack} title={tr('{0} 바로 재생', currentTrack.title)}>
             <Play size={18} fill="currentColor" />
           </div>
         </div>
@@ -370,8 +371,8 @@ function Browse() {
       {history.length > 0 && (
         <section className="history" data-enter>
           <div className="row-between">
-            <h2>최근 검색</h2>
-            <button className="text-btn" onClick={clear}>모두 지우기</button>
+            <h2>{tr('최근 검색')}</h2>
+            <button className="text-btn" onClick={clear}>{tr('모두 지우기')}</button>
           </div>
           <div className="chips">
             {history.map((h) => (
@@ -381,9 +382,9 @@ function Browse() {
                 onClick={() => go('search', { q: h })}
                 onContextMenu={(e) => {
                   openMenu(e, [
-                    { label: `'${h}' 검색`, icon: SearchIcon, onClick: () => go('search', { q: h }) },
+                    { label: tr('\'{0}\' 검색', h), icon: SearchIcon, onClick: () => go('search', { q: h }) },
                     { divider: true },
-                    { label: '이 검색 기록 삭제', icon: X, onClick: (ev) => removeItem(h, ev) },
+                    { label: tr('이 검색 기록 삭제'), icon: X, onClick: (ev) => removeItem(h, ev) },
                   ]);
                 }}
               >
@@ -392,8 +393,8 @@ function Browse() {
                 <button
                   className="chip-del-btn"
                   onClick={(e) => removeItem(h, e)}
-                  title={`'${h}' 검색 기록 삭제`}
-                  aria-label="삭제"
+                  title={tr('\'{0}\' 검색 기록 삭제', h)}
+                  aria-label={tr('삭제')}
                 >
                   <X size={12} />
                 </button>
@@ -402,9 +403,9 @@ function Browse() {
           </div>
         </section>
       )}
-      {recent.length > 0 && <Shelf title="최근 들은 곡" items={recent.map((t) => ({ ...t, kind: 'track', isRecent: true }))} />}
+      {recent.length > 0 && <Shelf title={tr('최근 들은 곡')} items={recent.map((t) => ({ ...t, kind: 'track', isRecent: true }))} />}
       <section>
-        <h2 data-enter>모두 둘러보기</h2>
+        <h2 data-enter>{tr('모두 둘러보기')}</h2>
         <div className="browse-grid">
           {BROWSE_CATEGORIES.map((cat) => (
             <BrowseTile key={cat.label} item={cat} />

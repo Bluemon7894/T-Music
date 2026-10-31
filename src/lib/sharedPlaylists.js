@@ -7,6 +7,7 @@ import { auth, db } from './firebase.js';
 import { safeTrack } from './safeTrack.js';
 import { useLibrary } from '../store/library.js';
 import { toast, useUI } from '../store/ui.js';
+import { tr } from './i18n.js';
 
 const ID_LENGTH = 22;
 const ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -28,7 +29,7 @@ function randomId() {
 function myName() {
   const user = auth.currentUser;
   const google = user?.providerData.find((p) => p.providerId === 'google.com');
-  return (user?.displayName || google?.displayName || '게스트').slice(0, 40);
+  return (user?.displayName || google?.displayName || tr('게스트')).slice(0, 40);
 }
 
 const remoteTracks = (data) => (Array.isArray(data?.tracks) ? data.tracks.map(safeTrack).filter(Boolean) : []);
@@ -77,12 +78,12 @@ function createSession() {
         const { share, ...rest } = p;
         return rest;
       });
-      if (had.share.ownerUid !== myUid()) toast(`'${had.name}' 공유가 끝나서 내 플레이리스트로 남겼습니다`);
+      if (had.share.ownerUid !== myUid()) toast(tr('\'{0}\' 공유가 끝나서 내 플레이리스트로 남겼습니다', had.name));
       return;
     }
     const data = snap.data();
     const tracks = remoteTracks(data);
-    const name = String(data.name || '').slice(0, 100) || '공유 플레이리스트';
+    const name = String(data.name || '').slice(0, 100) || tr('공유 플레이리스트');
     known.set(shareId, { name, tracks });
     if (timers.has(shareId)) return; // our own change is on its way; its result comes back here
     const share = toShare(shareId, data);
@@ -110,7 +111,7 @@ function createSession() {
       });
     } catch (e) {
       console.warn('[shared playlist]', e?.code || e);
-      toast(e?.code === 'permission-denied' ? '이 플레이리스트를 편집할 권한이 없습니다' : '공유 플레이리스트를 저장하지 못했습니다');
+      toast(e?.code === 'permission-denied' ? tr('이 플레이리스트를 편집할 권한이 없습니다') : tr('공유 플레이리스트를 저장하지 못했습니다'));
       restore(shareId);
     }
   };
@@ -128,7 +129,7 @@ function createSession() {
       const base = known.get(p.share.id);
       if (!base || (base.name === p.name && idsOf(base.tracks) === idsOf(p.tracks))) continue;
       if (!canEditPlaylist(p)) {
-        toast('이 플레이리스트를 편집할 권한이 없습니다');
+        toast(tr('이 플레이리스트를 편집할 권한이 없습니다'));
         restore(p.share.id);
         continue;
       }
@@ -198,7 +199,7 @@ export async function openSharedPlaylist(text) {
   const snap = await getDoc(sharedDoc(shareId));
   if (!snap.exists()) return null;
   const data = snap.data();
-  const id = useLibrary.getState().createPlaylist(String(data.name || '').slice(0, 100) || '공유 플레이리스트', remoteTracks(data), { share: toShare(shareId, data) });
+  const id = useLibrary.getState().createPlaylist(String(data.name || '').slice(0, 100) || tr('공유 플레이리스트'), remoteTracks(data), { share: toShare(shareId, data) });
   return id;
 }
 
@@ -207,17 +208,17 @@ export function confirmDeletePlaylist(playlist, afterDelete) {
   const shared = Boolean(share);
   const mine = share?.ownerUid === myUid();
   useUI.getState().prompt({
-    title: shared && !mine ? '내 보관함에서 뺄까요?' : `'${playlist.name}' 플레이리스트를 삭제할까요?`,
+    title: shared && !mine ? tr('내 보관함에서 뺄까요?') : tr('\'{0}\' 플레이리스트를 삭제할까요?', playlist.name),
     message: !shared
-      ? '플레이리스트가 삭제되고 되돌릴 수 없습니다. 곡 자체는 지워지지 않아요.'
+      ? tr('플레이리스트가 삭제되고 되돌릴 수 없습니다. 곡 자체는 지워지지 않아요.')
       : mine
-        ? '공유도 함께 끝납니다. 링크를 받은 친구에게는 복사본만 남아요.'
-        : '내 보관함에서만 사라지고, 공유 플레이리스트는 그대로 남아요.',
-    submitLabel: shared && !mine ? '빼기' : '삭제',
+        ? tr('공유도 함께 끝납니다. 링크를 받은 친구에게는 복사본만 남아요.')
+        : tr('내 보관함에서만 사라지고, 공유 플레이리스트는 그대로 남아요.'),
+    submitLabel: shared && !mine ? tr('빼기') : tr('삭제'),
     onSubmit: () => {
       useLibrary.getState().deletePlaylist(playlist.id);
       afterDelete?.();
-      toast(shared && !mine ? '내 보관함에서 뺐습니다' : '플레이리스트를 삭제했습니다');
+      toast(shared && !mine ? tr('내 보관함에서 뺐습니다') : tr('플레이리스트를 삭제했습니다'));
     },
   });
 }

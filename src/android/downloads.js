@@ -2,6 +2,7 @@
 // (Downloads.java); this keeps the list and decides what to fetch next.
 import { Native, onNative } from './native.js';
 import * as stream from '../../electron/youtube/stream.js';
+import { tr } from '../lib/i18n.js';
 
 const MAX_PARALLEL = 2;
 const MAX_ATTEMPTS = 3;
@@ -91,7 +92,7 @@ function finish() {
 
 function fail(job, error) {
   job.status = 'error';
-  job.error = String(error || '다운로드하지 못했습니다').slice(0, 160);
+  job.error = String(error || tr('다운로드하지 못했습니다')).slice(0, 160);
   finish();
 }
 
@@ -114,7 +115,7 @@ onNative('download', ({ id, status, received, total, size, mime, error }) => {
     // The URL was refused, which usually means it expired.
     stream.invalidate(id, job.source?.method, job.source?.fresh);
     job.attempts++;
-    if (job.attempts >= MAX_ATTEMPTS) { fail(job, '곡을 받을 수 없습니다'); return; }
+    if (job.attempts >= MAX_ATTEMPTS) { fail(job, tr('곡을 받을 수 없습니다')); return; }
     job.status = 'queued';
     finish();
   } else if (status === 'error') {

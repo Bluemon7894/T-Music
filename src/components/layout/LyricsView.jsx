@@ -9,6 +9,7 @@ import { api, streamUrl } from '../../lib/api.js';
 import { getAudioOnset, getOutputLatency } from '../../lib/audio.js';
 import { MIN_CONFIDENCE, measureLyricOffset } from '../../lib/lyricAlign.js';
 import LyricsPickerModal from './LyricsPickerModal.jsx';
+import { tr } from '../../lib/i18n.js';
 
 const ALREADY_ALIGNED_SEC = 0.1;
 // A manual scroll keeps the view where the user put it for this long.
@@ -108,21 +109,21 @@ async function resyncLyrics(track) {
   const data = await api.refreshLyrics(track);
   if (data) window.dispatchEvent(new CustomEvent('t-music:lyrics-changed', { detail: { trackId: track.id, lyrics: data } }));
   if (!data?.lines?.length) {
-    toast(data?.plainLyrics ? '싱크 가사를 찾지 못했어요. 일반 가사로 보여드려요.' : '가사를 찾지 못했어요.');
+    toast(data?.plainLyrics ? tr('싱크 가사를 찾지 못했어요. 일반 가사로 보여드려요.') : tr('가사를 찾지 못했어요.'));
     return;
   }
   const measured = await measureLyricOffset(streamUrl(track.id), data.lines);
   if (!measured || measured.confidence < MIN_CONFIDENCE) {
     saveAlignment(track.id, data, null);
     useRoom.getState().shareLyrics(track.id, data, null);
-    toast('이 곡은 자동으로 맞추기 어려워요. 가사 직접 찾기로 다른 가사를 골라 보세요.');
+    toast(tr('이 곡은 자동으로 맞추기 어려워요. 가사 직접 찾기로 다른 가사를 골라 보세요.'));
     return;
   }
   saveAlignment(track.id, data, measured.offset);
   useRoom.getState().shareLyrics(track.id, data, measured.offset);
   const size = Math.abs(measured.offset);
-  if (size < ALREADY_ALIGNED_SEC) toast('가사 싱크가 이미 잘 맞아요');
-  else toast(`가사를 ${size.toFixed(1)}초 ${measured.offset > 0 ? '늦춰서' : '앞당겨서'} 맞췄어요`);
+  if (size < ALREADY_ALIGNED_SEC) toast(tr('가사 싱크가 이미 잘 맞아요'));
+  else toast(tr('가사를 {0}초 {1} 맞췄어요', size.toFixed(1), measured.offset > 0 ? tr('늦춰서') : tr('앞당겨서')));
 }
 
 export default function LyricsView({ track, variant = 'panel' }) {
@@ -153,7 +154,7 @@ export default function LyricsView({ track, variant = 'panel' }) {
       await resyncLyrics(track);
     } catch (e) {
       console.warn('[lyrics]', e);
-      toast('재싱크하지 못했어요. 인터넷 연결을 확인해 주세요.');
+      toast(tr('재싱크하지 못했어요. 인터넷 연결을 확인해 주세요.'));
     } finally {
       setResyncing(false);
     }
@@ -161,8 +162,8 @@ export default function LyricsView({ track, variant = 'panel' }) {
   const hasSynced = lines.length > 0;
   const hasPlain = Boolean(data?.plainLyrics);
   const resyncButton = (className) => (
-    <button className={className} onClick={resync} disabled={resyncing} title="가사를 다시 찾아 음원에 맞춥니다">
-      <RefreshCw size={12} className={resyncing ? 'spin' : ''} /> {resyncing ? '맞추는 중...' : '재싱크'}
+    <button className={className} onClick={resync} disabled={resyncing} title={tr('가사를 다시 찾아 음원에 맞춥니다')}>
+      <RefreshCw size={12} className={resyncing ? 'spin' : ''} /> {resyncing ? tr('맞추는 중...') : tr('재싱크')}
     </button>
   );
 
@@ -173,9 +174,9 @@ export default function LyricsView({ track, variant = 'panel' }) {
       {!loading && !hasSynced && !hasPlain && (
         <div className="lyr-empty">
           <Mic2 size={34} opacity={0.35} />
-          <p>가사를 찾을 수 없습니다</p>
+          <p>{tr('가사를 찾을 수 없습니다')}</p>
           <div className="lyr-empty-actions">
-            <button className="lyr-search" onClick={openPicker}><Search size={14} /> 가사 직접 찾기</button>
+            <button className="lyr-search" onClick={openPicker}><Search size={14} />{' '}{tr('가사 직접 찾기')}</button>
             {resyncButton('lyr-search')}
           </div>
         </div>
@@ -184,8 +185,8 @@ export default function LyricsView({ track, variant = 'panel' }) {
       {!loading && (hasSynced || hasPlain) && (
         <>
           <div className="lyr-bar">
-            {!hasSynced && <span className="lyr-pill"><Mic2 size={12} /> 싱크 미지원</span>}
-            <button className="lyr-pill action" onClick={openPicker}><ListMusic size={12} /> 가사 직접 찾기</button>
+            {!hasSynced && <span className="lyr-pill"><Mic2 size={12} />{' '}{tr('싱크 미지원')}</span>}
+            <button className="lyr-pill action" onClick={openPicker}><ListMusic size={12} />{' '}{tr('가사 직접 찾기')}</button>
             {resyncButton('lyr-pill action')}
           </div>
           <div className="lyr-scroll" ref={scroller} onWheel={holdScroll} onPointerDown={holdScroll}>

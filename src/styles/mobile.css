@@ -419,7 +419,7 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .m-stage .stage-disc-wrap { flex: none; width: min(84vw, 46dvh); align-self: center; justify-self: auto; }
 .m-stage .now-viz { flex: none; width: min(84vw, 46dvh); height: 28px; margin-top: 2px; }
 .m-stage .stage-upnext { flex: none; width: min(84vw, 46dvh); max-width: none; padding: 5px 10px 5px 5px; }
-.m-stage .stage-upnext .thumb { width: 32px; height: 32px; }
+.m-stage .stage-upnext .thumb, .m-stage .stage-upnext .stage-upnext-random { width: 32px; height: 32px; }
 @media (max-height: 640px) {
   .m-stage .now-viz { display: none; }
 }

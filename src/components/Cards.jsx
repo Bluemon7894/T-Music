@@ -8,6 +8,7 @@ import { api } from '../lib/api.js';
 import { useTilt, useEnter, animate, ease, utils } from '../lib/motion.js';
 import { Thumb, PlayButton } from './common.jsx';
 import { trackMenuItems } from './TrackList.jsx';
+import { tr } from '../lib/i18n.js';
 
 // Loads an album/playlist/artist and plays it straight from a card.
 export async function playItem(item) {
@@ -18,10 +19,10 @@ export async function playItem(item) {
       : item.kind === 'playlist' ? await api.playlist(item.id)
         : await api.artist(item.id);
     const tracks = data.tracks || data.songs || [];
-    if (!tracks.length) return toast('재생할 곡이 없습니다');
+    if (!tracks.length) return toast(tr('재생할 곡이 없습니다'));
     p.playList(tracks, 0, { name: data.title || data.name });
   } catch {
-    toast('불러오지 못했습니다');
+    toast(tr('불러오지 못했습니다'));
   }
 }
 
@@ -35,9 +36,9 @@ export function openItem(item, go) {
 }
 
 export function subtitleOf(item) {
-  if (item.kind === 'artist') return item.subtitle?.includes('아티스트') ? item.subtitle : '아티스트';
-  if (item.kind === 'album') return [item.year, item.type || '앨범', item.artists?.map((a) => a.name).join(', ')].filter(Boolean).join(' · ');
-  if (item.kind === 'playlist') return item.author || '플레이리스트';
+  if (item.kind === 'artist') return item.subtitle?.includes(tr('아티스트')) ? item.subtitle : tr('아티스트');
+  if (item.kind === 'album') return [item.year, item.type || tr('앨범'), item.artists?.map((a) => a.name).join(', ')].filter(Boolean).join(' · ');
+  if (item.kind === 'playlist') return item.author || tr('플레이리스트');
   if (item.kind === 'track') return item.artists?.map((a) => a.name).join(', ');
   return item.subtitle || '';
 }
@@ -59,7 +60,7 @@ export function Card({ item, size }) {
   const onRemove = (e) => {
     e.stopPropagation();
     removeRecent(item.id);
-    toast('최근 들은 곡에서 삭제했습니다');
+    toast(tr('최근 들은 곡에서 삭제했습니다'));
   };
 
   return (
@@ -75,7 +76,7 @@ export function Card({ item, size }) {
         <span className="glare" />
         <PlayButton className="card-play" size={44} onClick={() => playItem(item)} />
         {item.isRecent && (
-          <button className="card-remove" onClick={onRemove} title="최근 들은 곡에서 삭제" aria-label="최근 들은 곡에서 삭제">
+          <button className="card-remove" onClick={onRemove} title={tr('최근 들은 곡에서 삭제')} aria-label={tr('최근 들은 곡에서 삭제')}>
             <X size={15} />
           </button>
         )}
@@ -106,9 +107,9 @@ export function Shelf({ title, subtitle, items, onMore, wide }) {
           {subtitle && <p className="shelf-sub">{subtitle}</p>}
         </div>
         <div className="shelf-nav">
-          {onMore && <button className="text-btn" onClick={onMore}>모두 보기</button>}
-          <button className="icon-btn circle glass" disabled={!edge.l} onClick={() => scroll(-1)} aria-label="이전"><ChevronLeft size={18} /></button>
-          <button className="icon-btn circle glass" disabled={!edge.r} onClick={() => scroll(1)} aria-label="다음"><ChevronRight size={18} /></button>
+          {onMore && <button className="text-btn" onClick={onMore}>{tr('모두 보기')}</button>}
+          <button className="icon-btn circle glass" disabled={!edge.l} onClick={() => scroll(-1)} aria-label={tr('이전')}><ChevronLeft size={18} /></button>
+          <button className="icon-btn circle glass" disabled={!edge.r} onClick={() => scroll(1)} aria-label={tr('다음')}><ChevronRight size={18} /></button>
         </div>
       </div>
       <div className={`shelf-row ${edge.l ? 'fade-l' : ''} ${edge.r ? 'fade-r' : ''}`} ref={row} onScroll={update}>
@@ -182,8 +183,8 @@ export function CoverFlow({ items, onActive }) {
           </div>
         ))}
       </div>
-      <button className="icon-btn circle glass cf-prev" onClick={() => step(-1)} aria-label="이전"><ChevronLeft size={20} /></button>
-      <button className="icon-btn circle glass cf-next" onClick={() => step(1)} aria-label="다음"><ChevronRight size={20} /></button>
+      <button className="icon-btn circle glass cf-prev" onClick={() => step(-1)} aria-label={tr('이전')}><ChevronLeft size={20} /></button>
+      <button className="icon-btn circle glass cf-next" onClick={() => step(1)} aria-label={tr('다음')}><ChevronRight size={20} /></button>
       <div className="cf-dots">{items.map((_, k) => <i key={k} className={k === index ? 'on' : ''} onClick={() => { setIndex(k); restart(); }} />)}</div>
     </div>
   );

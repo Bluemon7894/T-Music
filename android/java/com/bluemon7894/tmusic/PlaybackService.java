@@ -110,7 +110,7 @@ public final class PlaybackService extends Service {
         wifiLock.setReferenceCounted(false);
 
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        NotificationChannel channel = new NotificationChannel(CHANNEL, "재생", NotificationManager.IMPORTANCE_LOW);
+        NotificationChannel channel = new NotificationChannel(CHANNEL, Lang.say("재생", "Playback"), NotificationManager.IMPORTANCE_LOW);
         channel.setShowBadge(false);
         manager.createNotificationChannel(channel);
 
@@ -255,10 +255,10 @@ public final class PlaybackService extends Service {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
             .setOngoing(playing)
-            .addAction(action(R.drawable.ic_prev, "이전 곡", ACTION_PREV))
-            .addAction(action(playing ? R.drawable.ic_pause : R.drawable.ic_play, playing ? "일시정지" : "재생", ACTION_TOGGLE))
-            .addAction(action(R.drawable.ic_next, "다음 곡", ACTION_NEXT))
-            .addAction(action(R.drawable.ic_close, "닫기", ACTION_CLOSE))
+            .addAction(action(R.drawable.ic_prev, Lang.say("이전 곡", "Previous"), ACTION_PREV))
+            .addAction(action(playing ? R.drawable.ic_pause : R.drawable.ic_play, playing ? Lang.say("일시정지", "Pause") : Lang.say("재생", "Play"), ACTION_TOGGLE))
+            .addAction(action(R.drawable.ic_next, Lang.say("다음 곡", "Next"), ACTION_NEXT))
+            .addAction(action(R.drawable.ic_close, Lang.say("닫기", "Close"), ACTION_CLOSE))
             .setStyle(new Notification.MediaStyle().setMediaSession(session.getSessionToken()).setShowActionsInCompactView(0, 1, 2));
         if (art != null) builder.setLargeIcon(art);
         Notification notification = builder.build();

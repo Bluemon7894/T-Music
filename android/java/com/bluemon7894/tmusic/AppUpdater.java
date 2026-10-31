@@ -61,8 +61,8 @@ final class AppUpdater {
             } finally {
                 c.disconnect();
             }
-            if (total > 0 && received != total) throw new IOException("다운로드가 중간에 끊겼습니다");
-            if (!part.renameTo(target)) throw new IOException("저장하지 못했습니다");
+            if (total > 0 && received != total) throw new IOException(Lang.say("다운로드가 중간에 끊겼습니다", "The download was cut off"));
+            if (!part.renameTo(target)) throw new IOException(Lang.say("저장하지 못했습니다", "Couldn't save"));
             bridge.emit("update", "status", "completed", "total", received);
         } catch (IOException e) {
             part.delete();

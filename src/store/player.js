@@ -5,6 +5,7 @@ import { cancelSound, commitEnd, endLead, hasStarted, isEndCommitted, isEnding, 
 import { useLibrary } from './library.js';
 import { toast } from './ui.js';
 import { IS_ANDROID } from '../lib/platform.js';
+import { tr } from '../lib/i18n.js';
 
 // Phones set the volume with their own buttons, so the app stays at full level there.
 const DEFAULT_VOLUME = IS_ANDROID ? 1 : 0.8;
@@ -24,6 +25,9 @@ const saved = (() => {
   try { return JSON.parse(localStorage.getItem('t-music-player') || '{}'); } catch { return {}; }
 })();
 
+// A room's shuffle and repeat belong to the room. What the listener had alone waits here for them.
+let soloModes = null;
+
 function savePlayerState(extra = {}) {
   try {
     const s = usePlayer.getState();
@@ -35,7 +39,7 @@ function savePlayerState(extra = {}) {
     const data = {
       volume: s.volume,
       muted: s.muted,
-      repeat: s.repeat,
+      repeat: soloModes?.repeat ?? s.repeat,
       autoplay: s.autoplay,
       queue: (s.queue || []).slice(windowStart, windowStart + 100).map((t) => ({
         id: t.id,
@@ -287,7 +291,7 @@ export const usePlayer = create((set, get) => ({
     set({ queue: q });
     savePlayerState();
     get()._preloadNext();
-    toast('다음에 재생합니다');
+    toast(tr('다음에 재생합니다'));
   },
 
   addToQueue(tracks) {
@@ -309,7 +313,7 @@ export const usePlayer = create((set, get) => ({
     set({ queue: q });
     savePlayerState();
     get()._preloadNext();
-    toast(list.length > 1 ? `${list.length}곡을 대기열에 추가했습니다` : '대기열에 추가했습니다');
+    toast(list.length > 1 ? tr('{0}곡을 대기열에 추가했습니다', list.length) : tr('대기열에 추가했습니다'));
   },
 
   removeAt(i) {
@@ -373,7 +377,8 @@ export const usePlayer = create((set, get) => ({
 
   async next(auto = false) {
     if (room && !(auto ? room.allowAuto() : room.allowTrackChange())) return;
-    const { queue, index, repeat, autoplay } = get();
+    const { index, repeat, autoplay } = get();
+    let { queue } = get();
     if (auto && repeat === 'one') {
       commitListen();
       if (room) { room.seek(0); return; }
@@ -383,6 +388,14 @@ export const usePlayer = create((set, get) => ({
     }
     commitListen();
 
+    // Repeat-all in a room: the shared queue is what goes round, so this track rejoins it at the back,
+    // along with anything still waiting in this person's own queue.
+    if (room && repeat === 'all') {
+      room.loopQueue(queue[index], queue.slice(index + 1).filter((t) => !t.isAutoplay));
+      queue = queue.filter((t, i) => i <= index || t.isAutoplay);
+      set({ queue });
+    }
+
     const queued = room?.takeQueued();
     if (queued) {
       const q = queue.slice();
@@ -390,6 +403,17 @@ export const usePlayer = create((set, get) => ({
       set({ queue: q, index: index + 1 });
       get()._load();
       return;
+    }
+
+    if (room && get().shuffle) {
+      const waiting = queue.map((t, i) => (i > index && !t.isAutoplay ? i : -1)).filter((i) => i >= 0);
+      if (waiting.length > 1) {
+        const pick = waiting[Math.floor(Math.random() * waiting.length)];
+        queue = queue.slice();
+        const [track] = queue.splice(pick, 1);
+        queue.splice(index + 1, 0, track);
+        set({ queue });
+      }
     }
 
     // Check if next track is an auto-recommended track while autoplay is turned off
@@ -404,7 +428,7 @@ export const usePlayer = create((set, get) => ({
         set({ playing: false, loading: false, time: 0 });
         savePlayerState({ time: 0, wasPlaying: false });
         if (!auto) {
-          toast('자동 재생이 꺼져 있어 재생을 마쳤습니다.');
+          toast(tr('자동 재생이 꺼져 있어 재생을 마쳤습니다.'));
         }
         return;
       }
@@ -429,7 +453,7 @@ export const usePlayer = create((set, get) => ({
       set({ playing: false, loading: false, time: 0 });
       savePlayerState({ time: 0, wasPlaying: false });
       if (!auto) {
-        toast('대기열의 마지막 곡입니다.');
+        toast(tr('대기열의 마지막 곡입니다.'));
       }
       return;
     }
@@ -447,7 +471,7 @@ export const usePlayer = create((set, get) => ({
       queueFinished();
       active().pause();
       set({ playing: false, loading: false });
-      toast('추천곡을 불러올 수 없습니다 (네트워크 확인)');
+      toast(tr('추천곡을 불러올 수 없습니다 (네트워크 확인)'));
     }
   },
 
@@ -489,6 +513,7 @@ export const usePlayer = create((set, get) => ({
   },
 
   toggleShuffle() {
+    if (room) { room.setModes({ shuffle: !get().shuffle }); return; }
     const { shuffle, queue, index, unshuffled } = get();
     const cur = queue[index];
     if (!shuffle) {
@@ -503,7 +528,9 @@ export const usePlayer = create((set, get) => ({
   },
   cycleRepeat() {
     const order = ['off', 'all', 'one'];
-    set({ repeat: order[(order.indexOf(get().repeat) + 1) % 3] });
+    const repeat = order[(order.indexOf(get().repeat) + 1) % 3];
+    if (room) { room.setModes({ repeat }); return; }
+    set({ repeat });
     persistPrefs();
     get()._preloadNext();
   },
@@ -513,7 +540,7 @@ export const usePlayer = create((set, get) => ({
     persistPrefs();
     savePlayerState();
 
-    toast(next ? '추천곡 자동 재생을 켰습니다' : '추천곡 자동 재생을 껐습니다');
+    toast(next ? tr('추천곡 자동 재생을 켰습니다') : tr('추천곡 자동 재생을 껐습니다'));
 
     if (!next) {
       // Switched OFF: prune any unplayed auto-added recommendation tracks from queue
@@ -691,7 +718,7 @@ export const usePlayer = create((set, get) => ({
 
         // Quaternary fallback: popular tracks search
         try {
-          const searchData = await api.search('인기곡 차트');
+          const searchData = await api.search(tr('인기곡 차트'));
           const searchItems = (searchData?.tracks || searchData?.songs || []).filter(Boolean);
           const more = searchItems
             .filter((t) => t && t.id && !have.has(t.id))
@@ -766,6 +793,19 @@ export const roomPlayer = {
   // Not following the room any more: whatever it was doing to the sound is over.
   release() {
     if (isStarting() || isEnding()) dropSound();
+    if (soloModes) {
+      usePlayer.setState(soloModes);
+      soloModes = null;
+      usePlayer.getState()._preloadNext();
+    }
+  },
+  setModes(modes) {
+    if (!soloModes) {
+      const { repeat, shuffle } = usePlayer.getState();
+      soloModes = { repeat, shuffle };
+    }
+    usePlayer.setState({ repeat: modes?.repeat || 'off', shuffle: modes?.shuffle === true });
+    usePlayer.getState()._preloadNext();
   },
   seekTo(t) {
     try {
@@ -900,13 +940,13 @@ audios.forEach((a, i) => {
     if (consecutiveErrors >= 3) {
       active().pause();
       usePlayer.setState({ playing: false, loading: false });
-      toast('연속으로 음원을 재생할 수 없어 재생을 일시정지했습니다. 네트워크 연결을 확인해주세요.');
+      toast(tr('연속으로 음원을 재생할 수 없어 재생을 일시정지했습니다. 네트워크 연결을 확인해주세요.'));
       consecutiveErrors = 0;
       clearTimeout(errorSkipTimer);
       return;
     }
 
-    toast(`재생할 수 없어 건너뜁니다: ${track?.title || id}`);
+    toast(tr('재생할 수 없어 건너뜁니다: {0}', track?.title || id));
     clearTimeout(errorSkipTimer);
     errorSkipTimer = setTimeout(() => {
       usePlayer.getState().next(true);

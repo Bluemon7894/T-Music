@@ -2,10 +2,11 @@
 // for syncing in the background, but anything someone is waiting on needs a deadline.
 import { onValue, ref } from 'firebase/database';
 import { rtdb } from './firebase.js';
+import { tr } from './i18n.js';
 
 const CONNECT_WAIT_MS = 8000;
 
-export const OFFLINE_MESSAGE = '인터넷에 연결되지 않았습니다. 연결을 확인해 주세요.';
+export const OFFLINE_MESSAGE = tr('인터넷에 연결되지 않았습니다. 연결을 확인해 주세요.');
 
 export function within(promise, ms) {
   let timer;

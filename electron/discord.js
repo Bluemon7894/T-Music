@@ -2,6 +2,7 @@ import { Client } from '@xhayper/discord-rpc';
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
+import { say } from './lang.js';
 
 // Verified working YouTube Music Discord RPC Client ID
 const DEFAULT_CLIENT_ID = '1177081335727267940';
@@ -158,7 +159,7 @@ function applyActivity(data) {
   const activity = {
     type: ACTIVITY_LISTENING,
     statusDisplayType: STATUS_SHOWS_DETAILS,
-    details: (title || '음악 듣는 중').slice(0, 128),
+    details: (title || say('음악 듣는 중', 'Listening to music')).slice(0, 128),
     state: (artist || 'T-Music').slice(0, 128),
     instance: false,
   };
@@ -181,7 +182,7 @@ function applyActivity(data) {
   // Clickable button
   if (id && /^[\w-]{11}$/.test(id)) {
     activity.buttons = [
-      { label: 'YouTube에서 듣기', url: `https://www.youtube.com/watch?v=${id}` },
+      { label: say('YouTube에서 듣기', 'Listen on YouTube'), url: `https://www.youtube.com/watch?v=${id}` },
     ];
   }
 

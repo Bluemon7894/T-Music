@@ -10,12 +10,14 @@ import { getClient } from './youtube/client.js';
 import * as downloads from './downloads.js';
 import * as discord from './discord.js';
 import * as auth from './auth.js';
+import * as lang from './lang.js';
 import { registerScheme, handleProtocol } from './protocol.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BG = '#0a0712';
 
 let tray = null;
+let trayWindow = null;
 let isQuitting = false;
 let pendingInvite = null;
 let sizeBeforeMini = null;
@@ -67,6 +69,11 @@ const api = {
   album: (id) => catalog.album(id),
   artist: (id) => catalog.artist(id),
   playlist: (id) => catalog.playlist(id),
+  setLanguage: (language) => {
+    lang.setLanguage(language);
+    catalog.setLanguage(language);
+    updateTrayMenu();
+  },
   related: (id) => catalog.related(id),
   home: () => catalog.home(),
   lyrics: (track) => lyrics.getLyrics(track),
@@ -251,15 +258,12 @@ function createWindow() {
   return win;
 }
 
-function createTray(win) {
-  if (tray) return;
-  const image = getAppNativeImage(32);
-  tray = new Tray(image);
-  tray.setToolTip('T-Music');
-
-  const contextMenu = Menu.buildFromTemplate([
+function updateTrayMenu() {
+  if (!tray || !trayWindow) return;
+  const win = trayWindow;
+  tray.setContextMenu(Menu.buildFromTemplate([
     {
-      label: 'T-Music 열기',
+      label: lang.say('T-Music 열기', 'Open T-Music'),
       click: () => {
         win.show();
         win.focus();
@@ -267,28 +271,35 @@ function createTray(win) {
     },
     { type: 'separator' },
     {
-      label: '재생 / 일시정지',
+      label: lang.say('재생 / 일시정지', 'Play / Pause'),
       click: () => win.webContents.send('media-control', 'toggle'),
     },
     {
-      label: '다음 곡',
+      label: lang.say('다음 곡', 'Next track'),
       click: () => win.webContents.send('media-control', 'next'),
     },
     {
-      label: '이전 곡',
+      label: lang.say('이전 곡', 'Previous track'),
       click: () => win.webContents.send('media-control', 'prev'),
     },
     { type: 'separator' },
     {
-      label: '종료',
+      label: lang.say('종료', 'Quit'),
       click: () => {
         isQuitting = true;
         app.quit();
       },
     },
-  ]);
+  ]));
+}
 
-  tray.setContextMenu(contextMenu);
+function createTray(win) {
+  trayWindow = win;
+  if (tray) return;
+  const image = getAppNativeImage(32);
+  tray = new Tray(image);
+  tray.setToolTip('T-Music');
+  updateTrayMenu();
 
   tray.on('click', () => {
     if (win.isVisible()) {

@@ -13,6 +13,7 @@ import LyricsView from './LyricsView.jsx';
 import Deck from './Deck.jsx';
 import { fmtTime } from '../../lib/util.js';
 import { animate, createTimeline, ease, stagger } from '../../lib/motion.js';
+import { tr } from '../../lib/i18n.js';
 
 const VOLUME_WHEEL_STEP = 0.05;
 
@@ -41,8 +42,8 @@ function StageVolume() {
       <button
         className="icon-btn"
         onClick={toggleMute}
-        aria-label={muted ? '음소거 해제' : '음소거'}
-        title={muted ? '음소거 해제' : `음량: ${Math.round(shown * 100)}%`}
+        aria-label={muted ? tr('음소거 해제') : tr('음소거')}
+        title={muted ? tr('음소거 해제') : tr('음량: {0}%', Math.round(shown * 100))}
       >
         <Icon size={20} />
       </button>
@@ -59,11 +60,11 @@ function StageControls() {
   const { toggle, next, prev, toggleShuffle, cycleRepeat } = usePlayer.getState();
   return (
     <div className="stage-controls" data-rise>
-      <button className={`icon-btn toggle ${shuffle ? 'on' : ''}`} onClick={toggleShuffle} aria-label="셔플"><Shuffle size={20} /></button>
-      <button className="icon-btn" onClick={prev} aria-label="이전 곡"><SkipBack size={28} fill="currentColor" /></button>
+      <button className={`icon-btn toggle ${shuffle ? 'on' : ''}`} onClick={toggleShuffle} aria-label={tr('셔플')}><Shuffle size={20} /></button>
+      <button className="icon-btn" onClick={prev} aria-label={tr('이전 곡')}><SkipBack size={28} fill="currentColor" /></button>
       <PlayButton size={72} playing={playing} onClick={toggle} />
-      <button className="icon-btn" onClick={() => next()} aria-label="다음 곡"><SkipForward size={28} fill="currentColor" /></button>
-      <button className={`icon-btn toggle ${repeat !== 'off' ? 'on' : ''}`} onClick={cycleRepeat} aria-label="반복">{repeat === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}</button>
+      <button className="icon-btn" onClick={() => next()} aria-label={tr('다음 곡')}><SkipForward size={28} fill="currentColor" /></button>
+      <button className={`icon-btn toggle ${repeat !== 'off' ? 'on' : ''}`} onClick={cycleRepeat} aria-label={tr('반복')}>{repeat === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}</button>
       <StageVolume />
     </div>
   );
@@ -77,7 +78,7 @@ function UpNext() {
   if (!upcoming.length) return null;
   return (
     <div className="stage-next" data-rise>
-      <span className="stage-next-label">다음 곡</span>
+      <span className="stage-next-label">{tr('다음 곡')}</span>
       <div className="stage-next-row">
         {upcoming.map((t, i) => (
           <button key={t.id + i} className="stage-next-item" onClick={() => jumpTo(index + 1 + i)}>
@@ -93,17 +94,32 @@ function UpNext() {
 // One line under the deck saying what comes next. In a room that's the room's queue first.
 export function NextTrack({ className = '' }) {
   const fromRoom = useRoom((s) => (s.attached ? s.queue[0]?.track : null));
+  const randomOf = useRoom((s) => (s.attached && s.modes?.shuffle && s.queue.length > 1 ? s.queue.length : 0));
+  const looping = useRoom((s) => s.attached && s.modes?.repeat === 'all');
+  const current = usePlayer((s) => s.queue[s.index]);
   const fromQueue = usePlayer((s) => {
     const next = s.queue[s.index + 1];
     return next && (s.autoplay || !next.isAutoplay) ? next : null;
   });
-  const track = fromRoom || fromQueue;
+  const track = fromRoom || (fromQueue && !fromQueue.isAutoplay ? fromQueue : null) || (looping ? current : fromQueue);
   if (!track) return null;
+  if (randomOf) {
+    return (
+      <button className={`stage-upnext ${className}`} onClick={() => usePlayer.getState().next()} title={tr('다음 곡 재생')}>
+        <span className="stage-upnext-random"><Shuffle size={18} /></span>
+        <span>
+          <small>{tr('다음 곡')}</small>
+          <b>{tr('같이듣기 대기열 {0}곡 중 무작위', randomOf)}</b>
+        </span>
+        <SkipForward size={16} fill="currentColor" />
+      </button>
+    );
+  }
   return (
-    <button className={`stage-upnext ${className}`} onClick={() => usePlayer.getState().next()} title="다음 곡 재생">
+    <button className={`stage-upnext ${className}`} onClick={() => usePlayer.getState().next()} title={tr('다음 곡 재생')}>
       <Thumb src={track.thumb} />
       <span>
-        <small>다음 곡</small>
+        <small>{tr('다음 곡')}</small>
         <b>{track.title}</b>
       </span>
       <SkipForward size={16} fill="currentColor" />
@@ -172,7 +188,7 @@ function StageView({ track }) {
       <div className="stage-shade" />
       <div className="stage-top-gradient" />
       <div className="stage-top-drag" />
-      <button className="icon-btn circle glass stage-close" onClick={close} title="닫기 (Esc)"><ChevronDown size={22} /></button>
+      <button className="icon-btn circle glass stage-close" onClick={close} title={tr('닫기 (Esc)')}><ChevronDown size={22} /></button>
 
       <div className={`stage-main ${showLyrics ? 'with-lyrics' : ''}`}>
         <div className="stage-deck-col">
@@ -182,7 +198,7 @@ function StageView({ track }) {
 
         <div className={`stage-info ${showLyrics ? 'with-lyrics' : ''}`}>
           <div className="stage-header" data-rise>
-            <span className="stage-kicker">{contextName || '지금 재생 중'}</span>
+            <span className="stage-kicker">{contextName || tr('지금 재생 중')}</span>
             <h1 title={track.title}>{track.title}</h1>
             <div className="stage-artist"><ArtistLinks artists={track.artists} /></div>
             <div className="stage-actions">
@@ -191,7 +207,7 @@ function StageView({ track }) {
               <button
                 className={`icon-btn circle glass ${showLyrics ? 'on' : ''}`}
                 onClick={toggleLyrics}
-                title={showLyrics ? '가사 끄기' : '가사 보기'}
+                title={showLyrics ? tr('가사 끄기') : tr('가사 보기')}
               >
                 <Mic2 size={20} />
               </button>
