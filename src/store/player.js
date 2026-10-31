@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api, streamUrl } from '../lib/api.js';
 import { attach, setMusicFade, startAudioOnsetDetection } from '../lib/audio.js';
-import { cancelSound, commitEnd, endLead, hasStarted, isEndCommitted, isEnding, isStarting, isWaitingForCue, playEndSound, playStartSound, setDeckLevel, setStarted, startCue, useDeck } from './deck.js';
+import { cancelSound, commitEnd, endLead, hasStarted, isEndCommitted, isEnding, isStarting, isWaitingForMusic, playEndSound, playStartSound, setDeckLevel, setStarted, startLength, useDeck } from './deck.js';
 import { useLibrary } from './library.js';
 import { toast } from './ui.js';
 import { IS_ANDROID } from '../lib/platform.js';
@@ -113,10 +113,10 @@ function dropSound() {
   cancelSound();
 }
 
-// Alone, the music waits for the deck to get going: the needle has to land first.
+// Alone, the music waits for the start sound to finish.
 function playWithDeck() {
   const a = active();
-  if (isWaitingForCue()) return; // the sound's cue starts whichever track is current by then
+  if (isWaitingForMusic()) return; // the end of the sound starts whichever track is current by then
   if (isEnding()) dropSound();
   if (hasStarted() || !soundsOn()) {
     setStarted(true);
@@ -134,12 +134,13 @@ function playWithDeck() {
   });
 }
 
-// In a room the track runs on the room's clock, so nothing can wait: the music stays silent until the cue.
+// In a room the track runs on the room's clock. A track about to start is held long enough for the sound;
+// one already under way can't wait, so it stays silent until the sound is over.
 function firstPlayInRoom(secondsUntilMusic) {
   if (hasStarted()) return;
   setStarted(true);
   if (!soundsOn()) return;
-  playStartSound(riseMusic, Math.max(0, secondsUntilMusic - startCue()));
+  playStartSound(riseMusic, Math.max(0, secondsUntilMusic - startLength()));
 }
 
 // Nothing plays after this track unless something changes before it ends.
@@ -352,7 +353,7 @@ export const usePlayer = create((set, get) => ({
     if (room) { room.togglePlay(); return; }
     const a = active();
     if (get().index < 0) return;
-    if (isWaitingForCue()) {
+    if (isWaitingForMusic()) {
       dropSound();
       setStarted(false);
       set({ playing: false });
@@ -720,7 +721,7 @@ setDeckLevel(usePlayer.getState().muted ? 0 : usePlayer.getState().volume);
 useDeck.subscribe((s, prev) => {
   if (s.style === prev.style && s.sounds === prev.sounds) return;
   if (s.sounds && s.style === prev.style) return;
-  const waiting = isWaitingForCue() && !room;
+  const waiting = isWaitingForMusic() && !room;
   if (isStarting() || isEnding()) dropSound();
   if (waiting) active().play().catch(() => {});
 });
@@ -749,7 +750,7 @@ export const roomPlayer = {
     if (a.paused) a.play().catch(() => {});
   },
   pause() {
-    if (isWaitingForCue()) {
+    if (isWaitingForMusic()) {
       dropSound();
       setStarted(false);
     }
@@ -822,7 +823,7 @@ audios.forEach((a, i) => {
     if (isActive()) {
       usePlayer.setState({ playing: false });
       if (isEnding() && !isEndCommitted() && a.duration - a.currentTime > 0.5) dropSound();
-      if (isStarting() && !isWaitingForCue()) dropSound();
+      if (isStarting() && !isWaitingForMusic()) dropSound();
       pauseListening();
       savePlayerState({ wasPlaying: false, time: a.currentTime });
     }

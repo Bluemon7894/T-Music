@@ -43,7 +43,7 @@ function useDeckMotion({ platter, arm, glow }) {
       const beforeDrop = phase === 'starting' && t < start.cue;
       const ending = phase === 'ending';
       const afterLift = ending && t >= end.stop;
-      const running = beforeDrop ? t >= 0 : ending ? !afterLift : p.playing;
+      const running = phase === 'starting' ? t >= 0 : ending ? !afterLift : p.playing;
 
       speed += ((running ? 1 : 0) - speed) * Math.min(1, dt * (running ? 2.4 : 1.1));
       angle = (angle + speed * DEGREES_PER_SECOND * dt) % 360;

@@ -1,6 +1,6 @@
 // The deck the music plays on, and the sounds it makes. A sound plays only when playback really starts
-// and when the queue runs out, never on pause, skip or seek. The start sound runs down into the music
-// and the end sound comes up as the music goes, so the two meet instead of following each other.
+// and when the queue runs out, never on pause, skip or seek. The start sound dies away and the music
+// comes in once it's over; the end sound comes up as the music goes, so the two cross.
 import { create } from 'zustand';
 import { getAudioContext, setMusicFade } from '../lib/audio.js';
 import turntableStart from '../assets/sounds/turntable-start.mp3?inline';
@@ -11,22 +11,22 @@ import cassetteEnd from '../assets/sounds/cassette-end.mp3?inline';
 const STYLE_KEY = 't-music-deck-style';
 const SOUNDS_KEY = 't-music-deck-sounds';
 const PRELOAD_DELAY_MS = 1500;
-const MUSIC_AFTER_CUE_S = 0.12;
 const CANCEL_FADE_S = 0.15;
 
 const dB = (value) => 10 ** (value / 20);
 
 // Times are seconds into each file, read from its waveform: `cue` is the needle landing or the play key
-// going down, `stop` is the needle lifting or the key popping back up. The files swing from a hiss near
+// going down, `length` is where the music comes in, `stop` is the needle lifting or the key popping back
+// up. The files swing from a hiss near
 // -46 dB to clicks at full scale, so each has its own gain and a ceiling that keeps its clicks well under
 // the level of music.
 export const DECKS = {
   turntable: {
-    start: { src: turntableStart, gain: dB(0), ceiling: dB(-18), cue: 1.45, musicRise: 2.2, fadeFrom: 2.4 },
+    start: { src: turntableStart, gain: dB(0), ceiling: dB(-18), cue: 1.45, length: 5.11, musicRise: 1, fadeFrom: 3.6 },
     end: { src: turntableEnd, gain: dB(-4), ceiling: dB(-18), lead: 3.5, stop: 4.5, rise: 2 },
   },
   cassette: {
-    start: { src: cassetteStart, gain: dB(6), ceiling: dB(-16), cue: 2.3, musicRise: 2, fadeFrom: 2.6 },
+    start: { src: cassetteStart, gain: dB(6), ceiling: dB(-16), cue: 2.3, length: 5.09, musicRise: 1, fadeFrom: 3.6 },
     end: { src: cassetteEnd, gain: dB(6), ceiling: dB(-16), lead: 2.05, stop: 2.1, rise: 1.2 },
   },
 };
@@ -118,23 +118,22 @@ useDeck.subscribe((s, prev) => { if (s.style !== prev.style) preload(); });
 
 let current = null;
 let token = 0;
-let cueTimer = null;
+let musicTimer = null;
 let level = 1;
 let output = null;
 let started = false;
 let committed = false;
-let waitingForCue = false;
+let waitingForMusic = false;
 
 export const hasStarted = () => started;
 export const setStarted = (value) => { started = value; };
 export const isStarting = () => useDeck.getState().phase === 'starting';
 export const isEnding = () => useDeck.getState().phase === 'ending';
-// The start sound outlasts its cue: after the cue the music is on and only the sound's tail is left.
-export const isWaitingForCue = () => waitingForCue;
+export const isWaitingForMusic = () => waitingForMusic;
 export const isEndCommitted = () => committed;
 export const commitEnd = () => { committed = true; };
 export const endLead = () => spec('end').lead;
-export const startCue = () => spec('start').cue;
+export const startLength = () => spec('start').length;
 
 // The sounds follow the player's volume, so turning the music down turns them down too.
 export function setDeckLevel(value) {
@@ -158,8 +157,8 @@ function connect(ctx, buffer) {
 }
 
 function silence() {
-  clearTimeout(cueTimer);
-  waitingForCue = false;
+  clearTimeout(musicTimer);
+  waitingForMusic = false;
   if (!current) return;
   const { source, gain } = current;
   current = null;
@@ -185,24 +184,24 @@ export function cancelSound() {
   useDeck.setState({ phase: 'idle' });
 }
 
-// `onCue(seconds)` runs when the music should come in and how long it should take to come up. `after`
+// `onMusic(seconds)` runs when the sound is over and how long the music should take to come up. `after`
 // holds the whole thing back, for a room whose music starts at a set moment.
-export async function playStartSound(onCue, after = 0) {
+export async function playStartSound(onMusic, after = 0) {
   const sound = spec('start');
   const mine = ++token;
   silence();
   committed = false;
   setMusicFade(0);
-  waitingForCue = true;
+  waitingForMusic = true;
   useDeck.setState({ phase: 'starting', at: performance.now() + after * 1000 });
   let buffer = null;
   try { buffer = await load(sound); } catch (e) { console.warn('[deck]', e); }
   if (mine !== token) return;
   const ctx = getAudioContext();
   if (!buffer || !ctx) {
-    waitingForCue = false;
+    waitingForMusic = false;
     useDeck.setState({ phase: 'idle' });
-    onCue(0);
+    onMusic(0);
     return;
   }
   const when = ctx.currentTime + after;
@@ -210,13 +209,14 @@ export async function playStartSound(onCue, after = 0) {
   gain.gain.setValueAtTime(1, when);
   gain.gain.setValueAtTime(1, when + sound.fadeFrom);
   gain.gain.linearRampToValueAtTime(0, when + buffer.duration - 0.05);
-  source.onended = () => { if (mine === token) finish(); };
+  source.onended = () => { if (mine === token && !waitingForMusic) finish(); else if (mine === token) current = null; };
   source.start(when);
   useDeck.setState({ at: performance.now() + after * 1000 });
-  cueTimer = setTimeout(() => {
-    waitingForCue = false;
-    onCue(sound.musicRise);
-  }, (after + sound.cue + MUSIC_AFTER_CUE_S) * 1000);
+  musicTimer = setTimeout(() => {
+    waitingForMusic = false;
+    if (!current) finish();
+    onMusic(sound.musicRise);
+  }, (after + sound.length) * 1000);
 }
 
 // `left` is how much of the music is still to come; 0 means it already stopped.
