@@ -21,7 +21,7 @@ const check = (name, ok, detail = '') => {
 };
 const note = (text) => console.log(`      ${text}`);
 
-const adb = (...args) => spawnSync('adb', args, { encoding: 'utf8', timeout: 60000 }).stdout || '';
+const adb = (...args) => spawnSync('adb', args, { encoding: 'utf8', timeout: 60000, maxBuffer: 128 * 1024 * 1024 }).stdout || '';
 const shell = (...args) => adb('shell', ...args);
 function shot(name) {
   try {
@@ -57,6 +57,7 @@ async function connect() {
     const data = JSON.parse(m.data);
     if (data.id && replies.has(data.id)) { replies.get(data.id)(data); replies.delete(data.id); }
     if (data.method === 'Runtime.exceptionThrown') note(`page error: ${data.params.exceptionDetails?.exception?.description?.slice(0, 200)}`);
+    if (data.method === 'Runtime.consoleAPICalled' && ['warning', 'error'].includes(data.params.type)) note(`console ${data.params.type}: ${data.params.args.map((a) => a.value ?? a.description).join(' ').slice(0, 240)}`);
   };
   await cdp('Runtime.enable');
   await cdp('Page.enable');
@@ -65,7 +66,7 @@ const cdp = (method, params = {}) => new Promise((resolve, reject) => {
   const id = nextId++;
   replies.set(id, resolve);
   socket.send(JSON.stringify({ id, method, params }));
-  setTimeout(() => { if (replies.delete(id)) reject(new Error(`timeout: ${method}`)); }, 45000);
+  setTimeout(() => { if (replies.delete(id)) reject(new Error(`timeout: ${method} ${String(params.expression ?? '').slice(0, 80)}`)); }, 120000);
 });
 async function js(expression) {
   const r = await cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
@@ -127,8 +128,12 @@ async function main() {
   shot('02-home-loading');
 
   // ---- requests through the phone ----
+  const timing = await js(`(async () => { const out = {}; for (const [k, u] of [['sw', 'https://www.youtube.com/sw.js_data'], ['music', 'https://music.youtube.com/'], ['lrclib', 'https://lrclib.net/api/search?q=lilac']]) { const s = performance.now(); try { const r = await fetch(u, { signal: AbortSignal.timeout(40000) }); const t = await r.text(); out[k] = [r.status, t.length, Math.round(performance.now() - s)]; } catch (e) { out[k] = [String(e), Math.round(performance.now() - s)]; } } return out; })()`);
+  note(`proxy timing ${JSON.stringify(timing)}`);
+  check('the proxy answers', timing.sw?.[0] === 200 || timing.music?.[0] === 200, JSON.stringify(timing));
+  const started = Date.now();
   const home = await js(`window.api.call('home').then((h) => h.shelves?.length ?? 0).catch((e) => 'error: ' + e.message)`);
-  check('home loads through the proxy', typeof home === 'number' && home > 0, home);
+  check('home loads through the proxy', typeof home === 'number' && home > 0, `${home} in ${Date.now() - started} ms`);
   const search = await js(`window.api.call('search', '아이유 라일락').then((r) => r.songs?.length ?? 0).catch((e) => 'error: ' + e.message)`);
   check('search works through the proxy', typeof search === 'number' && search > 0, search);
   await waitFor(() => has('.cf-card'), 20000);

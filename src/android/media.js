@@ -39,7 +39,7 @@ function pause() {
   const p = usePlayer.getState();
   if (!p.playing) return;
   if (useRoom.getState().attached) useRoom.getState().pause();
-  else p.toggle();
+  usePlayer.getState().toggle();
 }
 
 function play() {
