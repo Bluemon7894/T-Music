@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { Heart, Link2, Plus, Library as LibraryIcon } from 'lucide-react';
+import { Heart, Link2, ListPlus, Plus, Library as LibraryIcon } from 'lucide-react';
+import { api, errorText } from '../lib/api.js';
 import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
@@ -15,6 +16,20 @@ const TABS = [
   { id: 'albums', label: '앨범' },
   { id: 'artists', label: '아티스트' },
 ];
+
+const PLAYLIST_ID = /^[\w-]{10,}$/;
+
+// Takes a youtube.com or music.youtube.com link, including one to a video playing from the list, or a bare id.
+function playlistIdFrom(text) {
+  const value = text.trim();
+  if (PLAYLIST_ID.test(value)) return value;
+  try {
+    const id = new URL(/^https?:/i.test(value) ? value : `https://${value}`).searchParams.get('list');
+    return id && PLAYLIST_ID.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function Library() {
   const lib = useLibrary();
@@ -34,6 +49,32 @@ export default function Library() {
     },
   });
 
+  const importFromYouTube = () => useUI.getState().prompt({
+    title: 'YouTube 재생목록 가져오기',
+    placeholder: 'youtube.com 또는 music.youtube.com 재생목록 링크',
+    submitLabel: '가져오기',
+    onSubmit: async (text) => {
+      const id = playlistIdFrom(text);
+      if (!id) {
+        toast('재생목록 링크를 인식하지 못했습니다');
+        return;
+      }
+      toast('재생목록을 불러오는 중...');
+      try {
+        const list = await api.playlist(id);
+        if (!list?.tracks?.length) {
+          toast('곡을 찾지 못했습니다. 비공개 재생목록은 가져올 수 없어요.');
+          return;
+        }
+        const created = lib.createPlaylist(list.title, list.tracks, list.thumb ? { thumb: list.thumb } : {});
+        toast(`'${list.title}' ${list.tracks.length}곡을 가져왔습니다`);
+        go('local', { id: created });
+      } catch (e) {
+        toast(errorText(e));
+      }
+    },
+  });
+
   const playlists = lib.playlists.map((p) => ({ kind: 'local', id: p.id, title: p.name, subtitle: `${p.tracks.length}곡`, thumb: p.thumb || p.tracks[0]?.thumb }));
   const albums = lib.savedAlbums.map((a) => ({ ...a, kind: 'album' }));
   const artists = lib.followed.map((a) => ({ ...a, kind: 'artist' }));
@@ -44,6 +85,7 @@ export default function Library() {
       <div className="page-title" data-enter>
         <h1>보관함</h1>
         <div className="row-btns">
+          <button className="btn" onClick={importFromYouTube}><ListPlus size={15} /> YouTube 가져오기</button>
           <button className="btn" onClick={openLink}><Link2 size={15} /> 공유 링크 열기</button>
           <button className="btn grad" onClick={() => go('local', { id: lib.createPlaylist() })}><Plus size={15} /> 새 플레이리스트</button>
         </div>
