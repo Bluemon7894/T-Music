@@ -46,7 +46,7 @@ final class WebHost {
 
     @SuppressLint("SetJavaScriptEnabled")
     private WebView createWebView() {
-        WebView view = new WebView(context);
+        WebView view = new AppWebView(context);
         view.setBackgroundColor(0xff0a0712);
         WebSettings s = view.getSettings();
         s.setJavaScriptEnabled(true);
