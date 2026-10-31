@@ -26,6 +26,8 @@ import Settings from './views/Settings.jsx';
 import Room from './views/Room.jsx';
 import Friends from './views/Friends.jsx';
 import InvitePrompt from './components/InvitePrompt.jsx';
+import MobileShell from './components/mobile/MobileShell.jsx';
+import { IS_ANDROID } from './lib/platform.js';
 import { Album, Playlist, Liked, LocalPlaylist } from './views/Collection.jsx';
 
 function View({ route }) {
@@ -231,6 +233,7 @@ function MainApp() {
 
   useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [index]);
 
+  if (IS_ANDROID) return <MobileShell mainRef={mainRef}><View route={route} key={index} /></MobileShell>;
   if (mini) return <><MiniPlayer /><Toast /></>;
 
   return (

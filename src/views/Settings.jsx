@@ -22,6 +22,7 @@ import { useUpdater } from '../store/updater.js';
 import { toast, useUI } from '../store/ui.js';
 import { fmtBytes } from '../lib/util.js';
 import { useEnter } from '../lib/motion.js';
+import { IS_ANDROID } from '../lib/platform.js';
 import { isNormalizeEnabled, setNormalize, getAudioSinkId, setAudioSinkId } from '../lib/audio.js';
 import logo from '../assets/logo-mark.png';
 
@@ -51,6 +52,7 @@ export default function Settings() {
   const [selectedDevice, setSelectedDevice] = useState(getAudioSinkId);
 
   useEffect(() => {
+    if (IS_ANDROID) return undefined;
     const updateDevices = async () => {
       try {
         if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -76,6 +78,7 @@ export default function Settings() {
     try { return localStorage.getItem('t-music-autostart') === '1'; } catch { return false; }
   });
   useEffect(() => {
+    if (IS_ANDROID) return;
     api.getAutoStart().then((v) => {
       setAutoStartState(Boolean(v));
       try { localStorage.setItem('t-music-autostart', v ? '1' : '0'); } catch {}
@@ -103,6 +106,7 @@ export default function Settings() {
   };
 
   useEffect(() => {
+    if (IS_ANDROID) return undefined;
     api.getDiscordRPC().then((v) => setDiscordRPCState(Boolean(v))).catch(() => {});
     refreshDiscordStatus();
     const timer = setInterval(refreshDiscordStatus, 3000);
@@ -134,11 +138,17 @@ export default function Settings() {
   const ref = useRef(null);
   useEnter(ref, [], { step: 50 });
 
-  const exportLib = () => {
-    const blob = new Blob([JSON.stringify({ liked: lib.liked, playlists: lib.playlists, savedAlbums: lib.savedAlbums, followed: lib.followed }, null, 1)], { type: 'application/json' });
+  const exportLib = async () => {
+    const text = JSON.stringify({ liked: lib.liked, playlists: lib.playlists, savedAlbums: lib.savedAlbums, followed: lib.followed }, null, 1);
+    const name = `t-music-library-${new Date().toISOString().slice(0, 10)}.json`;
+    if (IS_ANDROID) {
+      if (await api.saveFile(name, 'application/json', text)) toast('백업 파일을 저장했습니다');
+      return;
+    }
+    const blob = new Blob([text], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `t-music-library-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = name;
     a.click();
     toast('백업 파일을 저장했습니다');
   };
@@ -181,7 +191,7 @@ export default function Settings() {
 
         <section className="set-card" data-enter>
           <h2><Radio size={18} /> 재생 및 음질 설정</h2>
-          <p className="muted">오디오 재생 방식과 볼륨, 출력 장치를 설정해요.</p>
+          <p className="muted">{IS_ANDROID ? '오디오 재생 방식을 설정해요.' : '오디오 재생 방식과 볼륨, 출력 장치를 설정해요.'}</p>
 
           <div className="set-item" onClick={toggleAutoplay}>
             <div className="set-item-text">
@@ -199,7 +209,7 @@ export default function Settings() {
             <div className={`switch ${normalize ? 'on' : ''}`} />
           </div>
 
-          {devices.length > 0 && (
+          {!IS_ANDROID && devices.length > 0 && (
             <div className="set-item" style={{ cursor: 'default' }}>
               <div className="set-item-text">
                 <span className="set-item-title">오디오 출력 장치</span>
@@ -221,7 +231,7 @@ export default function Settings() {
           )}
         </section>
 
-        <section className="set-card" data-enter>
+        {!IS_ANDROID && <section className="set-card" data-enter>
           <h2><Monitor size={18} /> 시스템 및 연동</h2>
           <p className="muted">윈도우 시작 및 디스코드 상태 표시 설정을 관리해요.</p>
 
@@ -259,21 +269,23 @@ export default function Settings() {
               </ol>
             </div>
           )}
-        </section>
+        </section>}
 
         <section className="set-card" data-enter>
           <h2><Download size={18} /> 다운로드 저장소</h2>
           <p className="muted">{dl.items.length}곡 저장됨 · {fmtBytes(dl.totalSize)}</p>
-          <p className="muted small path">{dl.dir}</p>
-          <div className="row-btns">
-            <button className="btn" onClick={openDownloads}><FolderOpen size={15} /> 폴더 열기</button>
-            <button className="btn" onClick={changeDownloadsDir}><FolderEdit size={15} /> 폴더 변경</button>
-          </div>
+          {!IS_ANDROID && <p className="muted small path">{dl.dir}</p>}
+          {!IS_ANDROID && (
+            <div className="row-btns">
+              <button className="btn" onClick={openDownloads}><FolderOpen size={15} /> 폴더 열기</button>
+              <button className="btn" onClick={changeDownloadsDir}><FolderEdit size={15} /> 폴더 변경</button>
+            </div>
+          )}
         </section>
 
         <section className="set-card" data-enter>
           <h2><Library size={18} /> 보관함</h2>
-          <p className="muted">좋아요와 플레이리스트는 계정에 저장돼서 다른 PC에서도 이어져요. 유튜브 계정과는 연결되지 않습니다.</p>
+          <p className="muted">좋아요와 플레이리스트는 계정에 저장돼서 다른 {IS_ANDROID ? '기기' : 'PC'}에서도 이어져요. 유튜브 계정과는 연결되지 않습니다.</p>
           <div className="set-stats">
             <div><b>{lib.liked.length}</b><span>좋아요</span></div>
             <div><b>{lib.playlists.length}</b><span>플레이리스트</span></div>
@@ -286,7 +298,7 @@ export default function Settings() {
           </div>
         </section>
 
-        <section className="set-card" data-enter>
+        {!IS_ANDROID && <section className="set-card" data-enter>
           <h2><Keyboard size={18} /> 단축키</h2>
           <div className="shortcuts">
             <span><kbd>Space</kbd> 재생 / 일시정지</span>
@@ -299,7 +311,7 @@ export default function Settings() {
             <span><kbd>Esc</kbd> 전체 화면 닫기</span>
             <span><kbd>마우스</kbd> 4/5번 앞뒤 이동</span>
           </div>
-        </section>
+        </section>}
 
         <section className="set-card about-app" data-enter>
           <h2><Info size={18} /> 앱 정보 및 업데이트</h2>

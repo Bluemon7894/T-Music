@@ -8,8 +8,9 @@ import { api } from '../../lib/api.js';
 import { ProgressRing } from '../DownloadButton.jsx';
 import { AccountButton } from '../Account.jsx';
 import { useLibrary } from '../../store/library.js';
+import { IS_ANDROID } from '../../lib/platform.js';
 
-function UpdatePill() {
+export function UpdatePill() {
   const hasUpdate = useUpdater((s) => s.hasUpdate);
   const latestVersion = useUpdater((s) => s.latestVersion);
   const openModal = useUpdater((s) => s.openModal);
@@ -24,7 +25,7 @@ function UpdatePill() {
   );
 }
 
-function DownloadPill() {
+export function DownloadPill() {
   const allJobs = useDownloads((s) => s.jobs);
   const jobs = allJobs.filter((j) => j.status !== 'error');
   const go = useNav((s) => s.go);
@@ -39,13 +40,9 @@ function DownloadPill() {
   );
 }
 
-export default function TopBar() {
-  const { go, back, forward, replace } = useNav();
-  const canBack = useNav((s) => s.index > 0);
-  const canFwd = useNav((s) => s.index < s.stack.length - 1);
+export function SearchBox() {
+  const { go, replace } = useNav();
   const route = useRoute();
-  const panelOpen = useUI((s) => s.panelOpen);
-  const togglePanel = useUI((s) => s.togglePanel);
   const [text, setText] = useState('');
   const [sugs, setSugs] = useState([]);
   const history = useLibrary((s) => s.searches);
@@ -98,24 +95,25 @@ export default function TopBar() {
     else if (e.key === 'Escape') { inputRef.current?.blur(); setFocus(false); }
   };
 
+  const input = (
+    <input
+      ref={inputRef}
+      value={text}
+      placeholder="노래, 아티스트, 앨범 검색"
+      onChange={(e) => { setText(e.target.value); setHi(-1); }}
+      onFocus={() => { setFocus(true); if (route.name !== 'search' && !text) go('search', {}); }}
+      onBlur={() => setTimeout(() => setFocus(false), 150)}
+      onKeyDown={onKeyDown}
+      spellCheck={false}
+      enterKeyHint={IS_ANDROID ? 'search' : undefined}
+    />
+  );
+
   return (
-    <header className="topbar">
-      <div className="tb-nav">
-        <button className="icon-btn circle glass" disabled={!canBack} onClick={back} aria-label="뒤로"><ChevronLeft size={19} /></button>
-        <button className="icon-btn circle glass" disabled={!canFwd} onClick={forward} aria-label="앞으로"><ChevronRight size={19} /></button>
-      </div>
-      <div className={`searchbox ${focus ? 'focus' : ''}`}>
+    <div className={`searchbox ${focus ? 'focus' : ''}`}>
         <Search size={18} className="sb-icon" onClick={() => submit(text)} />
-        <input
-          ref={inputRef}
-          value={text}
-          placeholder="노래, 아티스트, 앨범 검색"
-          onChange={(e) => { setText(e.target.value); setHi(-1); }}
-          onFocus={() => { setFocus(true); if (route.name !== 'search' && !text) go('search', {}); }}
-          onBlur={() => setTimeout(() => setFocus(false), 150)}
-          onKeyDown={onKeyDown}
-          spellCheck={false}
-        />
+        {/* Phone keyboards composing Korean don't always report the Enter key, but they do submit forms. */}
+        {IS_ANDROID ? <form style={{ display: 'contents' }} onSubmit={(e) => { e.preventDefault(); submit(text); }}>{input}</form> : input}
         {text ? (
           <button className="icon-btn sb-clear" onClick={() => { setText(''); inputRef.current?.focus(); }} aria-label="지우기"><X size={16} /></button>
         ) : (
@@ -169,7 +167,25 @@ export default function TopBar() {
             ))}
           </ul>
         )}
+    </div>
+  );
+}
+
+export default function TopBar() {
+  const { go, back, forward } = useNav();
+  const canBack = useNav((s) => s.index > 0);
+  const canFwd = useNav((s) => s.index < s.stack.length - 1);
+  const route = useRoute();
+  const panelOpen = useUI((s) => s.panelOpen);
+  const togglePanel = useUI((s) => s.togglePanel);
+
+  return (
+    <header className="topbar">
+      <div className="tb-nav">
+        <button className="icon-btn circle glass" disabled={!canBack} onClick={back} aria-label="뒤로"><ChevronLeft size={19} /></button>
+        <button className="icon-btn circle glass" disabled={!canFwd} onClick={forward} aria-label="앞으로"><ChevronRight size={19} /></button>
       </div>
+      <SearchBox />
       <div className="tb-right">
         <UpdatePill />
         <DownloadPill />

@@ -12,6 +12,7 @@ import { useNav } from '../store/nav.js';
 import { useUI, toast } from '../store/ui.js';
 import { totalTime, colorFor } from '../lib/util.js';
 import { useEnter, useTilt } from '../lib/motion.js';
+import { IS_ANDROID } from '../lib/platform.js';
 import { useAsync, Thumb, PlayButton, ArtistLinks, PageSkeleton, ErrorMsg, Empty } from '../components/common.jsx';
 import TrackList, { startRadio } from '../components/TrackList.jsx';
 import { DownloadAllButton } from '../components/DownloadButton.jsx';
@@ -251,7 +252,7 @@ export function LocalPlaylist({ id }) {
             )}
           </Filterable>
         ) : (
-          <Empty icon={ListMusic} title="아직 비어 있어요" text="곡을 우클릭하고 '플레이리스트에 추가'를 눌러 담아보세요.">
+          <Empty icon={ListMusic} title="아직 비어 있어요" text={IS_ANDROID ? "곡의 ⋯ 버튼에서 '플레이리스트에 추가'를 눌러 담아보세요." : "곡을 우클릭하고 '플레이리스트에 추가'를 눌러 담아보세요."}>
             <button className="btn grad" onClick={() => go('search', {})}>곡 찾아보기</button>
           </Empty>
         )}

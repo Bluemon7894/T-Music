@@ -5,6 +5,7 @@ import { useFriends } from '../store/friends.js';
 import { toast, useUI } from '../store/ui.js';
 import { useSync } from '../lib/librarySync.js';
 import { GoogleMark } from '../views/Login.jsx';
+import { THIS_DEVICE } from '../lib/platform.js';
 
 export function Avatar({ user, size = 34 }) {
   const [failed, setFailed] = useState(false);
@@ -52,7 +53,7 @@ function confirmDelete(user) {
 const SYNC_LABEL = {
   syncing: { icon: RefreshCw, text: '계정과 동기화하는 중', className: 'spin' },
   synced: { icon: CloudCheck, text: '계정에 저장됨' },
-  error: { icon: CloudOff, text: '동기화 실패 (이 PC에는 저장됨)' },
+  error: { icon: CloudOff, text: `동기화 실패 (${THIS_DEVICE}에는 저장됨)` },
 };
 
 function SyncStatus() {
@@ -120,7 +121,7 @@ export function AccountCard() {
         <Avatar user={user} size={52} />
         <div className="account-text">
           <b>{user ? user.name : '오프라인'}</b>
-          <small>{!user ? '로그인하지 않았어요' : user.isGuest ? '게스트 계정 (이 PC에서만 사용)' : user.email}</small>
+          <small>{!user ? '로그인하지 않았어요' : user.isGuest ? `게스트 계정 (${THIS_DEVICE}에서만 사용)` : user.email}</small>
           <SyncStatus />
         </div>
       </div>

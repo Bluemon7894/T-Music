@@ -4,3 +4,10 @@ release/
 
 # Google OAuth client for sign-in (see auth.config.example.json)
 electron/auth.config.json
+
+# Android build output and signing key (back the key up somewhere safe)
+build-android/
+dist-android/
+android/release.keystore
+android/keystore.properties
+android/test/out/

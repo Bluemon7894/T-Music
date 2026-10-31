@@ -7,6 +7,7 @@ import * as P from '../youtube/parse.js';
 
 const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
 const TIMEOUT = 5000;
+const decodeBase64 = (text) => new TextDecoder().decode(Uint8Array.from(atob(text), (c) => c.charCodeAt(0)));
 
 async function fetchJson(url, init = {}, { retries = 0 } = {}) {
   for (let attempt = 0; ; attempt++) {
@@ -126,7 +127,7 @@ async function kugou({ title, artist, free }, meta) {
     duration: (c.duration || 0) / 1000,
     load: async () => {
       const d = await fetchJson(`https://lyrics.kugou.com/download?ver=1&client=pc&id=${c.id}&accesskey=${c.accesskey}&fmt=lrc&charset=utf8`, { headers: { 'User-Agent': BROWSER_UA } });
-      return { synced: d?.content ? Buffer.from(d.content, 'base64').toString('utf8') : null, plain: null };
+      return { synced: d?.content ? decodeBase64(d.content) : null, plain: null };
     },
   }));
 }

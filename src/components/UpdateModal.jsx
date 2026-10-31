@@ -4,6 +4,7 @@ import { marked } from 'marked';
 import { useUpdater } from '../store/updater.js';
 import { api } from '../lib/api.js';
 import { fmtBytes } from '../lib/util.js';
+import { IS_ANDROID } from '../lib/platform.js';
 
 export default function UpdateModal() {
   const modalOpen = useUpdater((s) => s.modalOpen);
@@ -94,7 +95,7 @@ export default function UpdateModal() {
         {downloaded && (
           <div className="update-completed-msg">
             <CheckCircle2 size={18} className="text-success" />
-            <span>설치 파일 다운로드가 완료되었습니다. 지금 재시작하여 설치할 수 있습니다.</span>
+            <span>{IS_ANDROID ? '다운로드가 끝났습니다. 설치를 누르면 Android 설치 화면으로 넘어갑니다.' : '설치 파일 다운로드가 완료되었습니다. 지금 재시작하여 설치할 수 있습니다.'}</span>
           </div>
         )}
 
@@ -119,7 +120,7 @@ export default function UpdateModal() {
                 }}
                 onClick={openReleasePage}
               >
-                웹 브라우저에서 직접 설치 파일(.exe) 다운로드하기 →
+                웹 브라우저에서 직접 설치 파일({IS_ANDROID ? '.apk' : '.exe'}) 다운로드하기 →
               </button>
             </div>
           </div>
@@ -135,7 +136,7 @@ export default function UpdateModal() {
           </button>
           {downloaded ? (
             <button className="btn-primary" onClick={install}>
-              <CheckCircle2 size={16} /> 지금 설치 및 재시작
+              <CheckCircle2 size={16} /> {IS_ANDROID ? '설치' : '지금 설치 및 재시작'}
             </button>
           ) : downloading ? (
             <button className="btn-primary" disabled>

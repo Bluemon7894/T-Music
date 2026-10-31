@@ -131,6 +131,7 @@ export function CoverFlow({ items, onActive }) {
   const go = useNav((s) => s.go);
   const count = items.length;
   const timer = useRef(null);
+  const swipeFrom = useRef(0);
 
   const layout = useCallback((i, instant) => {
     const cards = stage.current?.children;
@@ -166,7 +167,12 @@ export function CoverFlow({ items, onActive }) {
   const step = (d) => { setIndex((i) => (i + d + count) % count); restart(); };
 
   return (
-    <div className="coverflow" onWheel={(e) => { if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 20) step(e.deltaX > 0 ? 1 : -1); }}>
+    <div
+      className="coverflow"
+      onWheel={(e) => { if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 20) step(e.deltaX > 0 ? 1 : -1); }}
+      onTouchStart={(e) => { swipeFrom.current = e.touches[0].clientX; }}
+      onTouchEnd={(e) => { const moved = e.changedTouches[0].clientX - swipeFrom.current; if (Math.abs(moved) > 40) step(moved < 0 ? 1 : -1); }}
+    >
       <div className="cf-stage" ref={stage}>
         {items.map((it, k) => (
           <div key={it.kind + it.id} className="cf-card" onClick={() => (k === index ? openItem(it, go) : (setIndex(k), restart()))}>

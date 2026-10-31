@@ -1,3 +1,5 @@
+import { IS_ANDROID } from './platform.js';
+
 const call = (method, ...args) => window.api.call(method, ...args);
 
 export const api = {
@@ -43,6 +45,8 @@ export const api = {
   googleSignIn: () => call('googleSignIn'),
   cancelGoogleSignIn: () => call('cancelGoogleSignIn'),
   copyText: (text) => call('copyText', text),
+  shareText: (text) => call('shareText', text),
+  saveFile: (name, mime, content) => call('saveFile', name, mime, content),
   setMiniMode: (on) => call('setMiniMode', on),
   showWindow: () => call('showWindow'),
   takeInvite: () => call('takeInvite'),
@@ -51,7 +55,7 @@ export const api = {
   onMediaControl: (cb) => window.api?.onMediaControl?.(cb) || (() => {}),
 };
 
-export const streamUrl = (id) => `ytm://stream/${id}`;
+export const streamUrl = (id) => (IS_ANDROID ? `/stream/${id}` : `ytm://stream/${id}`);
 
 // IPC errors arrive as "Error invoking remote method 'api': Error: <message>".
 export function errorText(e) {

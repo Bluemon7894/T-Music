@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { auth } from '../lib/firebase.js';
 import { setPlaylistEditable, shareLink, sharePlaylist, stopSharing } from '../lib/sharedPlaylists.js';
 import { toast, useUI } from '../store/ui.js';
+import { IS_ANDROID } from '../lib/platform.js';
 
 export default function SharePanel({ playlist }) {
   const [busy, setBusy] = useState(false);
@@ -13,6 +14,7 @@ export default function SharePanel({ playlist }) {
   const copy = async (id) => {
     await api.copyText(shareLink(id));
     toast('공유 링크를 복사했습니다');
+    if (IS_ANDROID) api.shareText(shareLink(id));
   };
 
   const run = async (work, failure) => {

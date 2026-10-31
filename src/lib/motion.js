@@ -1,6 +1,7 @@
 // Motion helpers on top of anime.js v4.
 import { useLayoutEffect, useEffect } from 'react';
 import { animate, stagger, spring, createAnimatable, createTimeline, utils } from 'animejs';
+import { IS_ANDROID } from './platform.js';
 
 export const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -40,7 +41,7 @@ export function pop(el, from = 0.82) {
 export function useTilt(ref, { max = 12, scale = 1.03, enabled = true } = {}) {
   useEffect(() => {
     const el = ref.current;
-    if (!el || !enabled || reduced) return;
+    if (!el || !enabled || reduced || IS_ANDROID) return;
     const a = createAnimatable(el, { rotateX: 450, rotateY: 450, scale: 450, ease: 'out(4)' });
     const move = (e) => {
       const r = el.getBoundingClientRect();

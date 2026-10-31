@@ -8,6 +8,7 @@ import { useDownloads, download, removeDownload } from '../store/downloads.js';
 import { api } from '../lib/api.js';
 import { canEditPlaylist } from '../lib/sharedPlaylists.js';
 import { fmtTime } from '../lib/util.js';
+import { IS_ANDROID } from '../lib/platform.js';
 import { burst, useEnter } from '../lib/motion.js';
 import { Thumb, ArtistLinks, Equalizer } from './common.jsx';
 import DownloadButton from './DownloadButton.jsx';
@@ -151,7 +152,8 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
             key={t.id + ':' + i}
             data-enter={animate && i < 30 ? '' : undefined}
             className={`tl-row ${isCur ? 'current' : ''} ${onReorder ? 'reorderable' : ''} ${dragOverIdx === i ? 'drag-over' : ''}`}
-            draggable={true}
+            draggable={!IS_ANDROID}
+            onClick={IS_ANDROID ? () => play(i) : undefined}
             onDragStart={(e) => {
               try {
                 e.dataTransfer.setData('application/json', JSON.stringify(t));
@@ -180,8 +182,8 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
                 if (!isNaN(from) && from !== i) onReorder(from, i);
               }
             }}
-            onDoubleClick={() => play(i)}
-            onMouseEnter={() => api.prefetch(t.id)}
+            onDoubleClick={IS_ANDROID ? undefined : () => play(i)}
+            onMouseEnter={IS_ANDROID ? undefined : () => api.prefetch(t.id)}
             onContextMenu={(e) => openMenu(e, trackMenuItems(t, extra))}
           >
             <span className="c-num">

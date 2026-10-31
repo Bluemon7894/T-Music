@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Copy, Crown, GripVertical, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Users, Wifi, WifiOff, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Crown, GripVertical, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Share2, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { Empty, ArtistLinks, Thumb } from '../components/common.jsx';
 import LyricsView from '../components/layout/LyricsView.jsx';
 import { safePhoto, safeTrack } from '../lib/safeTrack.js';
@@ -10,6 +10,7 @@ import { inviteLink, normalizeCode, useRoom } from '../store/room.js';
 import { toast, useUI } from '../store/ui.js';
 import { api } from '../lib/api.js';
 import { useEnter } from '../lib/motion.js';
+import { IS_ANDROID } from '../lib/platform.js';
 
 function Lobby() {
   const busy = useRoom((s) => s.busy);
@@ -37,7 +38,7 @@ function Lobby() {
         </form>
       </div>
       {error && <p className="room-error" data-enter role="alert">{error}</p>}
-      <p className="room-hint" data-enter>음원은 각자 PC에서 재생하고, 재생 위치만 서로 맞춰요. 친구도 T-Music이 있어야 해요.</p>
+      <p className="room-hint" data-enter>음원은 각자 {IS_ANDROID ? '기기' : 'PC'}에서 재생하고, 재생 위치만 서로 맞춰요. 친구도 T-Music이 있어야 해요.</p>
     </>
   );
 }
@@ -130,6 +131,7 @@ function InRoom() {
           <div className="room-code" aria-label="초대 코드">{code}</div>
           <button className="btn" onClick={() => copy(code, '초대 코드를 복사했습니다')}><Copy size={15} /> 코드 복사</button>
           <button className="btn" onClick={() => copy(inviteLink(code), '초대 링크를 복사했습니다')}><Link2 size={15} /> 링크 복사</button>
+          {IS_ANDROID && <button className="btn" onClick={() => api.shareText(`T-Music 같이 듣기에 초대합니다. 초대 코드: ${code}`)}><Share2 size={15} /> 보내기</button>}
         </div>
         {!attached && <p className="room-note">이 방에 계속 들어와 있어요. 시작을 누르면 지금 방의 곡을 같이 들어요.</p>}
         {attached && !hostListening && listening > 1 && <p className="room-note">방장이 자리를 비웠어요. 30초 안에 돌아오지 않으면 가장 오래 있던 멤버가 대신 방장이 돼요.</p>}
@@ -189,7 +191,7 @@ function InRoom() {
               <li
                 key={item.key}
                 className={dropAt === i ? 'drop-target' : ''}
-                draggable={canReorder}
+                draggable={canReorder && !IS_ANDROID}
                 onDragStart={(e) => {
                   e.dataTransfer.setData('text/room-queue', String(i));
                   e.dataTransfer.effectAllowed = 'move';
@@ -228,7 +230,7 @@ function InRoom() {
             ))}
           </ul>
         ) : (
-          <p className="muted">곡을 우클릭해서 대기열에 추가하면 다음 곡으로 재생돼요. 누구나 추가할 수 있어요.</p>
+          <p className="muted">{IS_ANDROID ? '곡의 ⋯ 버튼으로 대기열에 추가하면' : '곡을 우클릭해서 대기열에 추가하면'} 다음 곡으로 재생돼요. 누구나 추가할 수 있어요.</p>
         )}
       </section>
 

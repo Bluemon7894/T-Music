@@ -6,6 +6,7 @@ import { useNav } from '../store/nav.js';
 import { useUI } from '../store/ui.js';
 import { fmtBytes, totalTime } from '../lib/util.js';
 import { useEnter } from '../lib/motion.js';
+import { IS_ANDROID, THIS_DEVICE } from '../lib/platform.js';
 import { Thumb, PlayButton, Empty } from '../components/common.jsx';
 import TrackList from '../components/TrackList.jsx';
 
@@ -50,10 +51,10 @@ export default function Downloads() {
         </div>
         <div className="dl-hero-actions">
           {items.length > 0 && <PlayButton size={58} onClick={() => usePlayer.getState().playList(items, 0, context)} />}
-          <button className="btn" onClick={openDownloads}><FolderOpen size={15} /> 폴더 열기</button>
+          {!IS_ANDROID && <button className="btn" onClick={openDownloads}><FolderOpen size={15} /> 폴더 열기</button>}
           {items.length > 0 && <button className="btn danger" onClick={() => useUI.getState().prompt({
             title: '다운로드한 곡을 모두 삭제할까요?',
-            message: `${items.length}곡(${fmtBytes(totalSize)})이 이 PC에서 삭제됩니다. 보관함의 곡 목록은 그대로예요.`,
+            message: `${items.length}곡(${fmtBytes(totalSize)})이 ${THIS_DEVICE}에서 삭제됩니다. 보관함의 곡 목록은 그대로예요.`,
             submitLabel: '전체 삭제',
             onSubmit: () => removeDownload(items.map((i) => i.id)),
           })}><Trash2 size={15} /> 전체 삭제</button>}

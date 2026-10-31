@@ -3,6 +3,10 @@ import { api, streamUrl } from '../lib/api.js';
 import { attach, startAudioOnsetDetection } from '../lib/audio.js';
 import { useLibrary } from './library.js';
 import { toast } from './ui.js';
+import { IS_ANDROID } from '../lib/platform.js';
+
+// Phones set the volume with their own buttons, so the app stays at full level there.
+const DEFAULT_VOLUME = IS_ANDROID ? 1 : 0.8;
 
 // Two <audio> elements: one plays, the other quietly buffers the next track so
 // skipping (or the track ending) switches instantly.
@@ -164,7 +168,7 @@ export const usePlayer = create((set, get) => ({
   time: initialTime,
   duration: initialDuration,
   buffered: 0,
-  volume: saved.volume ?? 0.8,
+  volume: saved.volume ?? DEFAULT_VOLUME,
   muted: saved.muted ?? false,
   shuffle: false,
   repeat: saved.repeat ?? 'off', // off | all | one
@@ -822,7 +826,7 @@ if (initialTrack) {
   const src = streamUrl(initialTrack.id);
   a.src = src;
   a.dataset.id = initialTrack.id;
-  a.volume = saved.volume ?? 0.8;
+  a.volume = saved.volume ?? DEFAULT_VOLUME;
   a.muted = saved.muted ?? false;
   currentListenTrack = initialTrack;
 

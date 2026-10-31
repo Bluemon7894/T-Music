@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { ChevronRight } from 'lucide-react';
 import { useUI } from '../store/ui.js';
 import { animate, ease } from '../lib/motion.js';
+import { IS_ANDROID } from '../lib/platform.js';
+import MobileSheet from './mobile/MobileSheet.jsx';
 
 function MenuItem({ it, index, parentRef, open, setOpen, onClose }) {
   const itemRef = useRef(null);
@@ -164,6 +166,7 @@ export function ContextMenu() {
     };
   }, [menu, close]);
   if (!menu) return null;
+  if (IS_ANDROID) return <MobileSheet key={menu.x + ':' + menu.y} items={menu.items} onClose={close} />;
   return <MenuList key={menu.x + ':' + menu.y} items={menu.items} x={menu.x} y={menu.y} onClose={close} />;
 }
 
@@ -196,7 +199,7 @@ export function Dialog() {
           ? <p className="modal-msg">{dialog.message}</p>
           : <input autoFocus value={value} placeholder={dialog.placeholder} onChange={(e) => setValue(e.target.value)} />}
         <div className="modal-actions">
-          <button type="button" className="pill" autoFocus={Boolean(dialog.message)} onClick={close}>취소</button>
+          <button type="button" className="pill" autoFocus={Boolean(dialog.message) && !IS_ANDROID} onClick={close}>취소</button>
           <button type="submit" className="pill white">{dialog.submitLabel || '확인'}</button>
         </div>
       </form>

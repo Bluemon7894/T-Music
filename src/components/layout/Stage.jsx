@@ -15,7 +15,7 @@ import { animate, createTimeline, ease, stagger } from '../../lib/motion.js';
 
 const VOLUME_WHEEL_STEP = 0.05;
 
-function StageProgress({ fallbackDuration }) {
+export function StageProgress({ fallbackDuration }) {
   const time = usePlayer((s) => s.time);
   const buffered = usePlayer((s) => s.buffered);
   const seek = usePlayer((s) => s.seek);
