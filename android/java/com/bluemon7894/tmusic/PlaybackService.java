@@ -12,8 +12,6 @@ import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.media.AudioAttributes;
-import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
@@ -34,7 +32,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 // Keeps the app alive while music plays, and provides the notification, lock screen and headset
-// controls. The audio itself plays in the page; this only tells it what the user pressed.
+// controls. The audio itself plays in the page; this only tells it what the user pressed. The WebView
+// takes audio focus for its own playback and pauses for calls by itself. Asking for focus here too
+// would take it away from the WebView, which then pauses the music.
 public final class PlaybackService extends Service {
     private static final String CHANNEL = "playback";
     private static final int NOTIFICATION_ID = 1;
@@ -53,10 +53,6 @@ public final class PlaybackService extends Service {
 
     private WebHost host;
     private MediaSession session;
-    private AudioManager audio;
-    private AudioFocusRequest focusRequest;
-    private boolean hasFocus;
-    private boolean resumeOnFocus;
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
     private boolean noisyRegistered;
@@ -106,11 +102,6 @@ public final class PlaybackService extends Service {
         super.onCreate();
         instance = this;
         host = WebHost.get(this);
-        audio = (AudioManager) getSystemService(AUDIO_SERVICE);
-        focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-            .setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
-            .setOnAudioFocusChangeListener(this::onFocusChange, main)
-            .build();
         PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
         wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "tmusic:playback");
         wakeLock.setReferenceCounted(false);
@@ -171,8 +162,6 @@ public final class PlaybackService extends Service {
 
         main.removeCallbacks(stopAfterPause);
         if (playing) {
-            if (!hasFocus) hasFocus = audio.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
-            resumeOnFocus = false;
             wakeLock.acquire();
             wifiLock.acquire();
             if (!noisyRegistered) {
@@ -185,10 +174,6 @@ public final class PlaybackService extends Service {
             if (noisyRegistered) {
                 unregisterReceiver(noisy);
                 noisyRegistered = false;
-            }
-            if (!resumeOnFocus && hasFocus) {
-                audio.abandonAudioFocusRequest(focusRequest);
-                hasFocus = false;
             }
             main.postDelayed(stopAfterPause, PAUSED_LIFETIME_MS);
         }
@@ -250,27 +235,6 @@ public final class PlaybackService extends Service {
         }
     }
 
-    private void onFocusChange(int change) {
-        switch (change) {
-            case AudioManager.AUDIOFOCUS_LOSS:
-                hasFocus = false;
-                resumeOnFocus = false;
-                press("pause");
-                break;
-            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-                if (playing) resumeOnFocus = true;
-                press("pause");
-                break;
-            case AudioManager.AUDIOFOCUS_GAIN:
-                hasFocus = true;
-                if (resumeOnFocus) press("play");
-                resumeOnFocus = false;
-                break;
-            default:
-                break; // the system lowers the volume by itself when it only needs to duck
-        }
-    }
-
     private PendingIntent openApp() {
         Intent open = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -327,7 +291,6 @@ public final class PlaybackService extends Service {
         if (wakeLock.isHeld()) wakeLock.release();
         if (wifiLock.isHeld()) wifiLock.release();
         if (noisyRegistered) unregisterReceiver(noisy);
-        audio.abandonAudioFocusRequest(focusRequest);
         session.setActive(false);
         session.release();
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(NOTIFICATION_ID);

@@ -121,6 +121,9 @@ function keepLog() {
 async function main() {
   console.log('device', shell('getprop', 'ro.build.version.release').trim(), 'API', shell('getprop', 'ro.build.version.sdk').trim(), '| WebView', /versionName=(\S+)/.exec(shell('dumpsys', 'package', 'com.google.android.webview'))?.[1] ?? 'unknown');
 
+  // The test machine counts as having a keyboard, which would hide the on-screen one.
+  shell('settings', 'put', 'secure', 'show_ime_with_hard_keyboard', '1');
+
   // ---- install and start ----
   check('installs', /Success/.test(spawnSync('adb', ['install', '-r', APK], { encoding: 'utf8' }).stdout));
   shell('pm', 'grant', PACKAGE, 'android.permission.POST_NOTIFICATIONS');
@@ -175,6 +178,7 @@ async function main() {
   const box = await js(`(() => { const r = document.querySelector('.m-tabs')?.getBoundingClientRect(); return { tabsHeight: r?.height, height: innerHeight, open: document.documentElement.classList.contains('kb-open') }; })()`);
   note(`with keyboard: ${JSON.stringify(box)}`);
   check('the tab bar steps aside for the keyboard', box.open && !box.tabsHeight, JSON.stringify(box));
+  // Another app taking the audio pauses the music by itself, without any help from this app.
   await js(`(() => { const i = document.querySelector('.searchbox input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i, '아이유 라일락'); i.dispatchEvent(new Event('input',{bubbles:true})); i.closest('form').requestSubmit(); i.blur(); })()`);
   await waitFor(() => has('.search-songs .tl-row'), 30000);
   await sleep(1200);
@@ -262,6 +266,11 @@ async function main() {
   check('media next button changes the track', await waitFor(async () => { const p = await pos(); return p.id && p.id !== firstId; }, 12000));
   shell('cmd', 'media_session', 'dispatch', 'previous');
   await sleep(1000);
+
+  // ---- a call or another music app takes the audio ----
+  const focusBefore = !(await pos()).paused;
+  note(`audio focus holders: ${shell('dumpsys', 'audio').split('\n').filter((l) => /source:.*(pack|com\.)/.test(l) && /tmusic|android/.test(l)).slice(-3).join(' | ').slice(0, 240)}`);
+  check('music was playing before the focus test', focusBefore);
 
   // ---- back button at the top level leaves the app running ----
   await js(`(async () => { for (let i = 0; i < 12; i++) { window.__tm.onNative({ type: 'noop' }); } })()`);
