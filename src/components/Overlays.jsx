@@ -187,6 +187,17 @@ export function Dialog() {
   const close = useUI((s) => s.closeDialog);
   const [value, setValue] = useState('');
   useEffect(() => setValue(dialog?.value || ''), [dialog]);
+  useEffect(() => {
+    if (!dialog) return;
+    // On the window: a click on the dialog's empty part takes the focus out of it.
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation(); // the stage behind us also closes on Esc
+      close();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [dialog, close]);
   if (!dialog) return null;
   const submit = (e) => {
     e.preventDefault();
@@ -195,7 +206,7 @@ export function Dialog() {
   };
   return (
     <div className="modal-back" onMouseDown={close}>
-      <form className="modal" onMouseDown={(e) => e.stopPropagation()} onSubmit={submit} onKeyDown={(e) => e.key === 'Escape' && close()}>
+      <form className="modal" onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
         <h3>{dialog.title}</h3>
         {dialog.message
           ? <p className="modal-msg">{dialog.message}</p>
