@@ -42,7 +42,7 @@ export default function Library() {
 
   const openLink = () => useUI.getState().prompt({
     title: tr('공유 플레이리스트 열기'),
-    placeholder: tr('tmusic://playlist/... 링크를 붙여넣으세요'),
+    placeholder: tr('공유 링크를 붙여넣으세요'),
     submitLabel: tr('열기'),
     onSubmit: async (text) => {
       const id = await openSharedPlaylist(text).catch(() => null);

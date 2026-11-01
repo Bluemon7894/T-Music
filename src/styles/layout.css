@@ -160,6 +160,10 @@
 .np-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 6px; gap: 8px; }
 .np-head .seg { min-width: 0; }
 .np-head .seg button { padding: 0 8px; font-size: 12px; gap: 4px; }
+.np-head .icon-btn { flex: none; }
+/* The English tabs need more room than a narrowed panel has: they give up their icons instead of running under the close button. */
+.np-head { container-type: inline-size; }
+@container (max-width: 290px) { html[lang="en"] .np-head .seg svg { display: none; } }
 .np-body { flex: 1; overflow-y: auto; padding: 6px 14px 14px; }
 .np-section { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 18px 4px 8px; font-weight: 800; font-size: 15px; }
 .np-section.auto-section { margin-top: 20px; padding-top: 14px; border-top: 1px dashed var(--line); color: var(--text); }

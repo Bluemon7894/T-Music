@@ -34,6 +34,8 @@ export default function ResizeHandle({ bar }) {
       if (last === null) return;
       const state = useUI.getState();
       if (last < limits.min - FOLD_BELOW) {
+        // Its saved width hasn't changed, so nothing else would undo what the drag wrote on the page.
+        app.style.setProperty(left ? '--side' : '--panel', `${left ? state.sideWidth : state.panelWidth}px`);
         if (left) state.toggleSide();
         else state.togglePanel();
       } else {

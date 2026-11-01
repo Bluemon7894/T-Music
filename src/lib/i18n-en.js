@@ -417,7 +417,7 @@ export default {
   "추천을 불러오지 못했어요.": "Couldn't load recommendations.",
   "전체": "All",
   "공유 플레이리스트 열기": "Open a shared playlist",
-  "tmusic://playlist/... 링크를 붙여넣으세요": "Paste a tmusic://playlist/... link",
+  "공유 링크를 붙여넣으세요": "Paste the shared link",
   "열기": "Open",
   "YouTube 재생목록 가져오기": "Import a YouTube playlist",
   "youtube.com 또는 music.youtube.com 재생목록 링크": "youtube.com or music.youtube.com playlist link",

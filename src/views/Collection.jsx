@@ -3,7 +3,7 @@ import { ListEnd } from 'lucide-react';
 import SharePanel from '../components/SharePanel.jsx';
 import { auth } from '../lib/firebase.js';
 import { canEditPlaylist, confirmDeletePlaylist } from '../lib/sharedPlaylists.js';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Heart, ListMusic, Shuffle, PlusCircle, CheckCircle2, Pencil, Trash2, Search as SearchIcon, Radio } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { usePlayer } from '../store/player.js';
@@ -191,6 +191,9 @@ export function LocalPlaylist({ id }) {
   const go = useNav((s) => s.go);
   const ref = usePage([id]);
   const { over: dragOver, dropProps } = useDrop((payload) => dropOnPlaylist(pl, payload), { enabled: Boolean(pl) && canEditPlaylist(pl) });
+  // Gone while it was open, such as Ctrl+Z on making it: nothing here to show anymore.
+  const gone = !pl;
+  useEffect(() => { if (gone) useNav.getState().back(); }, [gone]);
   if (!pl) return <ErrorMsg error={tr('플레이리스트를 찾을 수 없습니다.')} />;
   const context = { name: pl.name };
   const editable = canEditPlaylist(pl);
