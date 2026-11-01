@@ -9,6 +9,7 @@ import { api } from '../lib/api.js';
 import { canEditPlaylist } from '../lib/sharedPlaylists.js';
 import { fmtTime } from '../lib/util.js';
 import { IS_ANDROID } from '../lib/platform.js';
+import { dragProps, trackPayload } from '../lib/drag.js';
 import { burst, useEnter } from '../lib/motion.js';
 import { Thumb, ArtistLinks, Equalizer } from './common.jsx';
 import DownloadButton from './DownloadButton.jsx';
@@ -153,21 +154,18 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
             key={t.id + ':' + i}
             data-enter={animate && i < 30 ? '' : undefined}
             className={`tl-row ${isCur ? 'current' : ''} ${onReorder ? 'reorderable' : ''} ${dragOverIdx === i ? 'drag-over' : ''}`}
-            draggable={!IS_ANDROID}
             onClick={IS_ANDROID ? () => play(i) : undefined}
-            onDragStart={(e) => {
-              try {
-                e.dataTransfer.setData('application/json', JSON.stringify(t));
-                e.dataTransfer.setData('text/plain', t.id);
-                e.dataTransfer.effectAllowed = onReorder ? 'copyMove' : 'copy';
-                if (onReorder) {
-                  e.dataTransfer.setData('text/reorder-from', String(i));
-                }
-              } catch {}
-            }}
+            {...(IS_ANDROID ? {} : {
+              draggable: true,
+              onDragStart: (e) => {
+                dragProps(() => trackPayload(t)).onDragStart(e);
+                if (onReorder) e.dataTransfer.setData('text/reorder-from', String(i));
+              },
+            })}
             onDragOver={(e) => {
-              if (onReorder) {
+              if (onReorder && e.dataTransfer.types.includes('text/reorder-from')) {
                 e.preventDefault();
+                e.stopPropagation();
                 e.dataTransfer.dropEffect = 'move';
                 if (dragOverIdx !== i) setDragOverIdx(i);
               }
@@ -176,8 +174,9 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
               if (dragOverIdx === i) setDragOverIdx(null);
             }}
             onDrop={(e) => {
-              if (onReorder) {
+              if (onReorder && e.dataTransfer.types.includes('text/reorder-from')) {
                 e.preventDefault();
+                e.stopPropagation();
                 setDragOverIdx(null);
                 const from = parseInt(e.dataTransfer.getData('text/reorder-from'), 10);
                 if (!isNaN(from) && from !== i) onReorder(from, i);
@@ -195,7 +194,7 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
               </button>
             </span>
             <span className="c-title">
-              {showThumb && <Thumb src={t.thumb} className="tl-thumb" />}
+              {showThumb && <Thumb src={t.thumb} className="tl-thumb" videoId={t.id} />}
               <span className="tl-text">
                 <span className="tl-name">{t.title}</span>
                 <ArtistLinks artists={t.artists} className="tl-artist" />

@@ -80,6 +80,9 @@ export const useLibrary = create(
       renamePlaylist(id, name) {
         set({ playlists: get().playlists.map((p) => (p.id === id ? { ...p, name } : p)) });
       },
+      setPlaylistPublic(id, on) {
+        set({ playlists: get().playlists.map((p) => (p.id === id ? { ...p, public: on === true } : p)) });
+      },
       deletePlaylist(id) {
         set({ playlists: get().playlists.filter((p) => p.id !== id) });
       },

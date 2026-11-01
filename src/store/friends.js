@@ -20,16 +20,21 @@ import { OFFLINE_MESSAGE, waitForConnection, within } from '../lib/online.js';
 import { safePhoto, safeTrack } from '../lib/safeTrack.js';
 import { useNav } from './nav.js';
 import { usePlayer } from './player.js';
+import { useProfile } from './profile.js';
 import { useRoom } from './room.js';
 import { toast, useUI } from './ui.js';
+import { record } from './undo.js';
 import { tr } from '../lib/i18n.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 8;
 const INVITE_LIFETIME_MS = 6 * 60 * 60 * 1000;
 const PRESENCE_DELAY_MS = 800;
-const DEFAULT_SHARING = { online: true, track: true };
+// Listening details stay private until someone chooses to show them: nobody agreed to this when they signed up.
+const DEFAULT_SHARING = { online: true, track: true, playlists: false, topTracks: false, time: false, artists: false, genres: false, asked: false };
+export const DETAIL_SHARING = ['playlists', 'topTracks', 'time', 'artists', 'genres'];
 const OFFLINE_CLEANUP_MS = 4000;
+const PRESENCE_RETRY_MS = 5000;
 
 const dbRef = (...parts) => ref(rtdb, parts.join('/'));
 const myUid = () => auth.currentUser?.uid ?? null;
@@ -97,17 +102,31 @@ export const useFriends = create((set, get) => {
   };
 
   const watchFriend = (uid) => {
-    const stops = [
-      onValue(dbRef('profiles', uid), (snap) => {
-        const p = snap.val() || {};
-        patchFriend(uid, { name: p.name || tr('알 수 없음'), photo: safePhoto(p.photo) });
-      }),
-      onValue(dbRef('presence', uid), (snap) => {
+    let stopPresence = null;
+    let retry = null;
+    let stopped = false;
+    // The server drops a listener it refuses, for instance right after signing in, and it never comes
+    // back by itself. Without this, a friend stays "offline" until the app restarts.
+    const listen = () => {
+      stopPresence = onValue(dbRef('presence', uid), (snap) => {
         const p = snap.val();
         patchFriend(uid, { online: p?.online === true, track: p?.online ? safeTrack(p.track) : null, playing: p?.playing === true });
-      }, () => patchFriend(uid, { online: false, track: null, playing: false })),
-    ];
-    friendWatchers.set(uid, () => stops.forEach((stop) => stop()));
+      }, () => {
+        patchFriend(uid, { online: false, track: null, playing: false });
+        if (!stopped) retry = setTimeout(listen, PRESENCE_RETRY_MS);
+      });
+    };
+    listen();
+    const stopProfile = onValue(dbRef('profiles', uid), (snap) => {
+      const p = snap.val() || {};
+      patchFriend(uid, { name: p.name || tr('알 수 없음'), photo: safePhoto(p.photo) });
+    });
+    friendWatchers.set(uid, () => {
+      stopped = true;
+      clearTimeout(retry);
+      stopPresence?.();
+      stopProfile();
+    });
   };
 
   const onFriends = (snap) => {
@@ -139,6 +158,10 @@ export const useFriends = create((set, get) => {
 
   const onRequests = (snap) => {
     const requests = Object.entries(snap.val() || {}).map(([uid, r]) => ({ uid, name: r.name || tr('알 수 없음'), photo: safePhoto(r.photo) })).sort((a, b) => (a.uid < b.uid ? -1 : 1));
+    // Someone who asked and then deleted their guest account: there's nobody left to accept.
+    for (const r of requests) {
+      dbGet(dbRef('profiles', r.uid)).then((p) => { if (!p.exists()) remove(dbRef('friendRequests', myUid(), r.uid)).catch(() => {}); }).catch(() => {});
+    }
     for (const r of requests) {
       if (!announced.has(`request:${r.uid}`)) toast(tr('{0}님이 친구 요청을 보냈어요', r.name));
       notify(`request:${r.uid}`, tr('친구 요청'), tr('{0}님이 친구 요청을 보냈어요', r.name), () => useNav.getState().go('friends', {}));
@@ -150,7 +173,7 @@ export const useFriends = create((set, get) => {
     const now = Date.now();
     const invites = [];
     for (const [id, invite] of Object.entries(snap.val() || {})) {
-      if (now - (invite.at || 0) > INVITE_LIFETIME_MS) {
+      if (now - (invite.at || 0) > INVITE_LIFETIME_MS || invite.code === useRoom.getState().code) {
         remove(dbRef('invites', myUid(), id)).catch(() => {});
         continue;
       }
@@ -188,6 +211,7 @@ export const useFriends = create((set, get) => {
       get().stop();
       announced = new Set();
       ensureProfile(uid).catch((e) => console.warn('[friends]', e));
+      useProfile.getState().start(() => get().sharing);
       stopListening = [
         onValue(dbRef('profiles', uid, 'sharing'), (snap) => {
           set({ sharing: { ...DEFAULT_SHARING, ...snap.val() } });
@@ -199,6 +223,10 @@ export const useFriends = create((set, get) => {
         onValue(ref(rtdb, '.info/connected'), (snap) => {
           connected = snap.val() === true;
           if (connected) publishPresence();
+        }),
+        // A late "gone" note from an old connection or another device says offline while we're right here.
+        onValue(presenceRef(), (snap) => {
+          if (connected && get().sharing.online && snap.val()?.online !== true) schedulePresence();
         }),
         usePlayer.subscribe((s, prev) => {
           if (s.queue[s.index]?.id !== prev.queue[prev.index]?.id || s.playing !== prev.playing) schedulePresence();
@@ -239,7 +267,12 @@ export const useFriends = create((set, get) => {
     },
 
     setSharing(patch) {
+      const { sharing } = get();
+      const before = Object.fromEntries(Object.keys(patch).map((key) => [key, sharing[key]]));
+      set({ sharing: { ...sharing, ...patch } });
       update(dbRef('profiles', myUid(), 'sharing'), patch).catch(() => toast(tr('설정을 저장하지 못했습니다')));
+      useProfile.getState().publishSoon(get().sharing);
+      record(tr('공개 설정 변경'), () => get().setSharing(before));
     },
 
     // Returns an error message, or null if the request went out.
@@ -257,6 +290,7 @@ export const useFriends = create((set, get) => {
           return null;
         }
         await dbSet(dbRef('friendRequests', target, myUid()), myProfile());
+        set({ sentRequests: { ...get().sentRequests, [target]: true } });
         toast(tr('친구 요청을 보냈어요'));
         return null;
       } catch (e) {
@@ -304,11 +338,17 @@ export const useFriends = create((set, get) => {
     removeFriend(uid) {
       const me = myUid();
       update(ref(rtdb), { [`friends/${me}/${uid}`]: null, [`friends/${uid}/${me}`]: null }).catch(() => toast(tr('삭제하지 못했습니다')));
+      // Being friends again takes both people, so this asks.
+      record(tr('친구 삭제'), () => get().requestFriend(uid));
     },
 
     // Invites into the room we're in, opening one first if we aren't in any.
     async inviteFriend(uid) {
       const room = useRoom.getState();
+      if (room.members[uid]) {
+        toast(tr('이미 같은 방에 있어요'));
+        return;
+      }
       if (!room.code) await room.create();
       else if (!room.attached) await room.follow();
       const { code, meta } = useRoom.getState();
@@ -341,6 +381,49 @@ export const useFriends = create((set, get) => {
       remove(dbRef('invites', myUid(), invite.id)).catch(() => {});
     },
 
+    // What a guest needs noted down before it stops being the signed-in account.
+    moveOutPlan() {
+      onDisconnect(presenceRef()).cancel().catch(() => {});
+      return { ids: Object.keys(get().friends), friendCode: get().friendCode };
+    },
+
+    // A guest becoming an existing Google account. The new account can't vouch for itself, so the guest,
+    // still able to act through its token, leaves a note for each friend. The rules then let the new
+    // account stand in, and the guest's own traces go at the same moment.
+    async moveInto(guestUid, guestToken, { ids, friendCode }) {
+      const me = myUid();
+      const changes = {
+        [`presence/${guestUid}`]: null,
+        [`profiles/${guestUid}`]: null,
+        [`friendProfiles/${guestUid}`]: null,
+        [`friendRequests/${guestUid}`]: null,
+        [`invites/${guestUid}`]: null,
+        ...(friendCode ? { [`friendCodes/${friendCode}`]: null } : {}),
+      };
+      for (const friend of ids) {
+        if (friend === me) continue;
+        changes[`friendMoves/${me}/${friend}`] = guestUid;
+        changes[`friends/${guestUid}/${friend}`] = null;
+        changes[`friends/${friend}/${guestUid}`] = null;
+      }
+      try {
+        const res = await fetch(`${rtdb.app.options.databaseURL}/.json?auth=${guestToken}`, { method: 'PATCH', body: JSON.stringify(changes) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const since = Date.now();
+        const adopt = {};
+        for (const friend of ids) {
+          if (friend === me) continue;
+          adopt[`friends/${me}/${friend}`] = { since };
+          adopt[`friends/${friend}/${me}`] = { since };
+        }
+        if (Object.keys(adopt).length) await update(ref(rtdb), adopt);
+        await remove(dbRef('friendMoves', me));
+      } catch (e) {
+        console.warn('[friends]', e);
+        toast(tr('친구를 옮기지 못했어요. 친구 코드로 다시 추가해 주세요.'));
+      }
+    },
+
     // The account is going away for good: leave nothing behind in other people's lists.
     async deleteEverything() {
       const uid = myUid();
@@ -348,8 +431,10 @@ export const useFriends = create((set, get) => {
       const { friends, friendCode } = get();
       const code = friendCode || (await within(dbGet(dbRef('profiles', uid, 'friendCode')), OFFLINE_CLEANUP_MS).catch(() => null))?.val();
       const friendIds = Object.keys(friends);
+      const asked = Object.keys(get().sentRequests);
       await get().goOffline();
       const changes = {
+        ...Object.fromEntries(asked.map((other) => [`friendRequests/${other}/${uid}`, null])),
         [`presence/${uid}`]: null,
         [`profiles/${uid}`]: null,
         [`friendRequests/${uid}`]: null,

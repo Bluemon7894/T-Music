@@ -1,6 +1,6 @@
 // The deck the music plays on, and the sounds it makes. A sound plays only when playback really starts
 // and when the queue runs out, never on pause, skip or seek. The start sound dies away and the music
-// comes in once it's over; the end sound comes up as the music goes, so the two cross.
+// starts at full level once it's over; the end sound comes up as the music goes, so the two cross.
 import { create } from 'zustand';
 import { getAudioContext, setMusicFade } from '../lib/audio.js';
 import turntableStart from '../assets/sounds/turntable-start.mp3?inline';
@@ -22,11 +22,11 @@ const dB = (value) => 10 ** (value / 20);
 // the level of music.
 export const DECKS = {
   turntable: {
-    start: { src: turntableStart, gain: dB(0), ceiling: dB(-18), cue: 1.45, length: 5.11, musicRise: 1, fadeFrom: 3.6 },
+    start: { src: turntableStart, gain: dB(0), ceiling: dB(-18), cue: 1.45, length: 5.11, fadeFrom: 3.6 },
     end: { src: turntableEnd, gain: dB(-4), ceiling: dB(-18), lead: 3.5, stop: 4.5, rise: 2 },
   },
   cassette: {
-    start: { src: cassetteStart, gain: dB(6), ceiling: dB(-16), cue: 2.3, length: 5.09, musicRise: 1, fadeFrom: 3.6 },
+    start: { src: cassetteStart, gain: dB(6), ceiling: dB(-16), cue: 2.3, length: 5.09, fadeFrom: 3.6 },
     end: { src: cassetteEnd, gain: dB(6), ceiling: dB(-16), lead: 2.05, stop: 2.1, rise: 1.2 },
   },
 };
@@ -187,8 +187,8 @@ export function cancelSound() {
   useDeck.setState({ phase: 'idle' });
 }
 
-// `onMusic(seconds)` runs when the sound is over and how long the music should take to come up. `after`
-// holds the whole thing back, for a room whose music starts at a set moment.
+// `onMusic()` runs when the sound is over. `after` holds the whole thing back, for a room whose music
+// starts at a set moment.
 export async function playStartSound(onMusic, after = 0) {
   const sound = spec('start');
   const mine = ++token;
@@ -204,7 +204,7 @@ export async function playStartSound(onMusic, after = 0) {
   if (!buffer || !ctx) {
     waitingForMusic = false;
     useDeck.setState({ phase: 'idle' });
-    onMusic(0);
+    onMusic();
     return;
   }
   const when = ctx.currentTime + after;
@@ -218,7 +218,7 @@ export async function playStartSound(onMusic, after = 0) {
   musicTimer = setTimeout(() => {
     waitingForMusic = false;
     if (!current) finish();
-    onMusic(sound.musicRise);
+    onMusic();
   }, (after + sound.length) * 1000);
 }
 

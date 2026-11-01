@@ -1,8 +1,13 @@
 import { Component, useEffect, useRef } from 'react';
+import { setupUndo } from './lib/undoSetup.js';
+import { undoLast } from './store/undo.js';
+import { recoverFromCrash, watchForeground } from './lib/heal.js';
+import FriendProfile from './views/FriendProfile.jsx';
+import ResizeHandle from './components/layout/ResizeHandle.jsx';
 import { api } from './lib/api.js';
 import { useRoute, useNav } from './store/nav.js';
 import { resumeOnLaunch, usePlayer } from './store/player.js';
-import { toast, useUI } from './store/ui.js';
+import { SIDE, toast, useUI } from './store/ui.js';
 import { openSharedPlaylist } from './lib/sharedPlaylists.js';
 import { initDownloads } from './store/downloads.js';
 import { useUpdater } from './store/updater.js';
@@ -45,6 +50,7 @@ function View({ route }) {
     case 'settings': return <Settings />;
     case 'room': return <Room />;
     case 'friends': return <Friends />;
+    case 'friend': return <FriendProfile key={p.uid} uid={p.uid} />;
     default: return <Home />;
   }
 }
@@ -65,6 +71,11 @@ function useShortcuts() {
       if (typing) return;
       const p = usePlayer.getState();
 
+      if (e.ctrlKey && !e.shiftKey && (e.code === 'KeyZ' || e.key.toLowerCase() === 'z')) {
+        e.preventDefault();
+        undoLast();
+        return;
+      }
       if (e.code === 'Space') {
         e.preventDefault();
         p.toggle();
@@ -159,11 +170,16 @@ function MainApp() {
   const index = useNav((s) => s.index);
   const currentTrack = usePlayer((s) => s.queue[s.index]);
 
+  const sideOpen = useUI((s) => s.sideOpen);
+  const sideWidth = useUI((s) => s.sideWidth);
+  const panelWidth = useUI((s) => s.panelWidth);
+
   useShortcuts();
 
   useEffect(() => {
     initDownloads();
     useUpdater.getState().init();
+    return watchForeground();
   }, []);
 
   // Invite links: tmusic://join/CODE, possibly opened before the app was running or signed in.
@@ -174,6 +190,7 @@ function MainApp() {
         useUI.getState().setMini(false);
         if (invite.kind === 'room') {
           useNav.getState().go('room', {});
+          if (useRoom.getState().code === invite.code) return;
           useRoom.getState().join(invite.code);
           return;
         }
@@ -238,14 +255,16 @@ function MainApp() {
   if (mini) return <><MiniPlayer /><Toast /></>;
 
   return (
-    <div className={`app ${panelOpen ? 'with-panel' : ''}`}>
+    <div className={`app ${panelOpen ? 'with-panel' : ''} ${sideOpen ? '' : 'side-closed'}`} style={{ '--side': `${sideOpen ? sideWidth : SIDE.rail}px`, '--panel': `${panelWidth}px` }}>
       <div className="aurora"><i className="a1" /><i className="a2" /><i className="a3" /></div>
       <Sidebar />
       <TopBar />
       <main className="main" ref={mainRef}>
         <View route={route} key={index} />
       </main>
+      <ResizeHandle bar="side" />
       {panelOpen && <NowPanel />}
+      {panelOpen && <ResizeHandle bar="panel" />}
       <PlayerDock />
       {stage && <Stage />}
       <ContextMenu />
@@ -267,6 +286,7 @@ class CrashScreen extends Component {
 
   componentDidCatch(error) {
     console.error('[app]', error);
+    recoverFromCrash();
   }
 
   render() {
@@ -285,6 +305,8 @@ class CrashScreen extends Component {
     );
   }
 }
+
+setupUndo();
 
 function Root() {
   const status = useAccount((s) => s.status);

@@ -8,6 +8,7 @@ import {
   signInAnonymously,
   signInWithCredential,
   signOut as firebaseSignOut,
+  updateProfile,
 } from 'firebase/auth';
 import { auth, firebaseConfig } from '../lib/firebase.js';
 import { api, errorText } from '../lib/api.js';
@@ -17,7 +18,10 @@ import { deleteOwnedShares, startSharedPlaylists, stopSharedPlaylists } from '..
 import { useFriends } from './friends.js';
 import { forgetLibrary, libraryData, setLibraryOwner } from './library.js';
 import { resetPlayer } from './player.js';
+import { useProfile } from './profile.js';
 import { useRoom } from './room.js';
+import { toast } from './ui.js';
+import { clearUndo, record } from './undo.js';
 import { tr } from '../lib/i18n.js';
 
 const AUTH_ERRORS = {
@@ -37,10 +41,15 @@ const isOffline = (e) => e?.code === 'auth/network-request-failed';
 function toAccount(user) {
   if (!user) return null;
   const google = user.providerData.find((p) => p.providerId === GoogleAuthProvider.PROVIDER_ID);
+  const tag = user.uid.slice(0, 4).toUpperCase();
   return {
     uid: user.uid,
     isGuest: user.isAnonymous,
-    name: user.displayName || google?.displayName || tr('게스트'),
+    tag,
+    name: user.displayName || google?.displayName || tr('게스트 {0}', tag),
+    customName: Boolean(user.displayName && user.displayName !== google?.displayName),
+    googleName: google?.displayName || null,
+    googlePhoto: google?.photoURL || null,
     email: user.email || google?.email || null,
     photo: user.photoURL || google?.photoURL || null,
   };
@@ -71,6 +80,7 @@ export const useAccount = create((set, get) => {
     const user = auth.currentUser;
     const uid = user?.uid ?? null;
     if (uid !== owner) {
+      clearUndo(); // what's left to undo belonged to the other account
       stopSharedPlaylists();
       stopLibrarySync();
       setLibraryOwner(uid, carriedOver);
@@ -103,14 +113,16 @@ export const useAccount = create((set, get) => {
     }
   };
 
-  // That Google account already has its own data: move the guest's library into it, then remove
-  // the guest account. If the sign-in fails, the guest's copy on this computer is uploaded again.
+  // That Google account already has its own data: move the guest's library, friends and room into it, then
+  // remove the guest account. If the sign-in fails, the guest's copy on this computer is uploaded again.
   const mergeGuestInto = async (credential) => {
     const guest = auth.currentUser;
     const guestToken = await guest.getIdToken();
     const data = libraryData();
+    const friends = useFriends.getState().moveOutPlan();
+    const roomCode = useRoom.getState().code;
+    // Let go of the room first: from the moment of signing in, "me" is no longer who its list says.
     useRoom.getState().disconnect();
-    await useFriends.getState().deleteEverything();
     stopSharedPlaylists();
     stopLibrarySync();
     await within(deleteCloudData(guest.uid), DELETE_STEP_MS).catch(() => {});
@@ -121,11 +133,15 @@ export const useAccount = create((set, get) => {
       carriedOver = null;
       startLibrarySync(guest.uid);
       startSharedPlaylists();
-      useFriends.getState().start();
+      useRoom.getState().resume();
       throw e;
     }
+    await useFriends.getState().moveInto(guest.uid, guestToken, friends);
+    // In the room by this account's name from now on, keeping its place in the queue and playback.
+    if (roomCode) await useRoom.getState().swapMember(roomCode, guest.uid, guestToken);
     forgetLibrary(guest.uid);
     deleteAccountByToken(guestToken);
+    toast(friends.ids.length ? tr('게스트 계정의 보관함과 친구 {0}명을 옮겼어요', friends.ids.length) : tr('게스트 계정의 보관함을 옮겼어요'));
   };
 
   // A guest or a deleted account is gone for good, so it really leaves its room and ends its
@@ -172,6 +188,26 @@ export const useAccount = create((set, get) => {
 
     cancelGoogle: () => api.cancelGoogleSignIn(),
 
+    // Empty goes back to the Google name or guest number. Everywhere that shows it follows.
+    async setDisplay(patch) {
+      const user = auth.currentUser;
+      if (!user) return;
+      const before = { displayName: user.displayName || null, photoURL: user.photoURL || null };
+      const next = {};
+      if ('name' in patch) next.displayName = String(patch.name || '').trim().slice(0, 40) || null;
+      if ('photo' in patch) next.photoURL = patch.photo || null;
+      await updateProfile(user, next);
+      publish();
+      useFriends.getState().syncProfile();
+      useRoom.getState().syncProfile();
+      record(tr('프로필 변경'), async () => {
+        await updateProfile(auth.currentUser, before);
+        publish();
+        useFriends.getState().syncProfile();
+        useRoom.getState().syncProfile();
+      });
+    },
+
     continueOffline: () => set({ offline: true, error: null, canContinueOffline: false }),
     leaveOffline: () => set({ offline: false }),
 
@@ -182,6 +218,8 @@ export const useAccount = create((set, get) => {
       set({ status: 'loading' }); // removing a guest's data takes a few seconds
       try {
         await leaveEverything({ forGood: Boolean(user?.isAnonymous) });
+        if (user?.isAnonymous) await within(useProfile.getState().remove(user.uid), SIGN_OUT_STEP_MS).catch(() => {});
+        useProfile.getState().stop();
         if (user?.isAnonymous) {
           await within(deleteCloudData(user.uid), SIGN_OUT_STEP_MS).catch(() => {});
           forgetLibrary(user.uid);
@@ -208,6 +246,8 @@ export const useAccount = create((set, get) => {
       try {
         // Nothing is removed unless we can actually reach the servers.
         await waitForConnection();
+        await within(useProfile.getState().remove(user.uid), DELETE_STEP_MS).catch(() => {});
+        useProfile.getState().stop();
         await leaveEverything({ forGood: true });
         await within(deleteCloudData(user.uid), DELETE_STEP_MS);
         await within(deleteUser(user), DELETE_STEP_MS);

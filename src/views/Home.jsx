@@ -7,7 +7,7 @@ import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
 import { dailyOrder, greeting, fmtBytes } from '../lib/util.js';
 import { artistsOfTheDay, hasTaste, mixSeeds, rankMix, recentlyPlayedIds, tasteProfile } from '../lib/taste.js';
-import { useEnter, animate, stagger, ease } from '../lib/motion.js';
+import { useEnter, animate, stagger, ease, reduced } from '../lib/motion.js';
 import { splitText } from 'animejs';
 import { useAsync, Thumb, PlayButton, SkeletonCards } from '../components/common.jsx';
 import { Shelf, CoverFlow, openItem, playItem, subtitleOf } from '../components/Cards.jsx';
@@ -27,6 +27,7 @@ const MOODS = [
 function Greeting() {
   const ref = useRef(null);
   useLayoutEffect(() => {
+    if (reduced) return;
     try {
       const { chars } = splitText(ref.current, { chars: true });
       animate(chars, { opacity: [0, 1], translateY: [40, 0], rotateX: [-90, 0], delay: stagger(28), ease: ease.bouncy });
@@ -39,7 +40,7 @@ function QuickTile({ item, onPlay }) {
   const go = useNav((s) => s.go);
   return (
     <div className="quick-tile" data-enter onClick={() => (item.kind === 'mix' ? onPlay() : openItem(item, go))}>
-      {item.icon ? <div className="quick-art liked-art">{item.icon}</div> : <Thumb src={item.thumb} className="quick-art" />}
+      {item.icon ? <div className="quick-art liked-art">{item.icon}</div> : <Thumb src={item.thumb} className="quick-art" videoId={item.kind === 'track' ? item.id : undefined} />}
       <span className="quick-name">{item.title || item.name}</span>
       <PlayButton size={34} className="quick-play" onClick={onPlay} />
     </div>

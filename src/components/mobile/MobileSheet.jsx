@@ -25,6 +25,7 @@ export default function MobileSheet({ items, onClose }) {
         <div className="m-sheet-list">
           {list.map((item, i) => {
             if (item.divider) return <div key={i} className="ctx-div" />;
+            if (item.header) return <div key={i} className="ctx-header">{item.header}</div>;
             const Icon = item.icon;
             return (
               <button key={i} className="m-sheet-item" onClick={() => choose(item)}>

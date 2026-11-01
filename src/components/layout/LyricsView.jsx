@@ -6,12 +6,19 @@ import { useRoom } from '../../store/room.js';
 import { usePrefs } from '../../store/prefs.js';
 import { lyricsKey, saveAlignment, useAlignments } from '../../store/lyricAlignments.js';
 import { toast } from '../../store/ui.js';
+import { record } from '../../store/undo.js';
 import { api, streamUrl } from '../../lib/api.js';
 import { getAudioOnset, getOutputLatency } from '../../lib/audio.js';
-import { MIN_CONFIDENCE, measureLyricOffset } from '../../lib/lyricAlign.js';
+import { measureLyricOffset } from '../../lib/lyricAlign.js';
+import { IS_ANDROID } from '../../lib/platform.js';
 import LyricsPickerModal from './LyricsPickerModal.jsx';
 import { tr } from '../../lib/i18n.js';
 
+const LYRIC_RETRY_MS = 70000; // just past how long an empty answer caused by network trouble is remembered
+const LYRIC_RETRIES = 2;
+const NUDGE_SEC = 0.5;
+const ACTIVE_LINE_MS = 80;
+const ACTIVE_LINE_MS_PHONE = 200;
 const ALREADY_ALIGNED_SEC = 0.1;
 // A manual scroll keeps the view where the user put it for this long.
 const MANUAL_SCROLL_HOLD_MS = 4000;
@@ -29,6 +36,28 @@ function useTrackLyrics(track) {
       .catch(() => { if (!cancelled) setState({ data: null, loading: false }); });
     return () => { cancelled = true; };
   }, [track.id]);
+
+  // Nothing found can be a moment's trouble with the databases, so it looks again by itself: shortly
+  // after, and whenever the connection returns.
+  const empty = !state.loading && !state.data?.lines?.length && !state.data?.plainLyrics;
+  useEffect(() => {
+    if (!empty) return undefined;
+    let cancelled = false;
+    let tries = 0;
+    const again = () => api.lyrics(track).then((data) => {
+      if (!cancelled && (data?.lines?.length || data?.plainLyrics)) setState({ data, loading: false });
+    }).catch(() => {});
+    const timer = setInterval(() => {
+      if (++tries > LYRIC_RETRIES) clearInterval(timer);
+      else again();
+    }, LYRIC_RETRY_MS);
+    window.addEventListener('online', again);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('online', again);
+    };
+  }, [empty, track.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onChanged = (e) => {
@@ -80,16 +109,12 @@ function useActiveLine(lines, offset) {
       for (let i = 0; i < lines.length && lines[i].time + offset <= t + 0.05; i++) best = i;
       setActive(best);
     };
-    let raf = 0;
-    const loop = () => {
-      update();
-      raf = requestAnimationFrame(loop);
-    };
-    if (playing) loop();
-    else update();
+    // Lines change every few seconds, so there's no need to look every frame.
+    const timer = playing ? setInterval(update, IS_ANDROID ? ACTIVE_LINE_MS_PHONE : ACTIVE_LINE_MS) : null;
+    update();
     window.addEventListener('t-music:seeked', update);
     return () => {
-      cancelAnimationFrame(raf);
+      clearInterval(timer);
       window.removeEventListener('t-music:seeked', update);
     };
   }, [lines, offset, playing]);
@@ -145,10 +170,16 @@ async function resyncLyrics(track) {
     return;
   }
   const measured = await measureLyricOffset(streamUrl(track.id), data.lines);
-  if (!measured || measured.confidence < MIN_CONFIDENCE) {
+  if (!measured || (!measured.sure && !measured.near)) {
     saveAlignment(track.id, data, null);
     useRoom.getState().shareLyrics(track.id, data, null);
-    toast(tr('이 곡은 자동으로 맞추기 어려워요. 가사 직접 찾기로 다른 가사를 골라 보세요.'));
+    toast(tr('확실하게 맞출 수 없어서 원래 시간대로 두었어요. 어긋나면 가사 옆의 −/+ 버튼으로 맞춰 주세요.'));
+    return;
+  }
+  if (!measured.sure) {
+    saveAlignment(track.id, data, measured.offset);
+    useRoom.getState().shareLyrics(track.id, data, measured.offset);
+    toast(tr('조금만 맞췄어요. 그래도 어긋나면 가사 옆의 −/+ 버튼으로 맞춰 주세요.'));
     return;
   }
   saveAlignment(track.id, data, measured.offset);
@@ -156,6 +187,18 @@ async function resyncLyrics(track) {
   const size = Math.abs(measured.offset);
   if (size < ALREADY_ALIGNED_SEC) toast(tr('가사 싱크가 이미 잘 맞아요'));
   else toast(tr('가사를 {0}초 {1} 맞췄어요', size.toFixed(1), measured.offset > 0 ? tr('늦춰서') : tr('앞당겨서')));
+}
+
+// By hand, for what no measurement gets right. Goes to the room like any other alignment.
+function nudgeLyrics(track, data, current, by) {
+  const next = Math.round((current + by) * 100) / 100;
+  saveAlignment(track.id, data, next);
+  useRoom.getState().shareLyrics(track.id, data, next);
+  record(tr('가사 싱크 조절'), () => {
+    saveAlignment(track.id, data, current);
+    useRoom.getState().shareLyrics(track.id, data, current);
+  }, 'lyric-nudge');
+  toast(tr('가사를 {0}초에 맞췄어요', `${next > 0 ? '+' : ''}${next.toFixed(1)}`));
 }
 
 export default function LyricsView({ track, variant = 'panel' }) {
@@ -228,6 +271,13 @@ export default function LyricsView({ track, variant = 'panel' }) {
             {!hasSynced && <span className="lyr-pill"><Mic2 size={12} />{' '}{tr('싱크 미지원')}</span>}
             <button className="lyr-pill action" onClick={openPicker}><ListMusic size={12} />{' '}{tr('가사 직접 찾기')}</button>
             {resyncButton('lyr-pill action')}
+            {hasSynced && (
+              <div className="seg lyr-nudge" role="group" aria-label={tr('가사 싱크 조절')}>
+                <button onClick={() => nudgeLyrics(track, data, offset, -NUDGE_SEC)} title={tr('가사를 {0}초 앞당겨요', NUDGE_SEC)}>−</button>
+                <span title={tr('지금 적용된 싱크')}>{`${offset > 0 ? '+' : ''}${offset.toFixed(1)}`}</span>
+                <button onClick={() => nudgeLyrics(track, data, offset, NUDGE_SEC)} title={tr('가사를 {0}초 늦춰요', NUDGE_SEC)}>+</button>
+              </div>
+            )}
             <div className="seg lyr-lang" role="group" aria-label={tr('가사 번역')}>
               {LYRIC_LANGUAGES.map((l) => (
                 <button key={l.id} className={lyricLanguage === l.id ? 'on' : ''} onClick={() => setPref({ lyricLanguage: l.id })}>{l.label}</button>

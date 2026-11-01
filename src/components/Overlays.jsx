@@ -133,6 +133,7 @@ function MenuList({ items, x, y, onClose, parentWidth = 0 }) {
     <div className="ctx-menu" ref={ref} style={pos} onClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>
       {items.map((it, i) => {
         if (it.divider) return <div key={i} className="ctx-div" />;
+        if (it.header) return <div key={i} className="ctx-header">{it.header}</div>;
         return (
           <MenuItem
             key={i}
@@ -201,6 +202,7 @@ export function Dialog() {
           : <input autoFocus value={value} placeholder={dialog.placeholder} onChange={(e) => setValue(e.target.value)} />}
         <div className="modal-actions">
           <button type="button" className="pill" autoFocus={Boolean(dialog.message) && !IS_ANDROID} onClick={close}>{tr('취소')}</button>
+          {dialog.altLabel && <button type="button" className="pill" onClick={() => { close(); dialog.onAlt(); }}>{dialog.altLabel}</button>}
           <button type="submit" className="pill white">{dialog.submitLabel || tr('확인')}</button>
         </div>
       </form>

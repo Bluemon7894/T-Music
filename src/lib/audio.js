@@ -6,6 +6,10 @@ let ctx = null;
 let analyser = null;
 let compressor = null;
 let musicFade = null;
+let fadeTarget = 1;
+let fadeEndsAt = 0;
+let idleTimer = null;
+const IDLE_SLEEP_MS = 4000;
 const sources = new WeakMap();
 const FADE_CURVE_POINTS = 48;
 
@@ -81,7 +85,7 @@ export function attach(el) {
       src.connect(musicFade);
       sources.set(el, src);
     }
-    if (ctx.state === 'suspended') ctx.resume();
+    wakeAudio();
   } catch {
     // Visualizer is optional; playback works without it.
   }
@@ -89,8 +93,37 @@ export function attach(el) {
 
 export function getAudioContext() {
   setupGraph();
-  if (ctx?.state === 'suspended') ctx.resume();
+  wakeAudio();
   return ctx;
+}
+
+// A running audio graph keeps the sound hardware on and the phone from sleeping, music or not.
+export function wakeAudio() {
+  clearTimeout(idleTimer);
+  idleTimer = null;
+  if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {});
+}
+
+export function sleepAudioSoon(stillIdle) {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    idleTimer = null;
+    const idle = stillIdle();
+    if (idle === null) sleepAudioSoon(stillIdle); // a sound is still finishing: look again
+    else if (idle && ctx?.state === 'running') ctx.suspend().catch(() => {});
+  }, IDLE_SLEEP_MS);
+}
+
+// Music that should be heard but can't be: the system stopped the graph (a call, the app coming back
+// from the background), or a fade was lost along with the timer that was going to finish it.
+export function healSound() {
+  if (!ctx) return;
+  wakeAudio();
+  if (musicFade && fadeTarget === 1 && ctx.currentTime >= fadeEndsAt && musicFade.gain.value < 0.99) setMusicFade(1);
+}
+
+export function isSoundBlocked() {
+  return Boolean(ctx && ctx.state !== 'running');
 }
 
 // Fades the music on the audio clock, so it stays smooth with the window hidden or the phone locked.
@@ -101,6 +134,8 @@ export function setMusicFade(to, seconds = 0) {
   const gain = musicFade.gain;
   const now = ctx.currentTime;
   const from = gain.value;
+  fadeTarget = to;
+  fadeEndsAt = now + Math.max(0, seconds);
   gain.cancelScheduledValues(now);
   if (seconds <= 0 || Math.abs(from - to) < 0.001) {
     gain.setValueAtTime(to, now);

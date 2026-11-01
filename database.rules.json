@@ -96,7 +96,7 @@
           }
         },
         "playback": {
-          ".write": "auth != null && (root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid || (root.child('rooms').child($code).child('meta/controlMode').val() === 'everyone' && root.child('rooms').child($code).child('members').child(auth.uid).exists()))",
+          ".write": "auth != null && (root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid || (root.child('rooms').child($code).child('meta/controlMode').val() === 'everyone' && root.child('rooms').child($code).child('members').child(auth.uid).exists()) || (root.child('rooms').child($code).child('members').child(auth.uid).exists() && newData.child('playing').val() === false))",
           ".validate": "newData.hasChildren(['track', 'positionMs', 'playing', 'updatedAt', 'rev', 'by'])",
           "track": {
             "id": {
@@ -165,6 +165,24 @@
           "track": {
             ".validate": "newData.isBoolean()"
           },
+          "playlists": {
+            ".validate": "newData.isBoolean()"
+          },
+          "topTracks": {
+            ".validate": "newData.isBoolean()"
+          },
+          "time": {
+            ".validate": "newData.isBoolean()"
+          },
+          "artists": {
+            ".validate": "newData.isBoolean()"
+          },
+          "genres": {
+            ".validate": "newData.isBoolean()"
+          },
+          "asked": {
+            ".validate": "newData.isBoolean()"
+          },
           "$other": {
             ".validate": false
           }
@@ -172,6 +190,12 @@
         "$other": {
           ".validate": false
         }
+      }
+    },
+    "friendProfiles": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('friends').child(auth.uid).child($uid).exists())",
+        ".write": "auth != null && auth.uid === $uid"
       }
     },
     "friendCodes": {
@@ -202,7 +226,16 @@
       "$owner": {
         ".read": "auth != null && auth.uid === $owner",
         "$other": {
-          ".write": "auth != null && ((!newData.exists() && (auth.uid === $owner || auth.uid === $other)) || (newData.exists() && auth.uid === $owner && root.child('friendRequests').child($owner).child($other).exists()) || (newData.exists() && auth.uid === $other && root.child('friendRequests').child($other).child($owner).exists()))"
+          ".write": "auth != null && ((!newData.exists() && (auth.uid === $owner || auth.uid === $other)) || (newData.exists() && auth.uid === $owner && root.child('friendRequests').child($owner).child($other).exists()) || (newData.exists() && auth.uid === $other && root.child('friendRequests').child($other).child($owner).exists()) || (newData.exists() && auth.uid === $owner && root.child('friendMoves').child($owner).child($other).exists()) || (newData.exists() && auth.uid === $other && root.child('friendMoves').child($other).child($owner).exists()))"
+        }
+      }
+    },
+    "friendMoves": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        ".write": "auth != null && auth.uid === $to && !newData.exists()",
+        "$friend": {
+          ".write": "auth != null && ((auth.uid === $to && !newData.exists()) || (newData.isString() && newData.val() === auth.uid && root.child('friends').child(auth.uid).child($friend).exists()))"
         }
       }
     },

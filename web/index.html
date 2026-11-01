@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-Music</title>
+<meta name="description" content="T-Music에서 같이 듣기와 플레이리스트를 열어요.">
+<meta property="og:title" content="T-Music 초대">
+<meta property="og:description" content="눌러서 T-Music에서 열어 보세요.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://t-music-b8301.web.app/logo-mark.png">
+<meta name="theme-color" content="#0a0712">
+<link rel="icon" href="/logo-mark.png">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 20px; background: radial-gradient(90% 70% at 20% 10%, rgba(91, 33, 182, 0.55), transparent 65%), radial-gradient(80% 60% at 90% 90%, rgba(162, 28, 175, 0.28), transparent 65%), #0a0712; color: #f5f3ff; font: 15px/1.6 "Pretendard", system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+  main { width: min(420px, 100%); padding: 32px 28px; border-radius: 26px; text-align: center; background: linear-gradient(180deg, rgba(36, 22, 66, 0.92), rgba(18, 12, 34, 0.92)); border: 1px solid rgba(196, 181, 253, 0.2); box-shadow: 0 40px 90px -24px rgba(0, 0, 0, 0.9); }
+  img { width: 84px; height: 84px; object-fit: contain; filter: drop-shadow(0 10px 26px rgba(139, 92, 246, 0.7)); }
+  h1 { margin: 14px 0 6px; font-size: 24px; font-weight: 900; letter-spacing: -0.03em; }
+  p { margin: 0; color: #b8b0d8; }
+  .code { display: inline-block; margin-top: 12px; padding: 6px 14px; border-radius: 12px; font-size: 20px; font-weight: 800; letter-spacing: 0.14em; background: rgba(255, 255, 255, 0.07); }
+  a.open { display: block; margin-top: 22px; padding: 14px; border-radius: 15px; font-weight: 800; color: #fff; text-decoration: none; background: linear-gradient(135deg, #8b5cf6, #c026d3); box-shadow: 0 12px 28px -12px rgba(168, 85, 247, 0.85); }
+  .need { margin-top: 18px; font-size: 13px; color: #7c7699; }
+  .need a { color: #c4b5fd; }
+</style>
+</head>
+<body>
+<main>
+  <img src="/logo-mark.png" alt="T-Music">
+  <h1 id="title">T-Music</h1>
+  <p id="lead">앱에서 열어 주세요.</p>
+  <div class="code" id="code" hidden></div>
+  <a class="open" id="open" href="#">T-Music에서 열기</a>
+  <p class="need">앱이 없다면 <a href="https://github.com/Bluemon7894/T-Music/releases">여기에서 받을 수 있어요</a>.</p>
+</main>
+<script>
+  // The address is the invitation. Nothing is looked up or stored here: the app does all of that.
+  const room = /^\/join\/([A-Za-z0-9]{6})\/?$/.exec(location.pathname);
+  const playlist = /^\/playlist\/([A-Za-z0-9]{22})\/?$/.exec(location.pathname);
+  const en = !/^ko/i.test(navigator.language || 'ko');
+  const say = (ko, english) => (en ? english : ko);
+  document.documentElement.lang = en ? 'en' : 'ko';
+  document.getElementById('open').textContent = say('T-Music에서 열기', 'Open in T-Music');
+  document.querySelector('.need').innerHTML = say('앱이 없다면 <a href="https://github.com/Bluemon7894/T-Music/releases">여기에서 받을 수 있어요</a>.', 'No app yet? <a href="https://github.com/Bluemon7894/T-Music/releases">Get it here</a>.');
+  let target = null;
+  if (room) {
+    const code = room[1].toUpperCase();
+    target = `tmusic://join/${code}`;
+    document.getElementById('title').textContent = say('같이 듣기 초대', 'Listen together');
+    document.getElementById('lead').textContent = say('친구가 같이 듣자고 초대했어요.', 'A friend invited you to listen together.');
+    const box = document.getElementById('code');
+    box.textContent = code;
+    box.hidden = false;
+  } else if (playlist) {
+    target = `tmusic://playlist/${playlist[1]}`;
+    document.getElementById('title').textContent = say('공유 플레이리스트', 'Shared playlist');
+    document.getElementById('lead').textContent = say('친구가 플레이리스트를 공유했어요.', 'A friend shared a playlist with you.');
+  } else {
+    document.getElementById('lead').textContent = say('광고 없는 음악 플레이어예요. 친구와 같이 들을 수 있어요.', 'A music player to listen to with friends.');
+    document.getElementById('open').hidden = true;
+    document.getElementById('open').style.display = 'none';
+  }
+  if (target) {
+    document.getElementById('open').href = target;
+    location.href = target;
+  }
+</script>
+</body>
+</html>

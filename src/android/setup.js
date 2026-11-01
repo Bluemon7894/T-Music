@@ -7,6 +7,7 @@ import * as stream from '../../electron/youtube/stream.js';
 import * as lyrics from '../../electron/lyrics/index.js';
 import { translateLines } from '../../electron/lyrics/translate.js';
 import { getClient } from '../../electron/youtube/client.js';
+import { artistGenres } from '../../electron/youtube/genres.js';
 import * as downloads from './downloads.js';
 import * as updater from './updater.js';
 import * as auth from './auth.js';
@@ -39,7 +40,10 @@ window.__tm.invalidateStream = (id, method, fresh) => stream.invalidate(id, meth
 
 // ---- whether the app is on screen ----
 let visible = true;
-onNative('visibility', (event) => { visible = event.visible; });
+onNative('visibility', (event) => {
+  visible = event.visible;
+  window.dispatchEvent(new CustomEvent('t-music:visibility', { detail: { visible } }));
+});
 document.hasFocus = () => visible;
 
 // ---- web notifications become phone notifications ----
@@ -61,9 +65,9 @@ onNative('notificationClick', ({ id }) => {
 function takeInvite() {
   const link = Native.takeLink();
   if (!link) return null;
-  const room = /^tmusic:\/\/join\/([A-Za-z0-9]{6})/.exec(link);
+  const room = /^(?:tmusic:\/\/|https:\/\/t-music-b8301\.web\.app\/)join\/([A-Za-z0-9]{6})/.exec(link);
   if (room) return { kind: 'room', code: room[1].toUpperCase() };
-  const playlist = /^tmusic:\/\/playlist\/([A-Za-z0-9]{22})/.exec(link);
+  const playlist = /^(?:tmusic:\/\/|https:\/\/t-music-b8301\.web\.app\/)playlist\/([A-Za-z0-9]{22})/.exec(link);
   return playlist ? { kind: 'playlist', code: playlist[1] } : null;
 }
 
@@ -77,6 +81,7 @@ const api = {
   artist: (id) => catalog.artist(id),
   playlist: (id) => catalog.playlist(id),
   related: (id) => catalog.related(id),
+  artistGenres: (names) => artistGenres(names),
   home: () => catalog.home(),
   lyrics: (track) => lyrics.getLyrics(track),
   refreshLyrics: (track) => lyrics.refreshLyrics(track),

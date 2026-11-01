@@ -13,6 +13,7 @@ import { useUI, toast } from '../store/ui.js';
 import { totalTime, colorFor } from '../lib/util.js';
 import { useEnter, useTilt } from '../lib/motion.js';
 import { IS_ANDROID } from '../lib/platform.js';
+import { dropOnLiked, dropOnPlaylist, useDrop } from '../lib/drag.js';
 import { useAsync, Thumb, PlayButton, ArtistLinks, PageSkeleton, ErrorMsg, Empty } from '../components/common.jsx';
 import TrackList, { startRadio } from '../components/TrackList.jsx';
 import { DownloadAllButton } from '../components/DownloadButton.jsx';
@@ -155,8 +156,9 @@ export function Liked() {
   const go = useNav((s) => s.go);
   const ref = usePage([]);
   const context = { name: tr('좋아요 표시한 곡') };
+  const { over, dropProps } = useDrop(dropOnLiked);
   return (
-    <div className="page collection" ref={ref}>
+    <div className={`page collection ${over ? 'playlist-drag-over' : ''}`} ref={ref} {...dropProps}>
       <Header
         kind={tr('플레이리스트')}
         title={tr('좋아요 표시한 곡')}
@@ -184,11 +186,11 @@ const isOwnShare = (p) => p.share?.ownerUid === auth.currentUser?.uid;
 
 export function LocalPlaylist({ id }) {
   const pl = useLibrary((s) => s.playlists.find((p) => p.id === id));
-  const { addToPlaylist, removeFromPlaylist, renamePlaylist, reorderPlaylist } = useLibrary.getState();
+  const { removeFromPlaylist, renamePlaylist, reorderPlaylist } = useLibrary.getState();
   const prompt = useUI((s) => s.prompt);
   const go = useNav((s) => s.go);
   const ref = usePage([id]);
-  const [dragOver, setDragOver] = useState(false);
+  const { over: dragOver, dropProps } = useDrop((payload) => dropOnPlaylist(pl, payload), { enabled: Boolean(pl) && canEditPlaylist(pl) });
   if (!pl) return <ErrorMsg error={tr('플레이리스트를 찾을 수 없습니다.')} />;
   const context = { name: pl.name };
   const editable = canEditPlaylist(pl);
@@ -198,34 +200,7 @@ export function LocalPlaylist({ id }) {
     <div
       className={`page collection ${dragOver ? 'playlist-drag-over' : ''}`}
       ref={ref}
-      onDragOver={(e) => {
-        if (editable && e.dataTransfer.types.includes('application/json')) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'copy';
-          if (!dragOver) setDragOver(true);
-        }
-      }}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false);
-      }}
-      onDrop={(e) => {
-        setDragOver(false);
-        try {
-          if (e.dataTransfer.getData('text/reorder-from')) return;
-          const raw = e.dataTransfer.getData('application/json');
-          if (raw) {
-            const track = JSON.parse(raw);
-            if (track?.id) {
-              const added = addToPlaylist(pl.id, track);
-              if (added > 0) {
-                toast(tr('\'{0}\'에 \'{1}\'을(를) 추가했습니다', pl.name, track.title));
-              } else {
-                toast(tr('\'{0}\'에 이미 있는 곡입니다', pl.name));
-              }
-            }
-          }
-        } catch {}
-      }}
+      {...dropProps}
     >
       <Header
         kind={pl.share ? tr('공유 플레이리스트') : tr('내 플레이리스트')}

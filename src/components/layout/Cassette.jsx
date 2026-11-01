@@ -7,7 +7,7 @@ import { usePlayer } from '../../store/player.js';
 import { DECKS, useDeck } from '../../store/deck.js';
 import { getAnalyser } from '../../lib/audio.js';
 import { Thumb } from '../common.jsx';
-import { useTilt } from '../../lib/motion.js';
+import { deckFrameGap, useTilt } from '../../lib/motion.js';
 import logo from '../../assets/logo-mark.png';
 
 const REEL_LEFT_X = 22;
@@ -102,6 +102,7 @@ function useCassetteMotion(parts) {
 
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
+      if (now - last < deckFrameGap(speed < 0.01 && !usePlayer.getState().playing && useDeck.getState().phase === 'idle')) return;
       // The first frame's timestamp can be slightly older than the moment this loop started.
       const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;

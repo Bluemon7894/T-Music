@@ -2,7 +2,7 @@
 // lyrics database entry matches it.
 
 const ARTIST_ALIASES = {
-  아이유: 'IU', 이지금: 'IU', 방탄소년단: 'BTS', 소녀시대: "Girls' Generation", 동방신기: 'TVXQ', 에스파: 'aespa',
+  아이유: 'IU', 이지금: 'IU', 방탄소년단: 'BTS', BANGTANTV: 'BTS', 소녀시대: "Girls' Generation", 동방신기: 'TVXQ', 에스파: 'aespa',
   르세라핌: 'LE SSERAFIM', 아이브: 'IVE', 뉴진스: 'NewJeans', 블랙핑크: 'BLACKPINK', 트와이스: 'TWICE', '(여자)아이들': '(G)I-DLE',
   여자아이들: '(G)I-DLE', 세븐틴: 'SEVENTEEN', 스트레이키즈: 'Stray Kids', 엔하이픈: 'ENHYPEN', 투모로우바이투게더: 'TOMORROW X TOGETHER',
   데이식스: 'DAY6', 폴킴: 'Paul Kim', 박재정: 'Park Jae Jung', 성시경: 'Sung Si Kyung', 태연: 'TAEYEON', 악뮤: 'AKMU', 악동뮤지션: 'AKMU',
@@ -191,6 +191,9 @@ export function buildQueries(meta) {
   const q = [];
   const push = (title, artist) => { if (title) q.push({ title, artist: artist || '' }); };
   push(t0, a0);
+  // The whole title as written, for names that only look like two names ("오늘만 I LOVE YOU").
+  const whole = meta.titles.reduce((a, b) => (b.length > a.length ? b : a), t0 || '');
+  if (whole && whole !== t0 && whole !== t1) push(whole, a0);
   // The other language's title on its own: databases often spell the singer differently too.
   if (t1) push(t1, '');
   if (a1) push(t0, a1);
@@ -277,8 +280,9 @@ export function scoreCandidate(c, meta) {
 
   if (title < 0.6) return { ok: false, score: 0, textOnly: false };
   const shortTitle = norm(meta.titles[0]).length <= 3;
-  // A different spelling of the singer is fine when the length also lines up to the second.
-  const trusted = artist > 0 || (drift !== null && drift <= 2 && title >= 0.85 && !shortTitle);
+  // A different spelling of the singer is fine when the length also lines up to the second. A short title
+  // is easily shared by another song, so it has to match exactly, and the length even closer.
+  const trusted = artist > 0 || (drift !== null && (shortTitle ? drift <= 1.5 && title === 1 : drift <= 2 && title >= 0.85));
   if (!trusted) return { ok: false, score: 0, textOnly: false };
 
   const durScore = drift === null ? 0.5 : drift <= 1 ? 1 : drift <= 2 ? 0.9 : drift <= 4 ? 0.6 : drift <= MAX_SYNC_DRIFT ? 0.25 : 0;

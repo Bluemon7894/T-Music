@@ -5,9 +5,11 @@
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { getClient, resetClient } from './client.js';
+import { getClient, getPlayerClient, resetClient } from './client.js';
 
 const CLIENTS = ['VISIONOS', 'IOS', 'ANDROID_VR'];
+// Tried only once all of the above fail, with a session that can also unscramble web addresses.
+const LAST_RESORT_CLIENTS = ['TV', 'TV_EMBEDDED', 'WEB_EMBEDDED', 'MWEB', 'ANDROID', 'YTMUSIC', 'WEB'];
 const TIMEOUT_MS = 12000;
 const COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const FAILS_BEFORE_COOLDOWN = 3;
@@ -15,8 +17,8 @@ const FAILS_BEFORE_COOLDOWN = 3;
 // This video can't be played. That says nothing about the client that was asked.
 class UnplayableError extends Error {}
 
-async function innertube(id, clientName) {
-  const yt = await getClient();
+async function innertube(id, clientName, session = getClient) {
+  const yt = await session();
   const info = await yt.getBasicInfo(id, { client: clientName }).catch((e) => {
     // The library throws for deleted and private videos instead of reporting their status.
     throw /unavailable|private|removed/i.test(e.message) ? new UnplayableError(e.message) : e;
@@ -95,6 +97,16 @@ async function tryClients(id) {
   throw unplayable || lastError || new Error('no client available');
 }
 
+async function tryLastResort(id) {
+  for (const name of LAST_RESORT_CLIENTS) {
+    try {
+      const r = await withTimeout(innertube(id, name, getPlayerClient), TIMEOUT_MS);
+      if (await withTimeout(servesWholeFile(r), TIMEOUT_MS)) return { ...r, method: name };
+    } catch { /* on to the next */ }
+  }
+  return null;
+}
+
 const cache = new Map();
 const inflight = new Map();
 
@@ -112,7 +124,13 @@ export async function resolve(id) {
         if (e instanceof UnplayableError) throw e;
         // Every client failing usually means the session itself went stale.
         resetClient();
-        r = await tryClients(id);
+        try {
+          r = await tryClients(id);
+        } catch (again) {
+          if (again instanceof UnplayableError) throw again;
+          r = await tryLastResort(id);
+          if (!r) throw again;
+        }
       }
       const entry = { ...r, id, expires: r.expires || expiryOf(r.url) };
       cache.set(id, entry);

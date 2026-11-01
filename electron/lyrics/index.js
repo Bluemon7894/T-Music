@@ -15,6 +15,7 @@ const EMPTY_TTL_NETWORK_TROUBLE = 60 * 1000;
 const ACCEPT_SCORE = 62;
 const CONFIDENT_SCORE = 85; // right title, right artist, length within a couple of seconds
 const TIGHT_DRIFT = 2.5;
+const MAX_QUERIES = 4;
 
 const dir = () => path.join(app.getPath('userData'), 'lyrics');
 const fileOf = (id) => path.join(dir(), `${String(id).replace(/[^\w-]/g, '')}.json`);
@@ -115,7 +116,7 @@ function searchRound(query, meta, state) {
             if (hit) finish(hit);
           }
         })
-        .catch(() => {})
+        .catch(() => { state.flaky = true; })
         .finally(async () => {
           if (--pending > 0 || finished) return;
           const ranked = rank(all, meta, state.seen).slice(0, 6);
@@ -157,9 +158,9 @@ async function search(track) {
   const meta = parseTrack(track);
   if (meta.instrumental || !meta.titles.length) return { result: NOTHING(), answered: true };
 
-  const state = { seen: new Set(), text: null, answered: false };
+  const state = { seen: new Set(), text: null, answered: false, flaky: false };
   let best = null;
-  for (const query of buildQueries(meta).slice(0, 3)) {
+  for (const query of buildQueries(meta).slice(0, MAX_QUERIES)) {
     const hit = await searchRound(query, meta, state);
     if (hit && (!best || hit.total > best.total)) best = hit;
     if (best && (best.c.meta.drift ?? 0) <= TIGHT_DRIFT) break;
@@ -182,7 +183,8 @@ async function search(track) {
   }
   const naver = await naverPlain(meta.titles[0], meta.artists[0] || '');
   if (naver && isUsableText(naver)) return { result: plainResult(naver, '네이버', '출처: 네이버'), answered: true };
-  return { result: NOTHING(), answered: state.answered };
+  // A database that didn't answer might have had it, so this isn't "no lyrics" yet.
+  return { result: NOTHING(), answered: state.answered && !state.flaky };
 }
 
 export async function getLyrics(track) {

@@ -1,9 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Home, Search, Library, ArrowDownToLine, Users, UserRoundPlus, Plus, Heart, ListMusic, Trash2, Pencil, Disc3 } from 'lucide-react';
+import { Home, Search, Library, ArrowDownToLine, Users, UserRoundPlus, Plus, Heart, ListMusic, Trash2, Pencil, Disc3, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useLibrary } from '../../store/library.js';
 import { canEditPlaylist, confirmDeletePlaylist } from '../../lib/sharedPlaylists.js';
 import { useNav, useRoute } from '../../store/nav.js';
-import { useUI, toast } from '../../store/ui.js';
+import { useUI } from '../../store/ui.js';
+import { dragProps, dropOnDownloads, dropOnLibrary, dropOnLiked, dropOnNewPlaylist, dropOnPlaylist, dropOnRoom, dropOnSearch, itemPayload, useDrop } from '../../lib/drag.js';
 import { usePlayer } from '../../store/player.js';
 import { useDownloads } from '../../store/downloads.js';
 import { useFriends } from '../../store/friends.js';
@@ -21,6 +22,19 @@ const NAV = [
   { id: 'room', label: tr('같이 듣기'), icon: Users },
   { id: 'friends', label: tr('친구'), icon: UserRoundPlus },
 ];
+
+const NAV_DROPS = { search: dropOnSearch, library: dropOnLibrary, downloads: dropOnDownloads, room: dropOnRoom };
+
+function NavItem({ n, on, badge, onClick }) {
+  const { over, dropProps } = useDrop(NAV_DROPS[n.id] || (() => {}), { enabled: Boolean(NAV_DROPS[n.id]) });
+  return (
+    <button className={`nav-item ${on ? 'on' : ''} ${over ? 'drag-over' : ''}`} onClick={onClick} title={n.label} {...dropProps}>
+      <n.icon size={20} />
+      <span>{n.label}</span>
+      {badge > 0 && <b className="nav-badge">{badge}</b>}
+    </button>
+  );
+}
 
 function NavList() {
   const route = useRoute();
@@ -48,30 +62,25 @@ function NavList() {
     <nav className="nav" ref={list}>
       <span className="nav-pill" ref={pill} />
       {NAV.map((n, i) => (
-        <button key={n.id} className={`nav-item ${i === active ? 'on' : ''}`} onClick={() => go(n.id, {})}>
-          <n.icon size={20} />
-          <span>{n.label}</span>
-          {n.id === 'downloads' && jobs > 0 && <b className="nav-badge">{jobs}</b>}
-          {n.id === 'room' && listeners > 0 && <b className="nav-badge">{listeners}</b>}
-          {n.id === 'friends' && friendRequests > 0 && <b className="nav-badge">{friendRequests}</b>}
-        </button>
+        <NavItem key={n.id} n={n} on={i === active} onClick={() => go(n.id, {})} badge={{ downloads: jobs, room: listeners, friends: friendRequests }[n.id] || 0} />
       ))}
     </nav>
   );
 }
 
 // Lives outside Sidebar: a component defined during render remounts all its rows each time.
-function Row({ active, onClick, onContextMenu, art, name, sub, isDragOver, onDragOver, onDragLeave, onDrop }) {
+function Row({ active, onClick, onContextMenu, art, name, sub, drag, land }) {
   const isPlaying = usePlayer((s) => s.context?.name === name);
   const playing = usePlayer((s) => s.playing);
+  const { over, dropProps } = useDrop(land || (() => {}), { enabled: Boolean(land) });
   return (
     <div
-      className={`lib-row ${active ? 'active' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      className={`lib-row ${active ? 'active' : ''} ${over ? 'drag-over' : ''}`}
       onClick={onClick}
       onContextMenu={onContextMenu}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      title={name}
+      {...(drag ? dragProps(drag) : {})}
+      {...dropProps}
     >
       {art}
       <div className="lib-text">
@@ -90,7 +99,10 @@ export default function Sidebar() {
   const openMenu = useUI((s) => s.openMenu);
   const prompt = useUI((s) => s.prompt);
   const [tab, setTab] = useState('playlists');
-  const [dragOverId, setDragOverId] = useState(null);
+  const sideOpen = useUI((s) => s.sideOpen);
+  const toggleSide = useUI((s) => s.toggleSide);
+  const newDrop = useDrop(dropOnNewPlaylist);
+  const savedDrop = useDrop(dropOnLibrary);
 
   const isActive = (name, id) => route.name === name && (id == null || route.params.id === id);
   const newPlaylist = () => go('local', { id: lib.createPlaylist() });
@@ -102,9 +114,12 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="brand" onClick={() => go('home')}>
-        <img src={logo} alt="" />
-        <span>T-Music</span>
+      <div className="brand">
+        {sideOpen && <img src={logo} alt="" onClick={() => go('home')} />}
+        {sideOpen && <span onClick={() => go('home')}>T-Music</span>}
+        <button className="icon-btn side-toggle" onClick={toggleSide} title={sideOpen ? tr('사이드바 접기') : tr('사이드바 펴기')} aria-label={sideOpen ? tr('사이드바 접기') : tr('사이드바 펴기')}>
+          {sideOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+        </button>
       </div>
       <NavList />
 
@@ -114,40 +129,13 @@ export default function Sidebar() {
           <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>{tr('저장됨')}</button>
         </div>
         <div className="lib-actions">
-          <button
-            className={`icon-btn circle accent ${dragOverId === 'new-pl' ? 'drag-over' : ''}`}
-            title={tr('새 플레이리스트')}
-            onClick={newPlaylist}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'copy';
-              if (dragOverId !== 'new-pl') setDragOverId('new-pl');
-            }}
-            onDragLeave={() => {
-              if (dragOverId === 'new-pl') setDragOverId(null);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOverId(null);
-              try {
-                const raw = e.dataTransfer.getData('application/json');
-                if (raw) {
-                  const track = JSON.parse(raw);
-                  if (track?.id) {
-                    const id = lib.createPlaylist(track.title, [track]);
-                    go('local', { id });
-                    toast(tr('새 플레이리스트에 \'{0}\'을(를) 추가했습니다', track.title));
-                  }
-                }
-              } catch {}
-            }}
-          >
+          <button className={`icon-btn circle accent ${newDrop.over ? 'drag-over' : ''}`} title={tr('새 플레이리스트')} onClick={newPlaylist} {...newDrop.dropProps}>
             <Plus size={17} />
           </button>
         </div>
       </div>
 
-      <div className="lib-list">
+      <div className={`lib-list ${tab === 'saved' && savedDrop.over ? 'drag-over' : ''}`} {...(tab === 'saved' ? savedDrop.dropProps : {})}>
         {tab === 'playlists' ? (
           <>
             <Row
@@ -156,33 +144,8 @@ export default function Sidebar() {
               name={tr('좋아요 표시한 곡')}
               sub={tr('{0}곡', lib.liked.length)}
               art={<div className="lib-art liked-art"><Heart size={18} fill="#fff" /></div>}
-              isDragOver={dragOverId === 'liked'}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'copy';
-                if (dragOverId !== 'liked') setDragOverId('liked');
-              }}
-              onDragLeave={() => {
-                if (dragOverId === 'liked') setDragOverId(null);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOverId(null);
-                try {
-                  const raw = e.dataTransfer.getData('application/json');
-                  if (raw) {
-                    const track = JSON.parse(raw);
-                    if (track?.id) {
-                      if (!lib.isLiked(track.id)) {
-                        lib.toggleLike(track);
-                        toast(tr('\'좋아요 표시한 곡\'에 \'{0}\'을(를) 추가했습니다', track.title));
-                      } else {
-                        toast(tr('\'좋아요 표시한 곡\'에 이미 있는 곡입니다'));
-                      }
-                    }
-                  }
-                } catch {}
-              }}
+              drag={() => itemPayload({ kind: 'liked', title: tr('좋아요 표시한 곡') })}
+              land={dropOnLiked}
             />
             {lib.playlists.map((p) => (
               <Row
@@ -193,36 +156,8 @@ export default function Sidebar() {
                 name={p.name}
                 sub={tr('플레이리스트 · {0}곡', p.tracks.length)}
                 art={p.thumb || p.tracks[0]?.thumb ? <Thumb src={p.thumb || p.tracks[0]?.thumb} className="lib-art" /> : <div className="lib-art"><ListMusic size={18} /></div>}
-                isDragOver={dragOverId === p.id}
-                onDragOver={(e) => {
-                  if (!canEditPlaylist(p)) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = 'copy';
-                  if (dragOverId !== p.id) setDragOverId(p.id);
-                }}
-                onDragLeave={() => {
-                  if (dragOverId === p.id) setDragOverId(null);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOverId(null);
-                  try {
-                    const raw = e.dataTransfer.getData('application/json');
-                    if (raw) {
-                      const track = JSON.parse(raw);
-                      if (track?.id) {
-                        const added = lib.addToPlaylist(p.id, track);
-                        if (added > 0) {
-                          toast(tr('\'{0}\'에 \'{1}\'을(를) 추가했습니다', p.name, track.title));
-                        } else {
-                          toast(tr('\'{0}\'에 이미 있는 곡입니다', p.name));
-                        }
-                      }
-                    }
-                  } catch (err) {
-                    console.error('Drop error', err);
-                  }
-                }}
+                drag={() => itemPayload({ kind: 'local', id: p.id, title: p.name })}
+                land={canEditPlaylist(p) ? (payload) => dropOnPlaylist(p, payload) : null}
               />
             ))}
             {!lib.playlists.length && (
@@ -235,10 +170,10 @@ export default function Sidebar() {
         ) : (
           <>
             {lib.savedAlbums.map((a) => (
-              <Row key={'al' + a.id} active={isActive('album', a.id)} onClick={() => go('album', { id: a.id })} name={a.title} sub={`${a.type || tr('앨범')} · ${a.artists?.map((x) => x.name).join(', ')}`} art={<Thumb src={a.thumb} className="lib-art" />} />
+              <Row key={'al' + a.id} active={isActive('album', a.id)} onClick={() => go('album', { id: a.id })} name={a.title} sub={`${a.type || tr('앨범')} · ${a.artists?.map((x) => x.name).join(', ')}`} art={<Thumb src={a.thumb} className="lib-art" />} drag={() => itemPayload({ ...a, kind: 'album' })} />
             ))}
             {lib.followed.map((a) => (
-              <Row key={'ar' + a.id} active={isActive('artist', a.id)} onClick={() => go('artist', { id: a.id })} name={a.name} sub={tr('아티스트')} art={<Thumb src={a.thumb} round className="lib-art" />} />
+              <Row key={'ar' + a.id} active={isActive('artist', a.id)} onClick={() => go('artist', { id: a.id })} name={a.name} sub={tr('아티스트')} art={<Thumb src={a.thumb} round className="lib-art" />} drag={() => itemPayload({ ...a, kind: 'artist' })} />
             ))}
             {!lib.savedAlbums.length && !lib.followed.length && (
               <div className="lib-cta">

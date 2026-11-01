@@ -4,6 +4,7 @@ import { usePlayer } from '../../store/player.js';
 import { useUI } from '../../store/ui.js';
 import { useNav } from '../../store/nav.js';
 import { fmtTime } from '../../lib/util.js';
+import { dragProps, dropOnPlayer, trackPayload, useDrop } from '../../lib/drag.js';
 import { Thumb, ArtistLinks, PlayButton } from '../common.jsx';
 import { LikeButton, trackMenuItems } from '../TrackList.jsx';
 import DownloadButton from '../DownloadButton.jsx';
@@ -81,9 +82,10 @@ export default function PlayerDock() {
   const duration = p.duration || track?.duration || 0;
   const queueOn = panelOpen && panelTab === 'queue';
   const lyricsOn = panelOpen && panelTab === 'lyrics';
+  const { over, dropProps } = useDrop(dropOnPlayer);
 
   return (
-    <footer className={`dock ${track ? '' : 'idle'}`}>
+    <footer className={`dock ${track ? '' : 'idle'} ${over ? 'drag-over' : ''}`} {...dropProps}>
       <div className="dock-glow" style={{ width: `${duration ? ((scrub ?? p.time) / duration) * 100 : 0}%` }} />
       <div className="dock-left">
         {track ? (
@@ -92,7 +94,7 @@ export default function PlayerDock() {
               <Thumb src={track.thumb} />
               <span className="dock-art-hint"><Maximize2 size={16} /></span>
             </button>
-            <div className="dock-text" onContextMenu={(e) => openMenu(e, trackMenuItems(track))}>
+            <div className="dock-text" onContextMenu={(e) => openMenu(e, trackMenuItems(track))} {...dragProps(() => trackPayload(track))}>
               <div className="dock-title" onClick={() => track.album?.id && go('album', { id: track.album.id })}>{track.title}</div>
               <ArtistLinks artists={track.artists} className="dock-artist" />
             </div>

@@ -5,40 +5,82 @@ import { errorText } from '../lib/api.js';
 import { pop } from '../lib/motion.js';
 import { tr } from '../lib/i18n.js';
 
+const RETRY_DELAYS_MS = [1500, 5000];
+
+// Most failures are a moment's trouble, so they're retried before anyone sees them. What still fails
+// tries again by itself as soon as the connection returns.
 export function useAsync(fn, deps) {
   const [state, setState] = useState({ loading: true, data: null, error: null });
   const [nonce, setNonce] = useState(0);
   useEffect(() => {
     let alive = true;
-    setState((s) => ({ loading: true, data: s.data, error: null }));
-    fn().then(
+    let timer = null;
+    let attempt = 0;
+    const run = () => fn().then(
       (data) => alive && setState({ loading: false, data, error: null }),
-      (error) => alive && setState({ loading: false, data: null, error: errorText(error) }),
+      (error) => {
+        if (!alive) return;
+        if (attempt < RETRY_DELAYS_MS.length) {
+          timer = setTimeout(run, RETRY_DELAYS_MS[attempt++]);
+          return;
+        }
+        setState({ loading: false, data: null, error: errorText(error) });
+      },
     );
-    return () => { alive = false; };
+    setState((s) => ({ loading: true, data: s.data, error: null }));
+    run();
+    return () => { alive = false; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, nonce]);
+  useEffect(() => {
+    if (!state.error) return undefined;
+    const again = () => setNonce((n) => n + 1);
+    window.addEventListener('online', again);
+    return () => window.removeEventListener('online', again);
+  }, [state.error]);
   return { ...state, retry: () => setNonce((n) => n + 1) };
 }
 
-export function Thumb({ src, round, className = '', size, alt = '' }) {
+// From sharpest to the one every video has.
+const SMALLER_THUMB = { 'maxresdefault.jpg': 'hq720.jpg', 'hq720.jpg': 'mqdefault.jpg', 'mqdefault.jpg': 'hqdefault.jpg', 'hqdefault.jpg': 'default.jpg', 'default.jpg': null };
+const THUMB_RETRY_MS = 4000;
+const THUMB_RETRIES = 2;
+
+// Some addresses only work with the signature that was cut off them, so anything unknown starts over
+// from the standard sizes.
+function smallerThumb(url) {
+  const m = /^(https:\/\/i\.ytimg\.com\/vi(?:_webp)?\/[\w-]+\/)([\w.]+)/.exec(url || '');
+  if (!m) return null;
+  return m[2] in SMALLER_THUMB ? (SMALLER_THUMB[m[2]] && m[1] + SMALLER_THUMB[m[2]]) : `${m[1].replace('vi_webp', 'vi')}hq720.jpg`;
+}
+
+// `videoId`: when the picture it came with won't load, the video's own picture stands in.
+export function Thumb({ src, round, className = '', size, alt = '', videoId }) {
   const [url, setUrl] = useState(src);
   const [failed, setFailed] = useState(false);
-  useEffect(() => { setUrl(src); setFailed(false); }, [src]);
+  const tries = useRef(0);
+  useEffect(() => { setUrl(src); setFailed(false); tries.current = 0; }, [src]);
+  // Many pictures loading at once can lose a few to the network. A picture that failed isn't a missing
+  // picture, so it's asked for again, and again whenever the connection returns.
+  useEffect(() => {
+    if (!failed || !src) return undefined;
+    const again = () => { tries.current = 0; setUrl(src); setFailed(false); };
+    const timer = tries.current < THUMB_RETRIES ? setTimeout(() => { tries.current += 1; setUrl(src); setFailed(false); }, THUMB_RETRY_MS) : null;
+    window.addEventListener('online', again);
+    return () => { clearTimeout(timer); window.removeEventListener('online', again); };
+  }, [failed, src]);
   const style = size ? { width: size, height: size } : undefined;
   const fallback = () => {
-    if (url?.includes('/hq720.jpg')) setUrl(url.replace('/hq720.jpg', '/mqdefault.jpg'));
+    const next = smallerThumb(url) || (videoId && !url?.includes(`/vi/${videoId}/`) ? `https://i.ytimg.com/vi/${videoId}/hq720.jpg` : null);
+    if (next) setUrl(next);
     else setFailed(true);
   };
-  // Missing YouTube thumbnails come back as a 120x90 grey placeholder with 3 dots, not a network error.
+  // Missing YouTube video thumbnails come back as a 120x90 grey picture with 3 dots, not a network error.
+  // default.jpg is really that size, and album art can be too, so only sizes that should be larger count.
   const onLoad = (e) => {
-    if (e.currentTarget.naturalWidth <= 120) {
-      if (url?.includes('/hq720.jpg')) {
-        setUrl(url.replace('/hq720.jpg', '/mqdefault.jpg'));
-      } else {
-        setFailed(true);
-      }
-    }
+    if (e.currentTarget.naturalWidth > 120) return;
+    const next = smallerThumb(url);
+    if (next && !url.endsWith('/hqdefault.jpg')) setUrl(next);
   };
   if (!url || failed) {
     return (

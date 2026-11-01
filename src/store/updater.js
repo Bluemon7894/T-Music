@@ -3,6 +3,9 @@ import { api } from '../lib/api.js';
 import { toast } from './ui.js';
 import { tr } from '../lib/i18n.js';
 
+const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+let offeredVersion = null;
+
 export const useUpdater = create((set, get) => ({
   checking: false,
   hasUpdate: false,
@@ -49,6 +52,8 @@ export const useUpdater = create((set, get) => ({
     setTimeout(() => {
       get().check(true);
     }, 2500);
+    // A PC can sit in the tray for weeks, and a fix only helps once it's seen.
+    setInterval(() => get().check(true), CHECK_EVERY_MS);
   },
 
   check: async (silent = false) => {
@@ -71,7 +76,9 @@ export const useUpdater = create((set, get) => ({
       });
 
       if (res.hasUpdate) {
-        set({ modalOpen: true });
+        // Asked once per version; the top bar keeps offering it after that.
+        if (!silent || res.latestVersion !== offeredVersion) set({ modalOpen: true });
+        offeredVersion = res.latestVersion;
       } else if (!silent) {
         toast(tr('현재 최신 버전(v{0})을 사용하고 있습니다.', res.currentVersion));
       }

@@ -126,7 +126,7 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .m-mini-text small { font-size: 11.5px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .m-mini .like { width: 36px; height: 40px; flex: none; }
 .m-mini-next { width: 38px; height: 40px; flex: none; color: var(--ink); }
-.m-mini-progress { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--grad-hot); pointer-events: none; }
+.m-mini-progress { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--grad-hot); pointer-events: none; width: 100%; transform-origin: left center; }
 
 /* ---------- tab bar ---------- */
 .m-tabs {
@@ -176,13 +176,14 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .invite-card { left: 12px; right: 12px; bottom: calc(var(--m-bottom) + 10px); width: auto; }
 .modal { width: calc(100vw - 32px); padding: 20px; }
 .modal input { font-size: 16px; }
-.update-modal-box { width: calc(100vw - 24px); max-height: 88dvh; padding: 20px; }
-.update-modal-title { font-size: 17px; padding-right: 22px; }
-.update-modal-header { gap: 12px; }
-.update-modal-notes { max-height: 32dvh; }
-.update-modal-actions > div { display: none; }
-.update-modal-actions .btn-secondary, .update-modal-actions .btn-primary { flex: 1; justify-content: center; }
-.update-modal-actions .btn-ghost { width: 100%; justify-content: center; }
+.update-modal-backdrop { padding: 12px; }
+.update-modal-box { width: 100%; max-height: 88dvh; }
+.um-head { padding: 20px 20px 16px; gap: 12px; }
+.um-logo { width: 50px; height: 50px; }
+.um-head h2 { font-size: 20px; }
+.um-notes { padding: 14px 20px; }
+.um-foot { padding: 14px 20px 16px; }
+.um-error { margin: 0 20px 10px; }
 .lyrics-picker-backdrop { padding: 12px; backdrop-filter: none; }
 .lyrics-picker-modal { max-height: calc(100dvh - 24px - var(--safe-top)); }
 .lyrics-picker-header { padding: 14px; }
@@ -267,7 +268,7 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .c-dur .icon-btn { width: 36px; height: 44px; }
 
 /* ---------- search ---------- */
-.sticky-chips { flex-wrap: nowrap; margin: -4px -16px 8px; padding: 6px 16px 8px; background: rgba(12, 8, 22, 0.97); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.sticky-chips { flex-wrap: nowrap; margin: -4px -16px 8px; padding: 6px 16px 10px; background: linear-gradient(180deg, var(--m-page, #0d0819) 72%, transparent); backdrop-filter: none; -webkit-backdrop-filter: none; }
 .chip { flex: none; height: 32px; padding: 0 13px; font-size: 13px; }
 .search-top { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .search-top section { margin-top: 10px; }
@@ -316,9 +317,9 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .artist-hero h1.long { font-size: clamp(25px, 7.4vw, 32px); }
 .listeners { font-size: 12.5px; }
 .artist-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-.about-card { min-height: 180px; border-radius: 16px; }
-.about-body { padding: 14px; }
-.about-card p { font-size: 12.5px; }
+.about-card { padding: 16px; border-radius: 16px; }
+.about-text p { font-size: 13px; }
+.about-photo { width: 44px; height: 44px; }
 
 /* ---------- library ---------- */
 .liked-banner { padding: 16px; margin-bottom: 14px; gap: 12px; border-radius: 18px; }
@@ -463,3 +464,14 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .q-more { flex: none; width: 34px; height: 40px; }
 .np-section { margin: 14px 4px 6px; font-size: 14px; }
 .sb-clear { width: 34px; height: 34px; flex: none; }
+
+/* ---------- friend pages ---------- */
+.fp-hero { flex-wrap: wrap; gap: 14px; padding: 16px; }
+.fp-actions { width: 100%; margin-left: 0; }
+.fp-title h1 { font-size: 24px; }
+.fp-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.profile-photos { gap: 6px; }
+.bar-handle { display: none; }
+/* Backdrops and glows cost the most to repaint: with motion turned down they go entirely. */
+html[data-motion="calm"] .m-bg, html[data-motion="calm"] .ph-backdrop, html[data-motion="calm"] .m-stage .stage-bg { display: none; }
+.lyr-nudge button { width: 36px; height: 34px; }

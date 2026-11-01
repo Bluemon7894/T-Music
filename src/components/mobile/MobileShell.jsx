@@ -69,7 +69,7 @@ function MiniBar({ track }) {
       <LikeButton track={track} size={20} />
       <PlayButton size={40} playing={playing} onClick={toggle} className={`dock-play ${loading && playing ? 'loading' : ''}`} />
       <button className="icon-btn m-mini-next" onClick={(e) => { e.stopPropagation(); next(); }} aria-label={tr('다음 곡')}><SkipForward size={22} fill="currentColor" /></button>
-      <i className="m-mini-progress" style={{ width: `${duration ? Math.min(100, (time / duration) * 100) : 0}%` }} />
+      <i className="m-mini-progress" style={{ transform: `scaleX(${duration ? Math.min(1, time / duration) : 0})` }} />
     </div>
   );
 }

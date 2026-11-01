@@ -7,12 +7,15 @@ import { useNav } from '../store/nav.js';
 import { useUI } from '../store/ui.js';
 import { useUpdater } from '../store/updater.js';
 import { artistNames } from '../lib/util.js';
+import { rememberPlayback } from '../lib/resume.js';
+import { safeTrack } from '../lib/safeTrack.js';
 
 const POSITION_EVERY_MS = 5000;
 
 function publish() {
   const p = usePlayer.getState();
   const track = p.current();
+  rememberPlayback(track ? { id: track.id, track: safeTrack(track), time: p.getPreciseTime(), playing: p.playing, at: Date.now() } : null);
   Native.playbackState(JSON.stringify(track ? {
     playing: p.playing,
     title: track.title,

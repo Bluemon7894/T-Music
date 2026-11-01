@@ -11,6 +11,7 @@ import * as downloads from './downloads.js';
 import * as discord from './discord.js';
 import * as auth from './auth.js';
 import * as lang from './lang.js';
+import { artistGenres } from './youtube/genres.js';
 import { translateLines } from './lyrics/translate.js';
 import { registerScheme, handleProtocol } from './protocol.js';
 
@@ -29,8 +30,8 @@ const NORMAL_MIN_SIZE = [1024, 640];
 
 function rememberInvite(argv) {
   for (const arg of argv) {
-    const room = /^tmusic:\/\/join\/([A-Za-z0-9]{6})/.exec(arg);
-    const playlist = /^tmusic:\/\/playlist\/([A-Za-z0-9]{22})/.exec(arg);
+    const room = /^(?:tmusic:\/\/|https:\/\/t-music-b8301\.web\.app\/)join\/([A-Za-z0-9]{6})/.exec(arg);
+    const playlist = /^(?:tmusic:\/\/|https:\/\/t-music-b8301\.web\.app\/)playlist\/([A-Za-z0-9]{22})/.exec(arg);
     if (room) pendingInvite = { kind: 'room', code: room[1].toUpperCase() };
     if (playlist) pendingInvite = { kind: 'playlist', code: playlist[1] };
     if (room || playlist) return true;
@@ -77,6 +78,7 @@ const api = {
     updateTrayMenu();
   },
   related: (id) => catalog.related(id),
+  artistGenres: (names) => artistGenres(names),
   home: () => catalog.home(),
   lyrics: (track) => lyrics.getLyrics(track),
   refreshLyrics: (track) => lyrics.refreshLyrics(track),
@@ -253,6 +255,27 @@ function createWindow() {
     if (/^https?:/.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
+
+  // The page's process can die (out of memory, a driver fault) with the app still running. Start it
+  // again by itself, unless it keeps happening, which needs a person.
+  const RELOAD_WINDOW_MS = 60 * 1000;
+  const MAX_RELOADS = 3;
+  let reloads = [];
+  const reloadPage = () => {
+    const now = Date.now();
+    reloads = reloads.filter((at) => now - at < RELOAD_WINDOW_MS);
+    if (reloads.length >= MAX_RELOADS) return;
+    reloads.push(now);
+    if (!win.isDestroyed()) win.webContents.reload();
+  };
+  win.webContents.on('render-process-gone', (_e, details) => {
+    console.warn('[app] page process gone:', details.reason);
+    if (details.reason !== 'clean-exit') setTimeout(reloadPage, 500);
+  });
+  win.webContents.on('did-fail-load', (_e, code, _text, _url, isMainFrame) => {
+    if (isMainFrame && code !== -3) setTimeout(reloadPage, 1500); // -3 is a load that was superseded
+  });
+  win.on('unresponsive', () => console.warn('[app] page not responding'));
 
   if (process.env.VITE_DEV_URL) win.loadURL(process.env.VITE_DEV_URL);
   else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));

@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link2, Share2, Users, X } from 'lucide-react';
+import { Eye, EyeOff, Link2, Share2, Users, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { auth } from '../lib/firebase.js';
 import { setPlaylistEditable, shareLink, sharePlaylist, stopSharing } from '../lib/sharedPlaylists.js';
+import { useLibrary } from '../store/library.js';
 import { toast, useUI } from '../store/ui.js';
 import { IS_ANDROID } from '../lib/platform.js';
 import { tr } from '../lib/i18n.js';
@@ -38,11 +39,24 @@ export default function SharePanel({ playlist }) {
 
   if (!auth.currentUser) return null;
 
+  const friendsToggle = isOwner && (
+    <button
+      className={`btn ${playlist.public ? 'on' : ''}`}
+      title={tr('친구가 내 프로필에서 이 플레이리스트를 볼 수 있어요')}
+      onClick={() => {
+        useLibrary.getState().setPlaylistPublic(playlist.id, !playlist.public);
+        toast(playlist.public ? tr('친구에게 공개하지 않습니다') : tr('친구에게 공개합니다'));
+      }}
+    >
+      {playlist.public ? <Eye size={15} /> : <EyeOff size={15} />}{' '}{playlist.public ? tr('친구에게 공개 중') : tr('친구에게 공개')}</button>
+  );
+
   if (!share) {
     return (
       <div className="share-panel">
         <button className="btn" disabled={busy} onClick={() => run(startSharing, tr('공유하지 못했습니다'))}>
           <Share2 size={15} />{' '}{tr('링크로 공유')}</button>
+        {friendsToggle}
       </div>
     );
   }
@@ -60,6 +74,7 @@ export default function SharePanel({ playlist }) {
     <div className="share-panel">
       <span className="share-note"><Share2 size={14} />{' '}{tr('링크를 가진 사람은 누구나 볼 수 있어요')}</span>
       <button className="btn" onClick={() => copy(share.id)}><Link2 size={15} />{' '}{tr('링크 복사')}</button>
+      {friendsToggle}
       <div className="seg">
         <button className={!share.editable ? 'on' : ''} disabled={busy} onClick={() => run(() => setPlaylistEditable(share.id, false), tr('변경하지 못했습니다'))}>{tr('보기만')}</button>
         <button className={share.editable ? 'on' : ''} disabled={busy} onClick={() => run(() => setPlaylistEditable(share.id, true), tr('변경하지 못했습니다'))}>{tr('같이 편집')}</button>

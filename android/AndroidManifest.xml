@@ -36,6 +36,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="tmusic" />
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="t-music-b8301.web.app" android:pathPrefix="/join/" />
+                <data android:scheme="https" android:host="t-music-b8301.web.app" android:pathPrefix="/playlist/" />
+            </intent-filter>
         </activity>
 
         <service

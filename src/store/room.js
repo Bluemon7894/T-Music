@@ -24,6 +24,9 @@ import { useDeck } from './deck.js';
 import { saveAlignment } from './lyricAlignments.js';
 import { bindRoom, roomPlayer, usePlayer } from './player.js';
 import { toast } from './ui.js';
+import { record } from './undo.js';
+import { followingCode, forgetFollowing, rememberFollowing } from '../lib/resume.js';
+import { LINK_HOST } from '../lib/links.js';
 import { tr } from '../lib/i18n.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -36,6 +39,8 @@ const MARK_ENDING_S = 6; // ahead of the end of the last track, members are told
 const MAX_SHARED_LYRICS = 200000;
 const TRACK_ID = /^[A-Za-z0-9_-]{11}$/;
 const SYNC_TICK_MS = 1000;
+const EMPTY_STOP_EVERY_TICKS = 10;
+const LEFT_ELSEWHERE_MS = 1500;
 const MAX_ADD_AT_ONCE = 200;
 const HOST_GRACE_MS = 30000;
 const IGNORE_DRIFT = 0.05;
@@ -57,7 +62,7 @@ function randomCode() {
 }
 
 export const normalizeCode = (text) => String(text || '').replace(/^.*join\//i, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH);
-export const inviteLink = (code) => `tmusic://join/${code}`;
+export const inviteLink = (code) => `${LINK_HOST}/join/${code}`;
 
 function myProfile() {
   const user = auth.currentUser;
@@ -103,6 +108,12 @@ export const useRoom = create((set, get) => {
   let pausedAlone = false; // came back to a room nobody is listening in
   let seenLyrics = new Map();
   let lyricsLoaded = false;
+  let wasInRoom = false; // this follow has seen our own entry in the member list
+  let restoringPresence = false;
+  let emptyStopArmed = false;
+  let ticks = 0;
+  let playingWhenDropped = false;
+  let resumeWhenAlone = false;
 
   const serverNow = () => Date.now() + serverOffset;
   const isHost = () => get().meta?.hostUid === myUid();
@@ -170,11 +181,31 @@ export const useRoom = create((set, get) => {
     roomPlayer.play();
   };
 
+  // The last one listening: the server stops the room's clock if this device disappears. Nothing else is
+  // left to do it, and the position it stops at is kept fresh here.
+  const armEmptyStop = () => {
+    const { code, playback: pb, connected } = get();
+    const alone = connected && pb?.playing && !othersListening();
+    if (alone) {
+      emptyStopArmed = true;
+      onDisconnect(dbRef(code, 'playback')).update({ playing: false, positionMs: Math.round(roomPlayer.time() * 1000), updatedAt: serverTimestamp(), by: myUid(), rev: (pb.rev || 0) + 1 }).catch(() => {});
+    } else if (emptyStopArmed) {
+      emptyStopArmed = false;
+      onDisconnect(dbRef(code, 'playback')).cancel().catch(() => {});
+    }
+  };
+
   // Small differences are closed by playing slightly faster or slower so nobody hears a jump.
   const followTick = () => {
+    if (++ticks % EMPTY_STOP_EVERY_TICKS === 0) armEmptyStop();
     const pb = get().playback;
     const player = usePlayer.getState();
     const track = player.current();
+    // The room moved on and the load here was missed: catch up rather than play the wrong song forever.
+    if (!pausedAlone && pb?.playing && pb.track && track?.id !== pb.track.id) {
+      applyPlayback(pb);
+      return;
+    }
     if (pausedAlone || !pb?.playing || !track || track.id !== pb.track?.id) {
       roomPlayer.setRate(1);
       if (get().driftMs !== null) set({ driftMs: null });
@@ -226,13 +257,66 @@ export const useRoom = create((set, get) => {
     }, HOST_GRACE_MS);
   };
 
+  // The owner is the room's host whenever they're here. Someone standing in hands it straight back.
+  const reclaimHost = () => {
+    const { code, attached, connected, meta } = get();
+    if (code && attached && connected && meta?.ownerUid === myUid() && meta.hostUid !== myUid()) {
+      update(dbRef(code, 'meta'), { hostUid: myUid() }).catch(() => {});
+    }
+  };
+
+  // The server can run the last connection's "gone" note after we've already reconnected, and another
+  // device on the same account can leave one behind. Both mark someone who's listening as away.
+  const keepMeListening = () => {
+    const { code, attached, connected, members } = get();
+    if (!attached || !connected) return;
+    const me = members[myUid()];
+    if (!me) {
+      // Left from another device: this one follows. Being removed by the host looks the same at first,
+      // and that has its own message, so give it a moment to arrive.
+      if (wasInRoom) {
+        wasInRoom = false;
+        setTimeout(() => {
+          if (get().code !== code || get().members[myUid()]) return;
+          stopRoom();
+          deleteDoc(myRoomDoc()).catch(() => {});
+        }, LEFT_ELSEWHERE_MS);
+      }
+      return;
+    }
+    wasInRoom = true;
+    if (me.listening === true || restoringPresence) return;
+    restoringPresence = true;
+    const memberRef = dbRef(code, 'members', myUid());
+    update(memberRef, { listening: true })
+      .then(() => onDisconnect(memberRef).update({ listening: false }))
+      .catch((e) => console.warn('[room]', e))
+      .finally(() => { restoringPresence = false; });
+  };
+
+  // Nobody's listening, so the music stops: it shouldn't be running on for an empty room.
+  const stopIfEmpty = () => {
+    const { code, playback, members } = get();
+    if (!code || !playback?.playing || !members[myUid()]) return;
+    if (Object.values(members).some((m) => m.listening)) return;
+    publish({ playing: false, positionMs: restingPosition(playback) * 1000 });
+  };
+
+  // Stopping following on this device, when it was the last one listening.
+  const stopIfLastListener = () => {
+    const { attached, playback } = get();
+    if (attached && playback?.playing && !othersListening()) publish({ playing: false, positionMs: roomPlayer.time() * 1000 });
+  };
+
   const hooks = {
     following: () => !canControl(),
     soundsOn: () => get().meta?.sounds === true,
     hasQueued: () => get().queue.length > 0,
     setModes(patch) {
       if (!canControl()) { refuse(); return; }
+      const before = Object.fromEntries(Object.keys(patch).map((key) => [key, get().modes?.[key] ?? (key === 'repeat' ? 'off' : false)]));
       update(dbRef(get().code, 'modes'), patch).catch(() => toast(tr('변경하지 못했습니다')));
+      record(tr('같이 듣기 재생 모드'), () => hooks.setModes(before));
     },
     // Put at the back of the shared queue, after anything already in it.
     loopQueue(current, waiting) {
@@ -313,10 +397,29 @@ export const useRoom = create((set, get) => {
         items[push(dbRef(code, 'queue')).key] = { track, by: myUid(), byName: name, order: first + i };
       });
       update(dbRef(code, 'queue'), items).catch(() => toast(tr('대기열에 추가하지 못했습니다')));
+      record(tr('같이듣기 대기열에 추가'), () => update(dbRef(code, 'queue'), Object.fromEntries(Object.keys(items).map((key) => [key, null]))));
       if (safe.length > list.length) toast(tr('한 번에 {0}곡까지 추가할 수 있어요. 앞의 {1}곡만 넣었습니다.', MAX_ADD_AT_ONCE, MAX_ADD_AT_ONCE));
       else if (next) toast(tr('같이듣기 대기열 맨 앞에 추가했습니다'));
       else toast(list.length > 1 ? tr('같이듣기 대기열에 {0}곡을 추가했습니다', list.length) : tr('같이듣기 대기열에 추가했습니다'));
     },
+  };
+
+  // Things that needed this person's place in the room to exist first.
+  const afterJoining = () => {
+    const { playback, pendingTracks } = get();
+    const alone = !othersListening();
+    // This device's connection dropped while it was the only listener, which stopped the room. Carry on.
+    const dropped = playingWhenDropped && playback && !playback.playing && playback.by === myUid();
+    if (playback && alone && (dropped || resumeWhenAlone)) {
+      pausedAlone = false;
+      publish({ playing: true, positionMs: (dropped ? roomPlayer.time() : restingPosition(playback)) * 1000 });
+    }
+    playingWhenDropped = false;
+    resumeWhenAlone = false;
+    if (pendingTracks?.length && canControl()) {
+      set({ pendingTracks: null });
+      hooks.enqueue(pendingTracks);
+    }
   };
 
   const startPresence = (code) => {
@@ -324,6 +427,8 @@ export const useRoom = create((set, get) => {
     const profile = myProfile();
     stopListeningPresence = onValue(ref(rtdb, '.info/connected'), async (snap) => {
       const connected = snap.val() === true;
+      if (!connected && get().connected) playingWhenDropped = !roomPlayer.isPaused();
+      emptyStopArmed = false;
       set({ connected });
       if (!connected) return;
       try {
@@ -331,6 +436,8 @@ export const useRoom = create((set, get) => {
         await update(memberRef, { ...profile, listening: true, ...(existing.exists() ? {} : { joinedAt: serverTimestamp() }) });
         // Only now: the rules check this against the member's whole entry, which must exist first.
         await onDisconnect(memberRef).update({ listening: false });
+        reclaimHost();
+        afterJoining();
       } catch (e) {
         console.warn('[room]', e);
       }
@@ -348,6 +455,10 @@ export const useRoom = create((set, get) => {
     hostTimer = null;
     correcting = false;
     pausedAlone = false;
+    wasInRoom = false;
+    if (emptyStopArmed && get().code) onDisconnect(dbRef(get().code, 'playback')).cancel().catch(() => {});
+    emptyStopArmed = false;
+    forgetFollowing();
     bindRoom(null);
     roomPlayer.release();
     roomPlayer.setRate(1);
@@ -388,6 +499,7 @@ export const useRoom = create((set, get) => {
         }
         set({ meta: snap.val() });
         watchHost();
+        reclaimHost();
         syncSounds();
         // We came back to a silent room and have now become its host: stop its clock.
         if (pausedAlone && isHost() && get().playback?.playing) {
@@ -398,6 +510,9 @@ export const useRoom = create((set, get) => {
       onValue(dbRef(code, 'members'), (snap) => {
         set({ members: realMembers(snap.val()) });
         watchHost();
+        keepMeListening();
+        reclaimHost();
+        stopIfEmpty();
       }),
       onValue(dbRef(code, 'modes'), (snap) => {
         set({ modes: snap.val() });
@@ -423,6 +538,7 @@ export const useRoom = create((set, get) => {
         const playback = snap.val();
         set({ playback });
         if (playback && get().attached) applyPlayback(playback);
+        stopIfEmpty();
       }),
       onValue(dbRef(code, 'queue'), (snap) => {
         // Items from older versions have no order and go after the rest, oldest first.
@@ -439,6 +555,7 @@ export const useRoom = create((set, get) => {
   const follow = async () => {
     const code = get().code;
     if (!code || get().attached) return;
+    resumeWhenAlone = true; // whoever starts listening in an empty room starts its music
     // Decide from the room as it is now: its listeners may not have delivered anything yet.
     let freshMeta;
     let freshMembers;
@@ -455,6 +572,7 @@ export const useRoom = create((set, get) => {
     if (get().code !== code || get().attached) return;
     set({ meta: freshMeta.val(), members: realMembers(freshMembers.val()), playback: freshPlayback.val(), modes: freshModes.val(), attached: true });
     bindRoom(hooks);
+    rememberFollowing(code);
     roomPlayer.setModes(freshModes.val());
     startPresence(code);
     tick = setInterval(followTick, SYNC_TICK_MS);
@@ -485,6 +603,7 @@ export const useRoom = create((set, get) => {
     driftMs: null, // how far behind the room we are, in milliseconds
     busy: false,
     error: null,
+    pendingTracks: null, // dropped on the room before being in one
 
     async create(name) {
       if (get().code || !myUid()) return;
@@ -572,10 +691,13 @@ export const useRoom = create((set, get) => {
         if (!code || get().code) return;
         const member = await dbGet(dbRef(code, 'members', myUid()));
         if (!member.val()?.name) {
+          forgetFollowing();
           await deleteDoc(myRoomDoc()).catch(() => {});
           return;
         }
         watchRoom(code);
+        // The app was killed, not closed on purpose: pick the room back up.
+        if (followingCode() === code) await follow();
       } catch (e) {
         console.warn('[room]', e);
       }
@@ -588,9 +710,44 @@ export const useRoom = create((set, get) => {
       const { code, attached } = get();
       if (!code || !attached) return;
       const memberRef = dbRef(code, 'members', myUid());
+      stopIfLastListener();
       stopFollowing();
       onDisconnect(memberRef).cancel().catch(() => {});
       update(memberRef, { listening: false }).catch(() => {});
+      record(tr('혼자 듣기'), () => get().follow());
+    },
+
+    // A guest became a Google account: the guest's seat, host or owner role goes to this account.
+    async swapMember(code, oldUid, oldToken) {
+      const uid = myUid();
+      const base = `${rtdb.app.options.databaseURL}/${roomPath(code)}`;
+      try {
+        const meta = (await dbGet(dbRef(code, 'meta'))).val();
+        const old = (await dbGet(dbRef(code, 'members', oldUid))).val();
+        if (!meta || !old) return;
+        await update(dbRef(code, 'members', uid), { ...myProfile(), joinedAt: old.joinedAt || Date.now(), listening: false });
+        const handover = {
+          ...(meta.hostUid === oldUid ? { 'meta/hostUid': uid } : {}),
+          ...(meta.ownerUid === oldUid ? { 'meta/ownerUid': uid } : {}),
+          [`members/${oldUid}`]: null,
+        };
+        const res = await fetch(`${base}.json?auth=${oldToken}`, { method: 'PATCH', body: JSON.stringify(handover) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        await setDoc(myRoomDoc(), { code });
+        if (get().code !== code) {
+          await get().disconnect();
+          watchRoom(code);
+        }
+        await follow();
+      } catch (e) {
+        console.warn('[room]', e);
+      }
+    },
+
+    // A new name or photo shows in the member list straight away.
+    syncProfile() {
+      const { code, attached } = get();
+      if (code && attached) update(dbRef(code, 'members', myUid()), myProfile()).catch(() => {});
     },
 
     // Stop following for this session without giving up the room (signing out, closing).
@@ -598,6 +755,7 @@ export const useRoom = create((set, get) => {
       if (!get().code) return;
       const memberRef = dbRef(get().code, 'members', myUid());
       update(memberRef, { listening: false }).catch(() => {});
+      stopIfLastListener();
       stopRoom();
     },
 
@@ -608,7 +766,10 @@ export const useRoom = create((set, get) => {
       const uid = myUid();
       const memberRef = dbRef(code, 'members', uid);
       const { meta } = get();
+      stopIfLastListener();
       stopRoom();
+      forgetFollowing();
+      record(tr('방 나가기'), () => get().join(code));
       try {
         await onDisconnect(memberRef).cancel();
         const everyone = realMembers((await dbGet(dbRef(code, 'members'))).val());
@@ -630,15 +791,19 @@ export const useRoom = create((set, get) => {
     },
 
     setControlMode(mode) {
-      if (isHost()) update(dbRef(get().code, 'meta'), { controlMode: mode }).catch(() => toast(tr('변경하지 못했습니다')));
+      if (!isHost()) return;
+      const before = get().meta?.controlMode;
+      update(dbRef(get().code, 'meta'), { controlMode: mode }).catch(() => toast(tr('변경하지 못했습니다')));
+      if (before !== mode) record(tr('조작 권한'), () => get().setControlMode(before));
     },
     makeHost(uid) {
-      if (isHost()) update(dbRef(get().code, 'meta'), { hostUid: uid, ownerUid: uid }).catch(() => toast(tr('변경하지 못했습니다')));
+      if (isHost() || get().meta?.ownerUid === myUid()) update(dbRef(get().code, 'meta'), { hostUid: uid, ownerUid: uid }).catch(() => toast(tr('변경하지 못했습니다')));
     },
     kick(uid) {
       const { code, meta } = get();
       if (!isHost() || uid === myUid() || uid === meta?.ownerUid) return;
       update(dbRef(code), { [`members/${uid}`]: null, [`kicked/${uid}`]: true }).catch(() => toast(tr('내보내지 못했습니다')));
+      record(tr('멤버 내보내기'), () => get().pardon(uid));
     },
     // Inviting someone back is how the host takes it back.
     pardon(uid) {
@@ -661,6 +826,7 @@ export const useRoom = create((set, get) => {
       const { code, queue } = get();
       if (!canControl()) { refuse(); return; }
       if (from === to || from < 0 || to < 0 || from >= queue.length || to >= queue.length) return;
+      record(tr('대기열 순서 변경'), () => get().moveInQueue(to, from));
       const next = queue.slice();
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
@@ -671,7 +837,13 @@ export const useRoom = create((set, get) => {
     },
     removeFromQueue(key) {
       if (!canControl()) { refuse(); return; }
-      remove(dbRef(get().code, 'queue', key)).catch(() => toast(tr('삭제하지 못했습니다')));
+      const { code, queue } = get();
+      const item = queue.find((q) => q.key === key);
+      remove(dbRef(code, 'queue', key)).catch(() => toast(tr('삭제하지 못했습니다')));
+      if (item) {
+        const { key: _, ...data } = item;
+        record(tr('대기열에서 삭제'), () => dbSet(dbRef(code, 'queue', key), { ...data, by: myUid(), track: safeTrack(data.track) }));
+      }
     },
     clearError() { set({ error: null }); },
   };

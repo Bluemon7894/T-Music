@@ -1,12 +1,26 @@
 // Motion helpers on top of anime.js v4.
 import { useLayoutEffect, useEffect } from 'react';
-import { animate, stagger, spring, createAnimatable, createTimeline, utils } from 'animejs';
+import { animate as animeAnimate, stagger, spring, createAnimatable, createTimeline, utils } from 'animejs';
 import { IS_ANDROID } from './platform.js';
 
 const systemReduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 export let reduced = systemReduced;
 export function setCalmMotion(on) {
   reduced = systemReduced || on;
+  calmMotion = on;
+}
+
+// With motion turned down, everything still ends up in the same place, just right away.
+export const animate = (targets, params) => animeAnimate(targets, reduced ? { ...params, duration: 1, delay: 0, ease: 'linear' } : params);
+
+const DECK_FRAME_MS = { calm: 1000, phone: 33, resting: 250 }; // with motion turned down, a deck all but stops
+let calmMotion = false;
+
+// How long a deck waits between drawing frames. A stopped disc barely needs drawing at all.
+export function deckFrameGap(resting) {
+  if (calmMotion) return DECK_FRAME_MS.calm;
+  if (resting) return DECK_FRAME_MS.resting;
+  return IS_ANDROID ? DECK_FRAME_MS.phone : 0;
 }
 
 export const ease = {
@@ -93,4 +107,4 @@ export function burst(el, color = '#c4b5fd') {
   animate(el, { scale: [1, 1.35, 1], duration: 420, ease: 'out(3)' });
 }
 
-export { animate, stagger, utils, createTimeline };
+export { stagger, utils, createTimeline };

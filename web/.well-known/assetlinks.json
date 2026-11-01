@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.bluemon7894.tmusic",
+      "sha256_cert_fingerprints": [
+        "E5:93:DA:84:4A:60:A7:E6:2A:15:07:0D:D6:D1:86:0E:07:B1:D5:33:98:AE:17:90:44:B0:58:E3:5B:B7:DE:8F"
+      ]
+    }
+  }
+]

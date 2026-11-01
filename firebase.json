@@ -4,5 +4,33 @@
   },
   "database": {
     "rules": "database.rules.json"
+  },
+  "hosting": {
+    "public": "web",
+    "ignore": [
+      "firebase.json",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/join/**",
+        "destination": "/index.html"
+      },
+      {
+        "source": "/playlist/**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      }
+    ]
   }
 }

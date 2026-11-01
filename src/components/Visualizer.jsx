@@ -2,6 +2,9 @@ import { useEffect, useRef } from 'react';
 import { getAnalyser } from '../lib/audio.js';
 import { usePlayer } from '../store/player.js';
 import { IS_ANDROID } from '../lib/platform.js';
+import { usePrefs } from '../store/prefs.js';
+
+const FRAME_MS = IS_ANDROID ? 50 : 0;
 
 // Spectrum drawn on canvas. `variant`: "bars" (horizontal strip) or "ring" (around a disc).
 // When paused or before audio starts it idles with a gentle synthetic wave.
@@ -10,8 +13,10 @@ export default function Visualizer({ variant = 'bars', bars = 48, innerRatio = 0
   const playing = usePlayer((s) => s.playing);
   const playingRef = useRef(playing);
   playingRef.current = playing;
+  const calm = usePrefs((s) => s.calmMotion);
 
   useEffect(() => {
+    if (calm) return undefined;
     const canvas = ref.current;
     const g = canvas.getContext('2d');
     let raf = 0;
@@ -27,8 +32,13 @@ export default function Visualizer({ variant = 'bars', bars = 48, innerRatio = 0
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
 
+    let drawn = 0;
     const draw = (t) => {
       raf = requestAnimationFrame(draw);
+      // A paused player has nothing to show. It settles, then stops being redrawn at all.
+      if (!playingRef.current && levels.every((v) => v < 0.005)) return;
+      if (t - drawn < FRAME_MS) return;
+      drawn = t;
       const W = canvas.width;
       const H = canvas.height;
       g.clearRect(0, 0, W, H);
@@ -46,7 +56,7 @@ export default function Visualizer({ variant = 'bars', bars = 48, innerRatio = 0
           const idx = Math.min(data.length - 1, Math.floor(Math.pow(i / bars, 1.6) * data.length * 0.75));
           target = data[idx] / 255;
         } else {
-          const amp = playingRef.current ? 0.35 : 0.12;
+          const amp = playingRef.current ? 0.35 : 0;
           target = amp * (0.5 + 0.5 * Math.sin(t / 380 + i * 0.45)) * (0.6 + 0.4 * Math.sin(t / 900 + i));
         }
         levels[i] += (target - levels[i]) * 0.25;
@@ -88,7 +98,8 @@ export default function Visualizer({ variant = 'bars', bars = 48, innerRatio = 0
     };
     raf = requestAnimationFrame(draw);
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, [variant, bars, innerRatio, spanRatio]);
+  }, [variant, bars, innerRatio, spanRatio, calm]);
 
+  if (calm) return null;
   return <canvas ref={ref} className={`viz viz-${variant} ${className}`} />;
 }

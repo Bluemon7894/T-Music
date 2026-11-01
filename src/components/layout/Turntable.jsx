@@ -8,7 +8,7 @@ import { DECKS, useDeck } from '../../store/deck.js';
 import { getAnalyser } from '../../lib/audio.js';
 import { Thumb } from '../common.jsx';
 import Visualizer from '../Visualizer.jsx';
-import { useTilt } from '../../lib/motion.js';
+import { deckFrameGap, useTilt } from '../../lib/motion.js';
 import logo from '../../assets/logo-mark.png';
 
 const DEGREES_PER_SECOND = 120; // one turn every 3 seconds
@@ -34,6 +34,7 @@ function useDeckMotion({ platter, arm, glow }) {
 
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
+      if (now - last < deckFrameGap(speed < 0.01 && !usePlayer.getState().playing && useDeck.getState().phase === 'idle')) return;
       const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
       const p = usePlayer.getState();

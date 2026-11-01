@@ -5,6 +5,7 @@ import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
 import { useEnter } from '../lib/motion.js';
+import { dropOnLibrary, useDrop } from '../lib/drag.js';
 import { openSharedPlaylist } from '../lib/sharedPlaylists.js';
 import { toast, useUI } from '../store/ui.js';
 import { Grid } from '../components/Cards.jsx';
@@ -76,13 +77,14 @@ export default function Library() {
     },
   });
 
+  const libDrop = useDrop(dropOnLibrary);
   const playlists = lib.playlists.map((p) => ({ kind: 'local', id: p.id, title: p.name, subtitle: tr('{0}곡', p.tracks.length), thumb: p.thumb || p.tracks[0]?.thumb }));
   const albums = lib.savedAlbums.map((a) => ({ ...a, kind: 'album' }));
   const artists = lib.followed.map((a) => ({ ...a, kind: 'artist' }));
   const items = tab === 'playlists' ? playlists : tab === 'albums' ? albums : tab === 'artists' ? artists : [...playlists, ...albums, ...artists];
 
   return (
-    <div className="page library" ref={ref}>
+    <div className={`page library ${libDrop.over ? 'playlist-drag-over' : ''}`} ref={ref} {...libDrop.dropProps}>
       <div className="page-title" data-enter>
         <h1>{tr('보관함')}</h1>
         <div className="row-btns">

@@ -56,6 +56,17 @@ export async function getClient() {
 
 export function resetClient() {
   client = null;
+  playerClient = null;
+}
+
+// Slower to set up because it downloads YouTube's player, so only made when nothing else has worked.
+let playerClient = null;
+export async function getPlayerClient() {
+  playerClient ??= Innertube.create({ lang: market.lang, location: market.location, retrieve_player: true }).catch((e) => {
+    playerClient = null;
+    throw e;
+  });
+  return playerClient;
 }
 
 export async function call(endpoint, payload) {

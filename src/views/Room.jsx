@@ -11,6 +11,8 @@ import { toast, useUI } from '../store/ui.js';
 import { api } from '../lib/api.js';
 import { useEnter } from '../lib/motion.js';
 import { IS_ANDROID } from '../lib/platform.js';
+import { dragProps, dropOnRoom, trackPayload, useDrop } from '../lib/drag.js';
+import { useNav } from '../store/nav.js';
 import { tr } from '../lib/i18n.js';
 
 function Lobby() {
@@ -19,9 +21,11 @@ function Lobby() {
   const { create, join } = useRoom.getState();
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const waiting = useRoom((s) => s.pendingTracks?.length || 0);
 
   return (
     <>
+      {waiting > 0 && <p className="room-note" data-enter>{tr('방을 만들거나 들어가면 {0}곡을 대기열에 넣을게요', waiting)}</p>}
       <div className="room-lobby">
         <form className="room-card" data-enter onSubmit={(e) => { e.preventDefault(); create(name); }}>
           <span className="room-card-icon"><Plus size={22} /></span>
@@ -56,7 +60,7 @@ function FriendInvites({ members }) {
           {list.map(([uid, f]) => (
             <li key={uid}>
               <i className={`room-dot ${f.online ? 'on' : ''}`} />
-              <span className="room-member-name">{f.name || '...'}</span>
+              <span className="room-member-name room-member-open" onClick={() => useNav.getState().go('friend', { uid })}>{f.name || '...'}</span>
               <button className="text-btn" onClick={() => inviteFriend(uid)}>{tr('초대')}</button>
             </li>
           ))}
@@ -97,6 +101,7 @@ function InRoom() {
   const [dropAt, setDropAt] = useState(null);
 
   const isHost = meta?.hostUid === uid;
+  const ownerUid = meta?.ownerUid || meta?.hostUid;
   const everyone = meta?.controlMode === 'everyone';
   const canReorder = isHost || everyone;
   const list = Object.entries(members).sort((a, b) => Number(Boolean(b[1].listening)) - Number(Boolean(a[1].listening)) || (a[1].joinedAt || 0) - (b[1].joinedAt || 0));
@@ -129,7 +134,7 @@ function InRoom() {
         <div className="room-hero-top">
           <div className="room-title">
             <small className={connected ? 'room-live on' : 'room-live'}>
-              {connected ? <Wifi size={13} /> : <WifiOff size={13} />} {syncLabel(driftMs, connected, attached)}
+              {!attached ? <HeadphoneOff size={13} /> : connected ? <Wifi size={13} /> : <WifiOff size={13} />} {syncLabel(driftMs, connected, attached)}
             </small>
             <h2 title={meta?.name}>{meta?.name || tr('같이 듣기')}</h2>
           </div>
@@ -144,7 +149,7 @@ function InRoom() {
           <div className="room-code" aria-label={tr('초대 코드')}>{code}</div>
           <button className="btn" onClick={() => copy(code, tr('초대 코드를 복사했습니다'))}><Copy size={15} />{' '}{tr('코드 복사')}</button>
           <button className="btn" onClick={() => copy(inviteLink(code), tr('초대 링크를 복사했습니다'))}><Link2 size={15} />{' '}{tr('링크 복사')}</button>
-          {IS_ANDROID && <button className="btn" onClick={() => api.shareText(tr('T-Music 같이 듣기에 초대합니다. 초대 코드: {0}', code))}><Share2 size={15} />{' '}{tr('보내기')}</button>}
+          {IS_ANDROID && <button className="btn" onClick={() => api.shareText(tr('T-Music 같이 듣기에 초대합니다. {0}', inviteLink(code)))}><Share2 size={15} />{' '}{tr('보내기')}</button>}
         </div>
         {!attached && <p className="room-note">{tr('이 방에 계속 들어와 있어요. 시작을 누르면 지금 방의 곡을 같이 들어요.')}</p>}
         {attached && !hostListening && listening > 1 && <p className="room-note">{tr('방장이 자리를 비웠어요. 30초 안에 돌아오지 않으면 가장 오래 있던 멤버가 대신 방장이 돼요.')}</p>}
@@ -188,7 +193,7 @@ function InRoom() {
                 ? <img className="avatar" src={safePhoto(m.photo)} alt="" referrerPolicy="no-referrer" draggable={false} />
                 : <span className="avatar fallback"><Users size={15} /></span>}
               <i className={`room-dot ${m.listening ? 'on' : ''}`} title={m.listening ? tr('듣는 중') : tr('자리 비움')} />
-              <span className="room-member-name">{m.name}{memberUid === uid && <small>{' '}{tr('(나)')}</small>}</span>
+              <span className={`room-member-name ${friends[memberUid] ? 'room-member-open' : ''}`} onClick={friends[memberUid] ? () => useNav.getState().go('friend', { uid: memberUid }) : undefined}>{m.name}{memberUid === uid && <small>{' '}{tr('(나)')}</small>}</span>
               <span className="room-member-actions">
                 {memberUid !== uid && !friends[memberUid] && (
                   sentRequests[memberUid]
@@ -199,9 +204,11 @@ function InRoom() {
                       </button>
                     )
                 )}
-                {memberUid === meta?.hostUid
+                {memberUid === ownerUid
                   ? <span className="room-badge"><Crown size={12} />{' '}{tr('방장')}</span>
-                  : isHost && <button className="text-btn" onClick={() => makeHost(memberUid)}>{tr('방장 넘기기')}</button>}
+                  : memberUid === meta?.hostUid
+                    ? <span className="room-badge standing-in" title={tr('방장이 돌아오면 다시 넘어가요')}>{tr('대신 진행 중')}</span>
+                    : (uid === ownerUid) && <button className="text-btn" onClick={() => makeHost(memberUid)}>{tr('방장 넘기기')}</button>}
                 {isHost && memberUid !== uid && memberUid !== meta?.ownerUid && (
                   <button className="text-btn room-kick" onClick={() => confirmKick(memberUid, m.name)}>{tr('내보내기')}</button>
                 )}
@@ -219,10 +226,10 @@ function InRoom() {
               <li
                 key={item.key}
                 className={dropAt === i ? 'drop-target' : ''}
-                draggable={canReorder && !IS_ANDROID}
+                draggable={!IS_ANDROID}
                 onDragStart={(e) => {
-                  e.dataTransfer.setData('text/room-queue', String(i));
-                  e.dataTransfer.effectAllowed = 'move';
+                  dragProps(() => trackPayload(item.track)).onDragStart(e);
+                  if (canReorder) e.dataTransfer.setData('text/room-queue', String(i));
                 }}
                 onDragOver={(e) => {
                   if (!e.dataTransfer.types.includes('text/room-queue')) return;
@@ -279,9 +286,10 @@ export default function Room() {
   const user = useAccount((s) => s.user);
   const ref = useRef(null);
   useEnter(ref, [Boolean(code), Boolean(user)], { step: 50 });
+  const { over, dropProps } = useDrop(dropOnRoom, { enabled: Boolean(user) });
 
   return (
-    <div className="page room" ref={ref}>
+    <div className={`page room ${over ? 'playlist-drag-over' : ''}`} ref={ref} {...dropProps}>
       <div className="page-title" data-enter><h1>{tr('같이 듣기')}</h1></div>
       {!user && (
         <Empty icon={Users} title={tr('로그인이 필요해요')} text={tr('같이 듣기는 인터넷에 연결해 로그인해야 쓸 수 있어요.')}>

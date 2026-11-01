@@ -7,6 +7,7 @@ import { auth, db } from './firebase.js';
 import { safeTrack } from './safeTrack.js';
 import { useLibrary } from '../store/library.js';
 import { toast, useUI } from '../store/ui.js';
+import { LINK_HOST } from './links.js';
 import { tr } from './i18n.js';
 
 const ID_LENGTH = 22;
@@ -17,7 +18,7 @@ const sharedDoc = (id) => doc(db, 'sharedPlaylists', id);
 const myUid = () => auth.currentUser?.uid ?? null;
 const idsOf = (tracks) => tracks.map((t) => t.id).join();
 
-export const shareLink = (id) => `tmusic://playlist/${id}`;
+export const shareLink = (id) => `${LINK_HOST}/playlist/${id}`;
 export const parseShareId = (text) => String(text || '').trim().replace(/^.*playlist\//i, '').replace(/[^A-Za-z0-9]/g, '');
 export const canEditPlaylist = (p) => !p.share || p.share.ownerUid === myUid() || p.share.editable === true;
 

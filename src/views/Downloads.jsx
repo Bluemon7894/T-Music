@@ -6,6 +6,7 @@ import { useNav } from '../store/nav.js';
 import { useUI } from '../store/ui.js';
 import { fmtBytes, totalTime } from '../lib/util.js';
 import { useEnter } from '../lib/motion.js';
+import { dropOnDownloads, useDrop } from '../lib/drag.js';
 import { IS_ANDROID, THIS_DEVICE } from '../lib/platform.js';
 import { Thumb, PlayButton, Empty } from '../components/common.jsx';
 import TrackList from '../components/TrackList.jsx';
@@ -39,9 +40,10 @@ export default function Downloads() {
   const ref = useRef(null);
   useEnter(ref, [jobs.length > 0, items.length > 0]);
   const context = { name: tr('다운로드한 곡') };
+  const { over, dropProps } = useDrop(dropOnDownloads);
 
   return (
-    <div className="page downloads" ref={ref}>
+    <div className={`page downloads ${over ? 'playlist-drag-over' : ''}`} ref={ref} {...dropProps}>
       <div className="dl-hero" data-enter>
         <div className="dl-hero-icon"><ArrowDownToLine size={40} /></div>
         <div className="dl-hero-text">

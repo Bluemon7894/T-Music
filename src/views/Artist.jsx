@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react';
-import { BadgeCheck, Radio, Shuffle } from 'lucide-react';
+import { BadgeCheck, ChevronDown, Quote, Radio, Shuffle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { usePlayer } from '../store/player.js';
 import { useLibrary } from '../store/library.js';
@@ -29,9 +29,12 @@ function AboutText({ text }) {
   }, [text, open]);
 
   return (
-    <div className="about-body">
-      <p ref={box} className={open ? 'open' : ''}>{text}</p>
-      {(cut || open) && <button className="text-btn about-more" onClick={() => setOpen(!open)}>{open ? tr('간단히 보기') : tr('더 보기')}</button>}
+    <div className={`about-text ${open ? 'open' : ''} ${cut && !open ? 'cut' : ''}`}>
+      <p ref={box}>{text}</p>
+      {(cut || open) && (
+        <button className="about-more" onClick={() => setOpen(!open)}>
+          <ChevronDown size={15} />{' '}{open ? tr('간단히 보기') : tr('더 보기')}</button>
+      )}
     </div>
   );
 }
@@ -91,8 +94,15 @@ export default function Artist({ id }) {
           {a.description && (
             <section className="about" data-enter>
               <h2>{tr('소개')}</h2>
-              <div className="about-card" style={{ backgroundImage: a.thumb ? `url("${a.thumb}")` : undefined }}>
-                <div className="about-shade" />
+              <div className="about-card">
+                <header className="about-head">
+                  {a.thumb ? <img className="about-photo" src={a.thumb} alt="" draggable={false} /> : <span className="about-photo" />}
+                  <div className="about-who">
+                    <b title={a.name}>{a.name}</b>
+                    {a.subscribers && <small>{tr('구독자 {0}명', a.subscribers)}</small>}
+                  </div>
+                  <Quote size={22} className="about-mark" />
+                </header>
                 <AboutText text={a.description} />
               </div>
             </section>

@@ -12,18 +12,31 @@ import Visualizer from '../Visualizer.jsx';
 import LyricsView from './LyricsView.jsx';
 import { fmtTime } from '../../lib/util.js';
 import { auth } from '../../lib/firebase.js';
+import { dragProps, dropOnQueue, trackPayload, useDrop } from '../../lib/drag.js';
 import { useTilt, animate, ease } from '../../lib/motion.js';
 import { IS_ANDROID } from '../../lib/platform.js';
 import logo from '../../assets/logo-mark.png';
 import { tr } from '../../lib/i18n.js';
 
-function QueueRow({ track, onPlay, current, menu, index }) {
+// `order` identifies the row within its list, and `onMove(from, to)` takes a row dropped onto this one.
+function QueueRow({ track, onPlay, current, menu, index, order, onMove }) {
   const openMenu = useUI((s) => s.openMenu);
   const playing = usePlayer((s) => s.playing);
+  const { over, dropProps } = useDrop((payload) => {
+    if (Number.isInteger(payload.order) && payload.list === onMove?.list) onMove.to(payload.order, order);
+    else return dropOnQueue(payload);
+  }, { enabled: Boolean(onMove), effect: 'move' });
   return (
-    <div className={`q-row ${current ? 'current' : ''}`} onClick={IS_ANDROID ? onPlay : undefined} onDoubleClick={IS_ANDROID ? undefined : onPlay} onContextMenu={(e) => openMenu(e, menu)}>
+    <div
+      className={`q-row ${current ? 'current' : ''} ${over ? 'drag-over' : ''}`}
+      onClick={IS_ANDROID ? onPlay : undefined}
+      onDoubleClick={IS_ANDROID ? undefined : onPlay}
+      onContextMenu={(e) => openMenu(e, menu)}
+      {...dragProps(() => ({ ...trackPayload(track), order, list: onMove?.list }))}
+      {...dropProps}
+    >
       <span className="q-idx">{current ? <Equalizer playing={playing} /> : index}</span>
-      <Thumb src={track.thumb} className="q-thumb" />
+      <Thumb src={track.thumb} className="q-thumb" videoId={track.id} />
       <div className="q-text">
         <div className="q-name">{track.title}</div>
         <ArtistLinks artists={track.artists} className="q-artist" />
@@ -97,7 +110,7 @@ function RoomQueueSection() {
           ...(canReorder && i < queue.length - 1 ? [{ label: tr('아래로'), icon: ChevronDown, onClick: () => moveInQueue(i, i + 1) }] : []),
           ...(canReorder ? [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeFromQueue(item.key) }] : []),
         ];
-        return <QueueRow key={item.key} index={i + 1} track={track} menu={trackMenuItems(track, extra)} />;
+        return <QueueRow key={item.key} index={i + 1} order={i} onMove={canReorder ? { list: 'room', to: moveInQueue } : undefined} track={track} menu={trackMenuItems(track, extra)} />;
       })}
       {!queue.length && !canReorder && <p className="np-hint">{tr('지금은 방장만 곡을 추가할 수 있어요.')}</p>}
       {!queue.length && canReorder && <p className="np-hint">{IS_ANDROID ? tr('곡의 ⋯ 버튼으로 대기열에 추가하면 멤버 모두의 다음 곡이 돼요.') : tr('곡을 우클릭해서 대기열에 추가하면 멤버 모두의 다음 곡이 돼요.')}</p>}
@@ -110,9 +123,10 @@ export function QueueList() {
   const queue = usePlayer((s) => s.queue);
   const index = usePlayer((s) => s.index);
   const autoplay = usePlayer((s) => s.autoplay);
-  const { jumpTo, removeAt } = usePlayer.getState();
+  const { jumpTo, removeAt, reorderQueue } = usePlayer.getState();
   const inRoom = useRoom((s) => s.attached);
   const cur = queue[index];
+  const move = { list: 'mine', to: reorderQueue };
   const upcoming = queue.map((t, i) => ({ t, i })).slice(index + 1);
   const manualUpcoming = upcoming.filter(({ t }) => !t.isAutoplay);
   const autoUpcoming = upcoming.filter(({ t }) => t.isAutoplay);
@@ -127,7 +141,7 @@ export function QueueList() {
         <>
           <div className="np-section"><span>{tr('다음 곡')}</span><small>{tr('{0}곡', manualUpcoming.length)}</small></div>
           {manualUpcoming.map(({ t, i }) => (
-            <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeAt(i) }])} />
+            <QueueRow key={t.id + i} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeAt(i) }])} />
           ))}
         </>
       )}
@@ -139,7 +153,7 @@ export function QueueList() {
             <small>{tr('{0}곡', autoUpcoming.length)}</small>
           </div>
           {autoUpcoming.map(({ t, i }) => (
-            <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeAt(i) }])} />
+            <QueueRow key={t.id + i} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeAt(i) }])} />
           ))}
         </>
       )}
@@ -184,9 +198,11 @@ export default function NowPanel() {
   const upcoming = queue.map((t, i) => ({ t, i })).slice(index + 1);
   const manualUpcoming = upcoming.filter(({ t }) => !t.isAutoplay);
   const autoUpcoming = upcoming.filter(({ t }) => t.isAutoplay);
+  const { over, dropProps } = useDrop((payload) => (Number.isInteger(payload.order) ? null : dropOnQueue(payload)));
+  const move = { list: 'mine', to: usePlayer.getState().reorderQueue };
 
   return (
-    <aside className="now-panel">
+    <aside className={`now-panel ${over ? 'drag-over' : ''}`} {...dropProps}>
       <div className="np-head">
         <div className="seg">
           <button className={panelTab === 'next' ? 'on' : ''} onClick={() => setPanelTab('next')}><Sparkles size={14} />{' '}{tr('지금 재생')}</button>
@@ -210,7 +226,7 @@ export default function NowPanel() {
                   {contextName && <small>{contextName}</small>}
                 </div>
                 {manualUpcoming.slice(0, 6).map(({ t, i }) => (
-                  <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
+                  <QueueRow key={t.id + i} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
                 ))}
               </>
             )}
@@ -222,7 +238,7 @@ export default function NowPanel() {
                   <small>{tr('{0}곡', autoUpcoming.length)}</small>
                 </div>
                 {autoUpcoming.slice(0, manualUpcoming.length > 0 ? Math.max(2, 6 - manualUpcoming.length) : 6).map(({ t, i }) => (
-                  <QueueRow key={t.id + i} index={i - index} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
+                  <QueueRow key={t.id + i} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
                 ))}
               </>
             )}

@@ -2,7 +2,7 @@ import { tr } from './i18n.js';
 const shorten = (value, max) => String(value || '').slice(0, max);
 const TRUSTED_THUMB = /^https:\/\/([\w-]+\.)*(ytimg\.com|ggpht\.com|googleusercontent\.com)\//;
 
-const TRUSTED_PHOTO = /^https:\/\/([\w-]+\.)*(googleusercontent\.com|ggpht\.com)\//;
+const TRUSTED_PHOTO = /^https:\/\/([\w-]+\.)*(googleusercontent\.com|ggpht\.com|ytimg\.com)\//;
 
 // Loading a picture from an address someone else chose would reveal our IP address to them.
 export const safePhoto = (url) => (TRUSTED_PHOTO.test(url || '') ? url : null);

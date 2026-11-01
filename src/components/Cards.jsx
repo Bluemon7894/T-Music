@@ -5,6 +5,8 @@ import { usePlayer } from '../store/player.js';
 import { useUI, toast } from '../store/ui.js';
 import { useLibrary } from '../store/library.js';
 import { api } from '../lib/api.js';
+import { dragProps, itemPayload } from '../lib/drag.js';
+import { usePrefs } from '../store/prefs.js';
 import { useTilt, useEnter, animate, ease, utils } from '../lib/motion.js';
 import { Thumb, PlayButton } from './common.jsx';
 import { trackMenuItems } from './TrackList.jsx';
@@ -70,9 +72,10 @@ export function Card({ item, size }) {
       onClick={() => openItem(item, go)}
       onContextMenu={onContextMenu}
       style={size ? { width: size } : undefined}
+      {...dragProps(() => itemPayload(item))}
     >
       <div className={`card-art ${round ? 'round' : ''}`} ref={art}>
-        <Thumb src={item.thumb} round={round} />
+        <Thumb src={item.thumb} round={round} videoId={item.kind === 'track' ? item.id : undefined} />
         <span className="glare" />
         <PlayButton className="card-play" size={44} onClick={() => playItem(item)} />
         {item.isRecent && (
@@ -161,7 +164,10 @@ export function CoverFlow({ items, onActive }) {
 
   const restart = useCallback(() => {
     clearInterval(timer.current);
-    timer.current = setInterval(() => setIndex((i) => (i + 1) % count), 5200);
+    // Turning by itself is decoration, so not when there's nobody looking or the motion is turned down.
+    timer.current = setInterval(() => {
+      if (!document.hidden && !usePrefs.getState().calmMotion) setIndex((i) => (i + 1) % count);
+    }, 5200);
   }, [count]);
   useEffect(() => { restart(); return () => clearInterval(timer.current); }, [restart]);
 
