@@ -11,3 +11,5 @@ dist-android/
 android/release.keystore
 android/keystore.properties
 android/test/out/
+
+.firebase/
