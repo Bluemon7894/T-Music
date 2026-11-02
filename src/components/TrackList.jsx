@@ -208,7 +208,7 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
             <span className="c-dur">
               <LikeButton track={t} className="hover-show" />
               <DownloadButton track={t} className="hover-show" size={16} />
-              <span className="dur">{fmtTime(t.duration)}</span>
+              <span className="dur">{t.timeLabel ?? (t.duration ? fmtTime(t.duration) : '')}</span>
               <button className="icon-btn hover-show" onClick={(e) => openMenu(e, trackMenuItems(t, extra))} aria-label={tr('더 보기')}><MoreHorizontal size={18} /></button>
             </span>
           </div>

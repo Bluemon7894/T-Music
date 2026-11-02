@@ -788,4 +788,5 @@ export default {
   "컨트리": "Country",
   "뉴에이지": "New age",
   "보컬로이드": "Vocaloid",
+  "1분 미만": "Under a minute",
 };

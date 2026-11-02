@@ -161,7 +161,7 @@ export default function FriendProfile({ uid }) {
           <section className="room-card fp-wide" data-enter>
             <h3><Disc3 size={16} />{' '}{tr('자주 듣는 곡')}{' '}<small>{tr('최근 30일')}</small></h3>
             {topTracks.length ? (
-              <TrackList tracks={topTracks.map((t) => ({ ...t, duration: 0, minutes: minutesOf[t.id] }))} context={{ name: tr('{0}님이 자주 듣는 곡', name) }} showAlbum={false} compact animate={false} />
+              <TrackList tracks={topTracks.map((t) => ({ ...t, timeLabel: minutesOf[t.id] >= 1 ? hoursAndMinutes(minutesOf[t.id]) : tr('1분 미만') }))} context={{ name: tr('{0}님이 자주 듣는 곡', name) }} showAlbum={false} compact animate={false} />
             ) : <Nothing hidden={hidden.includes('topTracks')} />}
           </section>
 
