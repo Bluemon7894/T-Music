@@ -39,16 +39,17 @@ export default function SharePanel({ playlist }) {
 
   if (!auth.currentUser) return null;
 
+  const shownToFriends = playlist.public !== false;
   const friendsToggle = isOwner && (
     <button
-      className={`btn ${playlist.public ? 'on' : ''}`}
+      className={`btn ${shownToFriends ? 'on' : ''}`}
       title={tr('친구가 내 프로필에서 이 플레이리스트를 볼 수 있어요')}
       onClick={() => {
-        useLibrary.getState().setPlaylistPublic(playlist.id, !playlist.public);
-        toast(playlist.public ? tr('친구에게 공개하지 않습니다') : tr('친구에게 공개합니다'));
+        useLibrary.getState().setPlaylistPublic(playlist.id, !shownToFriends);
+        toast(shownToFriends ? tr('친구에게 공개하지 않습니다') : tr('친구에게 공개합니다'));
       }}
     >
-      {playlist.public ? <Eye size={15} /> : <EyeOff size={15} />}{' '}{playlist.public ? tr('친구에게 공개 중') : tr('친구에게 공개')}</button>
+      {shownToFriends ? <Eye size={15} /> : <EyeOff size={15} />}{' '}{shownToFriends ? tr('친구에게 공개 중') : tr('친구에게 공개')}</button>
   );
 
   if (!share) {

@@ -22,8 +22,8 @@ import { tr } from '../lib/i18n.js';
 const hoursAndMinutes = (minutes) => (minutes >= 60 ? tr('{0}시간 {1}분', Math.floor(minutes / 60), minutes % 60) : tr('{0}분', minutes));
 const listOf = (value) => (Array.isArray(value) ? value : Object.values(value || {}));
 
-function Private() {
-  return <p className="fp-private"><Lock size={13} />{' '}{tr('공개하지 않았어요')}</p>;
+function Nothing({ hidden }) {
+  return hidden ? <p className="fp-private"><Lock size={13} />{' '}{tr('공개하지 않았어요')}</p> : <p className="fp-private">{tr('아직 보여줄 내용이 없어요')}</p>;
 }
 
 function PublicPlaylist({ list, owner }) {
@@ -72,6 +72,7 @@ export default function FriendProfile({ uid }) {
   const genres = listOf(view.genres);
   const playlists = listOf(view.playlists);
   const time = view.time;
+  const hidden = listOf(view.hidden);
   const name = person.name || '...';
   const status = isMe ? null : !friend.online ? tr('오프라인') : friend.track ? (friend.playing ? tr('듣는 중') : tr('일시정지')) : tr('온라인');
 
@@ -135,12 +136,12 @@ export default function FriendProfile({ uid }) {
                 <div><b>{hoursAndMinutes(time.month || 0)}</b><span>{tr('최근 30일')}</span></div>
                 <div><b>{hoursAndMinutes(time.total || 0)}</b><span>{tr('최근 60일')}</span></div>
               </div>
-            ) : <Private />}
+            ) : <Nothing hidden={hidden.includes('time')} />}
           </section>
 
           <section className="room-card" data-enter>
             <h3><Tags size={16} />{' '}{tr('좋아하는 장르')}</h3>
-            {genres.length ? <div className="fp-genres">{genres.map((g) => <span key={g} className="fp-genre">{g}</span>)}</div> : <Private />}
+            {genres.length ? <div className="fp-genres">{genres.map((g) => <span key={g} className="fp-genre">{g}</span>)}</div> : <Nothing hidden={hidden.includes('genres')} />}
           </section>
 
           <section className="room-card fp-wide" data-enter>
@@ -154,19 +155,19 @@ export default function FriendProfile({ uid }) {
                   </li>
                 ))}
               </ol>
-            ) : <Private />}
+            ) : <Nothing hidden={hidden.includes('artists')} />}
           </section>
 
           <section className="room-card fp-wide" data-enter>
             <h3><Disc3 size={16} />{' '}{tr('자주 듣는 곡')}{' '}<small>{tr('최근 30일')}</small></h3>
             {topTracks.length ? (
               <TrackList tracks={topTracks.map((t) => ({ ...t, duration: 0, minutes: minutesOf[t.id] }))} context={{ name: tr('{0}님이 자주 듣는 곡', name) }} showAlbum={false} compact animate={false} />
-            ) : <Private />}
+            ) : <Nothing hidden={hidden.includes('topTracks')} />}
           </section>
 
           <section className="room-card fp-wide" data-enter>
             <h3><ListMusic size={16} />{' '}{tr('공개 플레이리스트')}</h3>
-            {playlists.length ? <ul className="fp-playlists">{playlists.map((p) => <PublicPlaylist key={p.name} list={p} owner={name} />)}</ul> : <Private />}
+            {playlists.length ? <ul className="fp-playlists">{playlists.map((p) => <PublicPlaylist key={p.name} list={p} owner={name} />)}</ul> : <Nothing hidden={hidden.includes('playlists')} />}
           </section>
         </div>
       )}

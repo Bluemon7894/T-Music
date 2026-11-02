@@ -475,4 +475,3 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .bar-handle { display: none; }
 /* Backdrops and glows cost the most to repaint: with motion turned down they go entirely. */
 html[data-motion="calm"] .m-bg, html[data-motion="calm"] .ph-backdrop, html[data-motion="calm"] .m-stage .stage-bg { display: none; }
-.lyr-nudge button { width: 36px; height: 34px; }

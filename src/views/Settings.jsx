@@ -15,6 +15,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { troubleNotes } from '../lib/trouble.js';
 import { useAsync } from '../components/common.jsx';
 import { AccountCard, FriendPrivacyCard } from '../components/Account.jsx';
 import { useLibrary } from '../store/library.js';
@@ -383,6 +384,11 @@ export default function Settings() {
               {hasUpdate && (
                 <button className="btn grad update-available-btn" onClick={openModal}>
                   <Sparkles size={14} />{' '}{tr('v{0} 업데이트 가능', latestVersion)}</button>
+              )}
+              {troubleNotes().length > 0 && (
+                <button className="btn" title={tr('재생이 끊겼을 때 남은 기록이에요. 원인을 찾을 때 쓸 수 있어요.')} onClick={async () => { await api.copyText(JSON.stringify(troubleNotes(), null, 1)); toast(tr('재생 문제 기록을 복사했어요')); }}>
+                  {tr('재생 문제 기록 복사')}
+                </button>
               )}
             </div>
           </section>

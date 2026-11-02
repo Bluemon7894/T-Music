@@ -6,13 +6,16 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { get as dbGet, ref, remove, serverTimestamp, set as dbSet } from 'firebase/database';
 import { auth, db, rtdb } from '../lib/firebase.js';
 import { api } from '../lib/api.js';
-import { safeTrack } from '../lib/safeTrack.js';
+import { safePhoto, safeTrack } from '../lib/safeTrack.js';
 import { useLibrary } from './library.js';
 import { record } from './undo.js';
 import { tr } from '../lib/i18n.js';
 
 export const MAX_BIO = 80;
 export const MAX_GENRES = 6;
+export const MAX_GENRE_LENGTH = 30;
+// What friends are shown of someone's listening unless they turn it off.
+export const DETAIL_SHARING = ['playlists', 'topTracks', 'time', 'artists', 'genres'];
 const PUBLISH_DELAY_MS = 20000;
 const TOP_TRACKS = 12;
 const TOP_ARTISTS = 8;
@@ -22,10 +25,29 @@ const TRACKS_PER_PLAYLIST = 100;
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const GENRE_CHOICES = ['K-Pop', tr('발라드'), tr('힙합'), 'R&B', tr('인디'), tr('록'), tr('팝'), 'J-Pop', 'OST', tr('재즈'), tr('클래식'), tr('로파이'), 'EDM', tr('게임 음악'), tr('애니메이션 음악')];
+// What's offered while typing a genre. Anything else can be typed as it is.
+export const GENRE_CHOICES = ['K-Pop', 'J-Pop', 'C-Pop', tr('팝'), tr('발라드'), tr('댄스'), tr('힙합'), tr('랩'), 'R&B', tr('소울'), tr('인디'), tr('록'), tr('메탈'), tr('펑크'), tr('포크'), tr('어쿠스틱'), tr('트로트'), tr('재즈'), tr('블루스'), tr('클래식'), tr('로파이'), 'EDM', tr('하우스'), tr('테크노'), tr('신스팝'), tr('시티팝'), tr('레게'), tr('라틴'), tr('컨트리'), tr('뉴에이지'), 'OST', tr('게임 음악'), tr('애니메이션 음악'), tr('보컬로이드'), 'CCM'];
 
 const profileDoc = () => doc(db, 'users', auth.currentUser.uid, 'state', 'profile');
 const friendViewRef = (uid) => ref(rtdb, `friendProfiles/${uid}`);
+
+// Kept on the device too, so the picture is there before the network answers.
+const photoKey = (uid) => `t-music-photo-${uid}`;
+const cachedPhoto = (uid) => {
+  try { return safePhoto(localStorage.getItem(photoKey(uid))); } catch { return null; }
+};
+function cachePhoto(uid, photo) {
+  try {
+    if (photo) localStorage.setItem(photoKey(uid), photo);
+    else localStorage.removeItem(photoKey(uid));
+  } catch { /* it's only a head start */ }
+}
+
+// The picture this account goes by: one it uploaded, then its chosen address, then Google's.
+export function photoToShow(user) {
+  const google = user.providerData.find((p) => p.providerId === 'google.com');
+  return useProfile.getState().photo || (user.photoURL || google?.photoURL || '').slice(0, 500) || null;
+}
 
 function topBy(entries, keyOf, limit) {
   const totals = new Map();
@@ -62,7 +84,8 @@ export const useProfile = create((set, get) => {
     const { bio, genres } = get();
     const now = Date.now();
     const recent = listens.filter((l) => now - l.at < MONTH_MS);
-    const view = {};
+    // So a friend can tell "kept private" from "nothing to show yet".
+    const view = { hidden: DETAIL_SHARING.filter((key) => !sharing[key]) };
     if (bio) view.bio = bio;
     if (sharing.time) {
       const minutes = (list) => Math.round(list.reduce((n, l) => n + (l.sec || 0), 0) / 60);
@@ -82,7 +105,7 @@ export const useProfile = create((set, get) => {
       if (merged.length) view.genres = merged;
     }
     if (sharing.playlists) {
-      view.playlists = playlists.filter((p) => p.public).slice(0, PUBLIC_PLAYLISTS).map((p) => ({
+      view.playlists = playlists.filter((p) => p.public !== false).slice(0, PUBLIC_PLAYLISTS).map((p) => ({
         name: String(p.name).slice(0, 100),
         count: p.tracks.length,
         tracks: p.tracks.slice(0, TRACKS_PER_PLAYLIST).map(safeTrack).filter(Boolean),
@@ -104,16 +127,20 @@ export const useProfile = create((set, get) => {
   return {
     bio: '',
     genres: [],
+    photo: null,
 
     async start(getSharing) {
       lastPublished = '';
+      const uid = auth.currentUser?.uid;
+      set({ photo: cachedPhoto(uid) });
       const schedule = () => {
         clearTimeout(timer);
         timer = setTimeout(() => publishNow(getSharing()).catch((e) => console.warn('[profile]', e)), PUBLISH_DELAY_MS);
       };
       try {
         const saved = (await getDoc(profileDoc())).data() || {};
-        set({ bio: String(saved.bio || '').slice(0, MAX_BIO), genres: Array.isArray(saved.genres) ? saved.genres.slice(0, MAX_GENRES) : [] });
+        set({ bio: String(saved.bio || '').slice(0, MAX_BIO), genres: Array.isArray(saved.genres) ? saved.genres.slice(0, MAX_GENRES) : [], photo: safePhoto(saved.photo) });
+        cachePhoto(uid, get().photo);
       } catch (e) {
         console.warn('[profile]', e);
       }
@@ -128,7 +155,7 @@ export const useProfile = create((set, get) => {
       clearTimeout(timer);
       stopWatching?.();
       stopWatching = null;
-      set({ bio: '', genres: [] });
+      set({ bio: '', genres: [], photo: null });
     },
 
     // Settings changed: friends should see it now, not in twenty seconds.
@@ -145,7 +172,14 @@ export const useProfile = create((set, get) => {
       record(tr('프로필 변경'), () => get().save(before, sharing));
     },
 
+    setPhoto(photo) {
+      cachePhoto(auth.currentUser?.uid, photo);
+      set({ photo });
+      setDoc(profileDoc(), { photo }, { merge: true }).catch((e) => console.warn('[profile]', e));
+    },
+
     async remove(uid) {
+      cachePhoto(uid, null);
       await remove(friendViewRef(uid)).catch(() => {});
     },
   };

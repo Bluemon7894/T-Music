@@ -17,6 +17,16 @@ const FAILS_BEFORE_COOLDOWN = 3;
 // This video can't be played. That says nothing about the client that was asked.
 class UnplayableError extends Error {}
 
+// A check for bots or a "try again later" is about whoever asked, and hits every video at once, so it must
+// not read as the video being unplayable. Reasons come in the language the app runs in.
+const ABOUT_THE_VIDEO = /\bage\b|private|member|연령|비공개|멤버십/i;
+const TRY_LATER = /try again|다시 시도|나중에/i;
+function refusedTheAsker(ps) {
+  const reason = ps?.reason || '';
+  if (ps?.status === 'LOGIN_REQUIRED') return !ABOUT_THE_VIDEO.test(reason);
+  return TRY_LATER.test(reason);
+}
+
 async function innertube(id, clientName, session = getClient) {
   const yt = await session();
   const info = await yt.getBasicInfo(id, { client: clientName }).catch((e) => {
@@ -24,7 +34,10 @@ async function innertube(id, clientName, session = getClient) {
     throw /unavailable|private|removed/i.test(e.message) ? new UnplayableError(e.message) : e;
   });
   const ps = info.playability_status;
-  if (ps?.status !== 'OK') throw new UnplayableError(ps?.reason || ps?.status || 'unplayable');
+  if (ps?.status !== 'OK') {
+    const reason = ps?.reason || ps?.status || 'unplayable';
+    throw refusedTheAsker(ps) ? new Error(reason) : new UnplayableError(reason);
+  }
   const fmt = info.chooseFormat({ type: 'audio', quality: 'best' });
   const url = await fmt.decipher(yt.session.player);
   if (!url) throw new Error('no url');

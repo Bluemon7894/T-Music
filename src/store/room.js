@@ -21,6 +21,7 @@ import { OFFLINE_MESSAGE, waitForConnection } from '../lib/online.js';
 import { safeTrack } from '../lib/safeTrack.js';
 import { api } from '../lib/api.js';
 import { useDeck } from './deck.js';
+import { photoToShow } from './profile.js';
 import { saveAlignment } from './lyricAlignments.js';
 import { bindRoom, roomPlayer, usePlayer } from './player.js';
 import { toast } from './ui.js';
@@ -68,8 +69,8 @@ function myProfile() {
   const user = auth.currentUser;
   const google = user.providerData.find((p) => p.providerId === 'google.com');
   const name = user.displayName || google?.displayName || tr('게스트 {0}', user.uid.slice(0, 4).toUpperCase());
-  const photo = user.photoURL || google?.photoURL || null;
-  return { name: name.slice(0, 40), ...(photo ? { photo: photo.slice(0, 500) } : {}) };
+  const photo = photoToShow(user);
+  return { name: name.slice(0, 40), ...(photo ? { photo } : {}) };
 }
 
 // A lost connection can write `listening` over a member the host just removed, leaving no name behind.
@@ -747,7 +748,7 @@ export const useRoom = create((set, get) => {
     // A new name or photo shows in the member list straight away.
     syncProfile() {
       const { code, attached } = get();
-      if (code && attached) update(dbRef(code, 'members', myUid()), myProfile()).catch(() => {});
+      if (code && attached) update(dbRef(code, 'members', myUid()), { photo: null, ...myProfile() }).catch(() => {});
     },
 
     // Stop following for this session without giving up the room (signing out, closing).

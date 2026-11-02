@@ -7,6 +7,7 @@ import { usePrefs } from './prefs.js';
 import { toast } from './ui.js';
 import { IS_ANDROID } from '../lib/platform.js';
 import { followingCode, lastPlayback } from '../lib/resume.js';
+import { noteTrouble } from '../lib/trouble.js';
 import { tr } from '../lib/i18n.js';
 
 // Phones set the volume with their own buttons, so the app stays at full level there.
@@ -127,6 +128,7 @@ function playWithDeck() {
   if (isEnding()) dropSound();
   if (hasStarted() || !soundsOn()) {
     setStarted(true);
+    usePlayer.setState({ playing: true });
     a.play().catch(() => {});
     return;
   }
@@ -267,6 +269,7 @@ export const usePlayer = create((set, get) => ({
     if (!tracks?.length) return;
     if (room && !room.allowTrackChange()) return;
     commitListen();
+    consecutiveErrors = 0;
     let queue = tracks.slice();
     let index = start;
     if (get().shuffle) {
@@ -351,6 +354,7 @@ export const usePlayer = create((set, get) => ({
   jumpTo(i) {
     if (room && !room.allowTrackChange()) return;
     commitListen();
+    consecutiveErrors = 0;
     set({ index: i });
     savePlayerState({ time: 0, wasPlaying: true });
     get()._load();
@@ -364,6 +368,10 @@ export const usePlayer = create((set, get) => ({
       dropSound();
       setStarted(false);
       set({ playing: false });
+      return;
+    }
+    if (isDead(a)) {
+      recover(get().time);
       return;
     }
     if (a.paused) {
@@ -380,7 +388,10 @@ export const usePlayer = create((set, get) => ({
 
   async next(auto = false) {
     if (room && !(auto ? room.allowAuto() : room.allowTrackChange())) return;
-    if (!auto) pressDeckKey('next');
+    if (!auto) {
+      pressDeckKey('next');
+      consecutiveErrors = 0;
+    }
     const { index, repeat, autoplay } = get();
     let { queue } = get();
     if (auto && repeat === 'one') {
@@ -488,7 +499,7 @@ export const usePlayer = create((set, get) => ({
     const a = active();
     if (a.currentTime > 3 || get().index <= 0) {
       if (room) room.seek(0);
-      else a.currentTime = 0;
+      else get().seek(0);
       return;
     }
     set({ index: get().index - 1 });
@@ -500,7 +511,13 @@ export const usePlayer = create((set, get) => ({
     const a = active();
     const dur = a.duration || get().duration || 0;
     const safeT = Math.max(0, dur > 0 ? Math.min(t, Math.max(0, dur - 0.5)) : t);
-    a.currentTime = safeT;
+    if (isDead(a)) {
+      set({ time: safeT });
+      recover(safeT);
+      return;
+    }
+    if (resumeAt != null) resumeAt = safeT;
+    else a.currentTime = safeT;
     set({ time: safeT });
     savePlayerState({ time: safeT });
   },
@@ -578,6 +595,10 @@ export const usePlayer = create((set, get) => ({
     currentListenTrack = track;
     const src = streamUrl(track.id);
     retried.delete(track.id);
+    stopRetrying();
+    resumeAt = null;
+    goodSince = 0;
+    earlyEnds = 0;
     if (isEnding()) dropSound();
     if (spare().dataset.id === track.id) {
       // Already buffered by _preloadNext: just swap.
@@ -903,7 +924,11 @@ const PHONE_TIME_STEP_S = 1;
 const WATCH_EVERY_MS = 3000;
 const STUCK_CHECKS = 3;
 const MAX_RELOADS = 3;
+const RETRY_EVERY_MS = 20000;
+const MAX_RETRIES = 15;
 let gaveUp = false; // stopped because nothing would play; a working connection brings it back
+let retryTimer = null;
+let resumeAt = null;
 let watchTimer = null;
 let watched = { id: null, time: -1, still: 0, reloads: 0 };
 
@@ -912,15 +937,61 @@ function reloadStream(from) {
   const id = a.dataset.id;
   if (!id) return;
   a.src = `${streamUrl(id)}?retry=${Date.now()}`;
-  if (from > 0) try { a.currentTime = from; } catch { /* set once it loads */ }
+  resumeAt = from > 0 ? from : null;
   attach(a);
   a.play().catch(() => {});
+}
+
+// A reload that hasn't answered yet knows nothing of where the track was, so that's kept apart from it.
+const whereItWas = (a) => resumeAt ?? (a.currentTime || usePlayer.getState().time);
+
+// An element that failed stays failed: play() and seeking do nothing until it is given a source again.
+const isDead = (a) => gaveUp || Boolean(a.error) || (Boolean(a.dataset.id) && a.networkState === a.NETWORK_NO_SOURCE);
+
+function stopRetrying() {
+  gaveUp = false;
+  clearInterval(retryTimer);
+  retryTimer = null;
+}
+
+// Someone pressed something, or the connection came back: start clean from where it was.
+function recover(from) {
+  const a = active();
+  stopRetrying();
+  consecutiveErrors = 0;
+  watched.still = 0;
+  watched.reloads = 0;
+  retried.delete(a.dataset.id);
+  usePlayer.setState({ playing: true, loading: true });
+  reloadStream(from);
+}
+
+// Whatever is wrong is wrong for the next track too, so stay on this one and keep trying it quietly.
+function giveUp(why) {
+  const a = active();
+  noteTrouble('gave up', { why, id: a.dataset.id });
+  a.pause();
+  usePlayer.setState({ playing: false, loading: false });
+  toast(tr('재생이 잘 되지 않아 잠시 멈췄어요. 연결이 돌아오면 이어서 재생해요.'));
+  consecutiveErrors = 0;
+  clearTimeout(errorSkipTimer);
+  stopRetrying();
+  gaveUp = true;
+  if (room) return;
+  let retries = 0;
+  retryTimer = setInterval(() => {
+    if (++retries > MAX_RETRIES) {
+      clearInterval(retryTimer);
+      retryTimer = null;
+    }
+    if (navigator.onLine !== false) reloadStream(whereItWas(active()));
+  }, RETRY_EVERY_MS);
 }
 
 function watchPlayback() {
   const player = usePlayer.getState();
   const a = active();
-  if (!player.current() || !a.dataset.id || isWaitingForMusic() || a.seeking) return;
+  if (!player.current() || !a.dataset.id || isWaitingForMusic()) return;
   if (!a.paused) {
     if (!isStarting() && !isEnding()) healSound();
     else wakeAudio();
@@ -944,11 +1015,12 @@ function watchPlayback() {
   watched.still = 0;
   if (++watched.reloads > MAX_RELOADS) {
     watched.reloads = 0;
-    a.dispatchEvent(new Event('error'));
+    giveUp('stuck');
     return;
   }
   console.warn('[player] stuck, reloading', a.dataset.id);
-  reloadStream(a.currentTime || player.time);
+  noteTrouble('stuck', { id: a.dataset.id, time: a.currentTime, reloads: watched.reloads, seeking: a.seeking, net: a.networkState, ready: a.readyState });
+  reloadStream(whereItWas(a));
 }
 
 function watchWhilePlaying(on) {
@@ -963,8 +1035,7 @@ usePlayer.subscribe((s, prev) => {
 // Back on the network or back on screen is the moment to check, rather than at the next tick.
 function comeBack() {
   if (gaveUp && navigator.onLine !== false) {
-    gaveUp = false;
-    reloadStream(active().currentTime || usePlayer.getState().time);
+    recover(whereItWas(active()));
     return;
   }
   if (!active().paused) {
@@ -980,17 +1051,22 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) come
 let lastTimeSave = 0;
 let consecutiveErrors = 0;
 let errorSkipTimer = null;
+let goodSince = 0;
+let earlyEnds = 0;
+// Starting says little: a stream can play its first minute and refuse the rest. This much means it works.
+const GOOD_PLAY_MS = 90000;
+const MAX_EARLY_ENDS = 3;
 const appHidden = () => document.hidden || (IS_ANDROID && !document.hasFocus());
 
 audios.forEach((a, i) => {
   const isActive = () => i === cur;
   a.addEventListener('playing', () => {
     if (isActive()) {
-      consecutiveErrors = 0;
       clearTimeout(errorSkipTimer);
       usePlayer.setState({ playing: true, loading: false });
       wakeAudio();
-      gaveUp = false;
+      stopRetrying();
+      goodSince ||= performance.now();
       const curTrack = usePlayer.getState().current();
       startListening(curTrack);
       startAudioOnsetDetection(a, curTrack?.id);
@@ -999,7 +1075,8 @@ audios.forEach((a, i) => {
   });
   a.addEventListener('pause', () => {
     if (isActive()) {
-      usePlayer.setState({ playing: false, time: a.currentTime });
+      goodSince = 0;
+      usePlayer.setState({ playing: false, time: a.currentTime, ...(a.paused ? { loading: false } : {}) });
       if (isEnding() && !isEndCommitted() && a.duration - a.currentTime > 0.5) dropSound();
       if (isStarting() && !isWaitingForMusic()) dropSound();
       pauseListening();
@@ -1009,6 +1086,7 @@ audios.forEach((a, i) => {
   });
   a.addEventListener('waiting', () => {
     if (isActive()) {
+      goodSince = 0;
       usePlayer.setState({ loading: true });
       pauseListening();
     }
@@ -1021,8 +1099,9 @@ audios.forEach((a, i) => {
   });
   a.addEventListener('timeupdate', () => {
     if (!isActive()) return;
-    if (a.currentTime > 1) {
+    if (goodSince && performance.now() - goodSince > GOOD_PLAY_MS) {
       consecutiveErrors = 0;
+      retried.delete(a.dataset.id);
     }
     // Nobody can see a progress bar with the screen off, and every update redraws it.
     if (!appHidden() && (!IS_ANDROID || Math.abs(a.currentTime - usePlayer.getState().time) >= PHONE_TIME_STEP_S)) {
@@ -1046,18 +1125,24 @@ audios.forEach((a, i) => {
       savePlayerState({ time: a.currentTime, wasPlaying: !a.paused });
     }
   });
+  a.addEventListener('loadedmetadata', () => {
+    if (!isActive() || resumeAt == null) return;
+    a.currentTime = resumeAt;
+    resumeAt = null;
+  });
   a.addEventListener('seeked', () => { if (isActive()) window.dispatchEvent(new CustomEvent('t-music:seeked')); });
   a.addEventListener('durationchange', () => isActive() && isFinite(a.duration) && usePlayer.setState({ duration: a.duration }));
   a.addEventListener('ended', () => {
     if (!isActive()) return;
-    consecutiveErrors = 0;
     const dur = a.duration || 0;
     // Guard against premature 'ended' events caused by network truncations:
-    if (dur > 0 && dur - a.currentTime > 3) {
+    if (dur > 0 && dur - a.currentTime > 3 && ++earlyEnds <= MAX_EARLY_ENDS) {
       console.warn('Playback ended prematurely at', a.currentTime, 'of', dur);
+      noteTrouble('ended early', { id: a.dataset.id, time: a.currentTime, duration: dur });
       reloadStream(a.currentTime);
       return;
     }
+    consecutiveErrors = 0;
     commitListen();
     savePlayerState({ time: 0, wasPlaying: true });
     usePlayer.getState().next(true);
@@ -1066,13 +1151,17 @@ audios.forEach((a, i) => {
     const id = a.dataset.id;
     if (!id) return;
     if (!isActive()) { a.dataset.id = ''; return; } // preload failed; retry when it becomes current
+    goodSince = 0;
+    noteTrouble('error', { id, code: a.error?.code, message: a.error?.message, time: a.currentTime, net: a.networkState, offline: navigator.onLine === false });
+    if (gaveUp) return; // one of the quiet retries; there will be another
+    if (navigator.onLine === false) {
+      giveUp('offline');
+      return;
+    }
     if (!retried.has(id)) {
       // One retry: the main process fetches a fresh URL if the first one died.
       retried.add(id);
-      const t = a.currentTime;
-      a.src = streamUrl(id) + '?retry=' + Date.now();
-      a.currentTime = t;
-      a.play().catch(() => {});
+      reloadStream(whereItWas(a));
       return;
     }
     consecutiveErrors++;
@@ -1081,12 +1170,7 @@ audios.forEach((a, i) => {
 
     // Circuit breaker: prevent rapid cascading skip of entire queue on network/stream outage
     if (consecutiveErrors >= 3) {
-      active().pause();
-      usePlayer.setState({ playing: false, loading: false });
-      toast(tr('연속으로 음원을 재생할 수 없어 재생을 일시정지했습니다. 네트워크 연결을 확인해주세요.'));
-      consecutiveErrors = 0;
-      clearTimeout(errorSkipTimer);
-      gaveUp = true;
+      giveUp('errors');
       return;
     }
 

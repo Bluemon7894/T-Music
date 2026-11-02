@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Check, CloudCheck, CloudOff, Copy, Eye, Library, LogIn, LogOut, RefreshCw, Settings, Trash2, UserRound, Users } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { CloudCheck, CloudOff, Copy, Eye, ImagePlus, Library, LogIn, LogOut, Plus, RefreshCw, Settings, Trash2, UserRound, Users, X } from 'lucide-react';
 import { useAccount } from '../store/account.js';
-import { DETAIL_SHARING, useFriends } from '../store/friends.js';
-import { GENRE_CHOICES, MAX_BIO, MAX_GENRES, useProfile } from '../store/profile.js';
+import { useFriends } from '../store/friends.js';
+import { GENRE_CHOICES, MAX_BIO, MAX_GENRE_LENGTH, MAX_GENRES, useProfile } from '../store/profile.js';
 import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { useUpdater } from '../store/updater.js';
 import { toast, useUI } from '../store/ui.js';
 import { api } from '../lib/api.js';
+import { photoFromFile } from '../lib/photo.js';
 import { useSync } from '../lib/librarySync.js';
 import { GoogleMark } from '../views/Login.jsx';
 import { THIS_DEVICE } from '../lib/platform.js';
@@ -112,7 +113,7 @@ export function AccountButton() {
 }
 
 const DETAIL_ROWS = [
-  { key: 'playlists', title: tr('공개 플레이리스트'), text: tr('플레이리스트 화면에서 친구에게 공개로 표시한 것만 보여요.') },
+  { key: 'playlists', title: tr('공개 플레이리스트'), text: tr('플레이리스트 화면에서 공개를 끈 것은 빼고 보여요.') },
   { key: 'topTracks', title: tr('자주 듣는 곡'), text: tr('최근 30일 동안 오래 들은 곡을 보여요.') },
   { key: 'artists', title: tr('자주 듣는 아티스트'), text: tr('최근 30일 동안 오래 들은 아티스트를 보여요.') },
   { key: 'time', title: tr('청취 시간'), text: tr('이번 주와 최근 30일, 60일 청취 시간을 보여요.') },
@@ -143,7 +144,7 @@ export function FriendPrivacyCard() {
         <div className={`switch ${sharing.online && sharing.track ? 'on' : ''}`} />
       </div>
       {DETAIL_ROWS.map(({ key, title, text }) => (
-        <div key={key} className="set-item" onClick={() => setSharing({ [key]: !sharing[key], asked: true })}>
+        <div key={key} className="set-item" onClick={() => setSharing({ [key]: !sharing[key] })}>
           <div className="set-item-text">
             <span className="set-item-title">{title}</span>
             <span className="muted small">{text}</span>
@@ -152,6 +153,51 @@ export function FriendPrivacyCard() {
         </div>
       ))}
     </section>
+  );
+}
+
+const MAX_SUGGESTIONS = 6;
+// Taken apart into letters, so 바 already finds 발라드 while it's still being typed.
+const forSearch = (text) => text.normalize('NFKD').toLowerCase().replace(/\s+/g, '');
+
+function GenreField({ genres, onSave }) {
+  const [typed, setTyped] = useState('');
+  const wanted = forSearch(typed);
+  const suggestions = wanted ? GENRE_CHOICES.filter((g) => !genres.includes(g) && forSearch(g).includes(wanted)).slice(0, MAX_SUGGESTIONS) : [];
+  const add = (text) => {
+    const genre = text.trim().slice(0, MAX_GENRE_LENGTH);
+    setTyped('');
+    if (!genre || genres.some((g) => g.toLowerCase() === genre.toLowerCase())) return;
+    if (genres.length < MAX_GENRES) onSave([...genres, genre]);
+    else toast(tr('장르는 {0}개까지 고를 수 있어요', MAX_GENRES));
+  };
+  return (
+    <div className="profile-field">
+      <span>{tr('좋아하는 장르')}</span>
+      {genres.length > 0 && (
+        <div className="profile-genres">
+          {genres.map((genre) => (
+            <button key={genre} className="chip on" title={tr('빼기')} onClick={() => onSave(genres.filter((g) => g !== genre))}>{genre}<X size={13} /></button>
+          ))}
+        </div>
+      )}
+      <div className="profile-genre-add">
+        <input
+          value={typed}
+          maxLength={MAX_GENRE_LENGTH}
+          onChange={(e) => setTyped(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) add(typed); }}
+          placeholder={tr('장르를 입력해 보세요')}
+          aria-label={tr('장르 추가')}
+        />
+        <button className="btn" disabled={!typed.trim()} title={tr('장르 추가')} aria-label={tr('장르 추가')} onClick={() => add(typed)}><Plus size={16} /></button>
+      </div>
+      {suggestions.length > 0 && (
+        <div className="profile-genres profile-suggest">
+          {suggestions.map((genre) => <button key={genre} className="chip" onClick={() => add(genre)}><Plus size={13} />{genre}</button>)}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -174,13 +220,21 @@ function ProfileEditor({ user }) {
     setDisplay({ name: clean }).catch(() => toast(tr('저장하지 못했습니다')));
   };
   const commitBio = () => { if (about.trim() !== bio) save({ bio: about.trim().slice(0, MAX_BIO) }, sharing); };
-  const toggleGenre = (genre) => {
-    if (genres.includes(genre)) save({ genres: genres.filter((g) => g !== genre) }, sharing);
-    else if (genres.length < MAX_GENRES) save({ genres: [...genres, genre] }, sharing);
-    else toast(tr('장르는 {0}개까지 고를 수 있어요', MAX_GENRES));
-  };
   const covers = [...new Set(recent.map((t) => t.thumb).filter(Boolean))].slice(0, 6);
   const setPhoto = (photo) => setDisplay({ photo }).catch(() => toast(tr('저장하지 못했습니다')));
+  const picker = useRef(null);
+  const uploaded = String(user.photo || '').startsWith('data:');
+  const pickedFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      setPhoto(await photoFromFile(file));
+    } catch (err) {
+      console.warn('[profile]', err);
+      toast(tr('이 사진은 쓸 수 없어요. 다른 사진을 골라 주세요.'));
+    }
+  };
 
   return (
     <div className="profile-edit">
@@ -195,22 +249,16 @@ function ProfileEditor({ user }) {
       </label>
       <div className="profile-field">
         <span>{tr('프로필 사진')}</span>
+        <input ref={picker} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickedFile} />
         <div className="profile-photos">
+          <button className="profile-photo profile-photo-add" onClick={() => picker.current.click()} title={tr('내 사진 올리기')} aria-label={tr('내 사진 올리기')}><ImagePlus size={20} /></button>
+          {uploaded && <span className="profile-photo on" title={tr('내가 올린 사진')}><img src={user.photo} alt="" /></span>}
           <button className={`profile-photo ${!user.photo ? 'on' : ''}`} onClick={() => setPhoto(null)} title={tr('기본 사진')}><UserRound size={20} /></button>
           {user.googlePhoto && <button className={`profile-photo ${user.photo === user.googlePhoto ? 'on' : ''}`} onClick={() => setPhoto(user.googlePhoto)} title={tr('Google 사진')}><img src={user.googlePhoto} alt="" referrerPolicy="no-referrer" /></button>}
           {covers.map((cover) => <button key={cover} className={`profile-photo ${user.photo === cover ? 'on' : ''}`} onClick={() => setPhoto(cover)} title={tr('최근 들은 곡의 앨범 아트')}><img src={cover} alt="" /></button>)}
         </div>
       </div>
-      <div className="profile-field">
-        <span>{tr('좋아하는 장르')}</span>
-        <div className="profile-genres">
-          {GENRE_CHOICES.map((genre) => (
-            <button key={genre} className={`chip ${genres.includes(genre) ? 'on' : ''}`} onClick={() => toggleGenre(genre)}>
-              {genres.includes(genre) && <Check size={13} />}{genre}
-            </button>
-          ))}
-        </div>
-      </div>
+      <GenreField genres={genres} onSave={(next) => save({ genres: next }, sharing)} />
     </div>
   );
 }

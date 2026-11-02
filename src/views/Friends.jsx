@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
-import { Check, Copy, Eye, Headphones, MoreHorizontal, UserMinus, UserPlus, UserRound, Users, X } from 'lucide-react';
+import { Check, Copy, Headphones, MoreHorizontal, UserMinus, UserPlus, UserRound, Users, X } from 'lucide-react';
 import { Avatar } from '../components/Account.jsx';
 import { Empty, Thumb } from '../components/common.jsx';
 import { useAccount } from '../store/account.js';
-import { DETAIL_SHARING, normalizeFriendCode, useFriends } from '../store/friends.js';
+import { normalizeFriendCode, useFriends } from '../store/friends.js';
 import { useNav } from '../store/nav.js';
 import { useRoom } from '../store/room.js';
 import { usePlayer } from '../store/player.js';
@@ -72,8 +72,7 @@ export default function Friends() {
   const friendCode = useFriends((s) => s.friendCode);
   const friends = useFriends((s) => s.friends);
   const requests = useFriends((s) => s.requests);
-  const asked = useFriends((s) => s.sharing.asked);
-  const { addFriend, acceptRequest, declineRequest, setSharing } = useFriends.getState();
+  const { addFriend, acceptRequest, declineRequest } = useFriends.getState();
   const [code, setCode] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -130,18 +129,6 @@ export default function Friends() {
           {error ? <p className="room-error friend-error" role="alert">{error}</p> : <p>{tr('상대방이 수락하면 친구가 돼요.')}</p>}
         </form>
       </div>
-
-      {!asked && (
-        <section className="room-card friends-section friend-share-ask" data-enter>
-          <h3><Eye size={16} />{' '}{tr('친구에게 무엇을 보여줄까요?')}</h3>
-          <p>{tr('자주 듣는 곡과 아티스트, 청취 시간, 좋아하는 장르, 공개 플레이리스트를 친구가 볼 수 있어요. 고르기 전에는 아무것도 보이지 않고, 설정에서 언제든 바꿀 수 있어요.')}</p>
-          <div className="row-btns">
-            <button className="btn-primary" onClick={() => setSharing({ ...Object.fromEntries(DETAIL_SHARING.map((key) => [key, true])), asked: true })}>{tr('모두 공개')}</button>
-            <button className="btn" onClick={() => setSharing({ asked: true })}>{tr('공개하지 않기')}</button>
-            <button className="btn" onClick={() => { setSharing({ asked: true }); useNav.getState().go('settings'); }}>{tr('직접 고르기')}</button>
-          </div>
-        </section>
-      )}
 
       {requests.length > 0 && (
         <section className="room-card friends-section" data-enter>

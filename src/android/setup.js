@@ -11,6 +11,7 @@ import { artistGenres } from '../../electron/youtube/genres.js';
 import * as downloads from './downloads.js';
 import * as updater from './updater.js';
 import * as auth from './auth.js';
+import { noteTrouble } from '../lib/trouble.js';
 
 const info = JSON.parse(Native.appInfo());
 updater.setCurrentVersion(info.version);
@@ -33,6 +34,7 @@ window.__tm.resolveStream = async (id, request) => {
     Native.streamResolved(request, JSON.stringify({ url: s.url, method: s.method, fresh: s.fresh }));
   } catch (e) {
     console.warn('[stream]', e.message);
+    noteTrouble('resolve', { id, message: e.message });
     Native.streamResolved(request, null);
   }
 };

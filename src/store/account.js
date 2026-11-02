@@ -18,7 +18,7 @@ import { deleteOwnedShares, startSharedPlaylists, stopSharedPlaylists } from '..
 import { useFriends } from './friends.js';
 import { forgetLibrary, libraryData, setLibraryOwner } from './library.js';
 import { resetPlayer } from './player.js';
-import { useProfile } from './profile.js';
+import { photoToShow, useProfile } from './profile.js';
 import { useRoom } from './room.js';
 import { toast } from './ui.js';
 import { clearUndo, record } from './undo.js';
@@ -51,7 +51,7 @@ function toAccount(user) {
     googleName: google?.displayName || null,
     googlePhoto: google?.photoURL || null,
     email: user.email || google?.email || null,
-    photo: user.photoURL || google?.photoURL || null,
+    photo: photoToShow(user),
   };
 }
 
@@ -158,6 +158,7 @@ export const useAccount = create((set, get) => {
 
   // Registered here so the first state arrives once the saved session has been read from disk.
   onAuthStateChanged(auth, publish);
+  useProfile.subscribe((next, prev) => { if (next.photo !== prev.photo && auth.currentUser) publish(); });
 
   return {
     status: 'loading', // loading | signedOut | signedIn
@@ -193,14 +194,19 @@ export const useAccount = create((set, get) => {
       const user = auth.currentUser;
       if (!user) return;
       const before = { displayName: user.displayName || null, photoURL: user.photoURL || null };
+      const uploadedBefore = useProfile.getState().photo;
       const next = {};
       if ('name' in patch) next.displayName = String(patch.name || '').trim().slice(0, 40) || null;
-      if ('photo' in patch) next.photoURL = patch.photo || null;
+      // A picture someone uploaded is too long for the account's own field, which only takes an address.
+      const uploaded = String(patch.photo || '').startsWith('data:');
+      if ('photo' in patch && !uploaded) next.photoURL = patch.photo || null;
+      if ('photo' in patch) useProfile.getState().setPhoto(uploaded ? patch.photo : null);
       await updateProfile(user, next);
       publish();
       useFriends.getState().syncProfile();
       useRoom.getState().syncProfile();
       record(tr('프로필 변경'), async () => {
+        useProfile.getState().setPhoto(uploadedBefore);
         await updateProfile(auth.currentUser, before);
         publish();
         useFriends.getState().syncProfile();

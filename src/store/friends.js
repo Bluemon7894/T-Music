@@ -20,7 +20,7 @@ import { OFFLINE_MESSAGE, waitForConnection, within } from '../lib/online.js';
 import { safePhoto, safeTrack } from '../lib/safeTrack.js';
 import { useNav } from './nav.js';
 import { usePlayer } from './player.js';
-import { useProfile } from './profile.js';
+import { photoToShow, useProfile } from './profile.js';
 import { useRoom } from './room.js';
 import { toast, useUI } from './ui.js';
 import { record } from './undo.js';
@@ -31,8 +31,8 @@ const CODE_LENGTH = 8;
 const INVITE_LIFETIME_MS = 6 * 60 * 60 * 1000;
 const PRESENCE_DELAY_MS = 800;
 // Listening details stay private until someone chooses to show them: nobody agreed to this when they signed up.
-const DEFAULT_SHARING = { online: true, track: true, playlists: false, topTracks: false, time: false, artists: false, genres: false, asked: false };
-export const DETAIL_SHARING = ['playlists', 'topTracks', 'time', 'artists', 'genres'];
+// Shown until someone turns it off.
+const DEFAULT_SHARING = { online: true, track: true, playlists: true, topTracks: true, time: true, artists: true, genres: true };
 const OFFLINE_CLEANUP_MS = 4000;
 const PRESENCE_RETRY_MS = 5000;
 
@@ -51,7 +51,7 @@ function myProfile() {
   const google = user.providerData.find((p) => p.providerId === 'google.com');
   return {
     name: (user.displayName || google?.displayName || tr('게스트 {0}', user.uid.slice(0, 4).toUpperCase())).slice(0, 40),
-    photo: (user.photoURL || google?.photoURL || '').slice(0, 500) || null,
+    photo: photoToShow(user),
   };
 }
 
