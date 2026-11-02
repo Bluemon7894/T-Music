@@ -65,7 +65,13 @@ function topBy(entries, keyOf, limit) {
 async function genresFromListening(listens) {
   const artists = topBy(listens, (l) => l.artist, GENRE_ARTISTS);
   if (!artists.length) return [];
-  const found = await api.artistGenres(artists.map((a) => a.entry.artist)).catch(() => ({}));
+  // Nice to have: failing here must not keep everything else from reaching friends.
+  let found = {};
+  try {
+    found = await api.artistGenres(artists.map((a) => a.entry.artist));
+  } catch (e) {
+    console.warn('[profile]', e);
+  }
   const weight = new Map();
   for (const { entry, sec } of artists) {
     const genre = found?.[entry.artist];
@@ -131,11 +137,17 @@ export const useProfile = create((set, get) => {
 
     async start(getSharing) {
       lastPublished = '';
+      clearTimeout(timer);
+      timer = null;
       const uid = auth.currentUser?.uid;
       set({ photo: cachedPhoto(uid) });
+      // Not pushed back by each new change: while music plays there's always another one coming.
       const schedule = () => {
-        clearTimeout(timer);
-        timer = setTimeout(() => publishNow(getSharing()).catch((e) => console.warn('[profile]', e)), PUBLISH_DELAY_MS);
+        if (timer) return;
+        timer = setTimeout(() => {
+          timer = null;
+          publishNow(getSharing()).catch((e) => console.warn('[profile]', e));
+        }, PUBLISH_DELAY_MS);
       };
       try {
         const saved = (await getDoc(profileDoc())).data() || {};
@@ -153,6 +165,7 @@ export const useProfile = create((set, get) => {
 
     stop() {
       clearTimeout(timer);
+      timer = null;
       stopWatching?.();
       stopWatching = null;
       set({ bio: '', genres: [], photo: null });
@@ -161,6 +174,7 @@ export const useProfile = create((set, get) => {
     // Settings changed: friends should see it now, not in twenty seconds.
     publishSoon(sharing) {
       clearTimeout(timer);
+      timer = null;
       publishNow(sharing).catch((e) => console.warn('[profile]', e));
     },
 

@@ -10,6 +10,7 @@ export const api = {
   artist: (id) => call('artist', id),
   playlist: (id) => call('playlist', id),
   related: (id) => call('related', id),
+  artistGenres: (names) => call('artistGenres', names),
   home: () => call('home'),
   lyrics: (track) => call('lyrics', track),
   refreshLyrics: (track) => call('refreshLyrics', track),
