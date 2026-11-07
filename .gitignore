@@ -13,3 +13,6 @@ android/keystore.properties
 android/test/out/
 
 .firebase/
+
+# Copies of every file above that is kept out of git (back this folder up)
+secrets/

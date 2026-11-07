@@ -147,6 +147,12 @@ if (DEBUG) {
   } else {
     password = /password=(.+)/.exec(fs.readFileSync(props, 'utf8'))[1].trim();
   }
+  // Keep a copy in secrets/ (not in git) so the key survives with the rest of the private files.
+  fs.mkdirSync('secrets', { recursive: true });
+  for (const file of [keystore, props]) {
+    const copy = path.join('secrets', path.basename(file));
+    if (!fs.existsSync(copy)) fs.copyFileSync(file, copy);
+  }
 }
 
 fs.mkdirSync(path.join('release'), { recursive: true });
