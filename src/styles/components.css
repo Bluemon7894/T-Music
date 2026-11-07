@@ -268,8 +268,8 @@ html[data-platform='desktop']:not([data-motion='calm']) .now-panel { animation: 
 html[data-platform='desktop']:not([data-motion='calm']) .mini { animation: mini-in 0.45s var(--spring); }
 @keyframes mini-in { from { transform: scale(0.92); opacity: 0; } to { transform: none; opacity: 1; } }
 
-/* Music showing the app's placeholder instead of a cover goes to the end of its row or grid (shelves,
-   quick tiles, search and library cards). When a cover turns up later it moves back. The radio stays
-   in dial order. */
+/* Music that has no cover to show (the app's placeholder instead) is left out of shelves, quick tiles,
+   search and library cards, so what's shown always has a picture. If a cover turns up later it appears.
+   The radio is not affected. */
 .card:has(> .card-art .thumb.placeholder),
-.quick-tile:has(.thumb.placeholder) { order: 1; }
+.quick-tile:has(.thumb.placeholder) { display: none; }
