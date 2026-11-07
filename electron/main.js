@@ -14,6 +14,9 @@ import * as lang from './lang.js';
 import { artistGenres } from './youtube/genres.js';
 import { translateLines } from './lyrics/translate.js';
 import { registerScheme, handleProtocol } from './protocol.js';
+import * as remote from './remoteConfig.js';
+import * as radio from './radio.js';
+import * as quick from './quickMenu.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BG = '#0a0712';
@@ -39,6 +42,39 @@ function rememberInvite(argv) {
   return false;
 }
 
+// 'floating' is the lowest topmost level, so other always-on-top windows and Windows itself (leaving a
+// fullscreen app, clicking the taskbar) could push the mini player under them, and it never came back.
+// It now sits higher, and climbs back on top whenever it loses focus or is shown again.
+const MINI_TOP_LEVEL = 'screen-saver';
+const MINI_REASSERT_MS = 1500;
+let miniTimer = null;
+let miniReassert = null;
+
+function keepMiniOnTop(win, on) {
+  clearInterval(miniTimer);
+  miniTimer = null;
+  if (miniReassert) {
+    win.off('blur', miniReassert);
+    win.off('show', miniReassert);
+    win.off('restore', miniReassert);
+    miniReassert = null;
+  }
+  if (!on) {
+    win.setAlwaysOnTop(false);
+    return;
+  }
+  miniReassert = () => {
+    if (win.isDestroyed() || !win.isVisible() || win.isMinimized() || quick.isQuickVisible()) return;
+    win.setAlwaysOnTop(true, MINI_TOP_LEVEL);
+    win.moveTop();
+  };
+  win.setAlwaysOnTop(true, MINI_TOP_LEVEL);
+  win.on('blur', miniReassert);
+  win.on('show', miniReassert);
+  win.on('restore', miniReassert);
+  miniTimer = setInterval(miniReassert, MINI_REASSERT_MS);
+}
+
 function setMiniMode(on) {
   const [win] = BrowserWindow.getAllWindows();
   if (!win || on === Boolean(sizeBeforeMini)) return;
@@ -50,11 +86,11 @@ function setMiniMode(on) {
     win.setBounds({ ...MINI_SIZE, x: workArea.x + workArea.width - MINI_SIZE.width - MINI_MARGIN, y: workArea.y + workArea.height - MINI_SIZE.height - MINI_MARGIN });
     win.setResizable(false);
     win.setMaximizable(false);
-    win.setAlwaysOnTop(true, 'floating');
+    keepMiniOnTop(win, true);
   } else {
     const { bounds, maximized } = sizeBeforeMini;
     sizeBeforeMini = null;
-    win.setAlwaysOnTop(false);
+    keepMiniOnTop(win, false);
     win.setResizable(true);
     win.setMaximizable(true);
     win.setMinimumSize(...NORMAL_MIN_SIZE);
@@ -87,6 +123,14 @@ const api = {
   setCustomLyrics: (trackId, lyricsData) => lyrics.setCustom(trackId, lyricsData),
   prefetch: (id) => { if (!downloads.localFile(id)) stream.prefetch(id); return true; },
   status: () => ({ methods: stream.status(), version: app.getVersion() }),
+  remoteNotice: async () => { await remote.start(); return remote.notice(); },
+  quickState: (state) => { quick.relayState(state); return true; },
+  quickCommand: (command, arg) => quick.relayCommand(String(command), arg),
+  quickShortcut: () => quick.shortcutInfo(),
+  setQuickShortcut: (key) => quick.setShortcut(String(key)),
+  pauseQuickShortcut: (paused) => quick.pauseShortcut(Boolean(paused)),
+  radioChannels: (country) => radio.channels(String(country || 'KR')),
+  radioLive: (videoId) => radio.liveManifest(String(videoId)),
   diagnose: () => stream.diagnose(),
   downloads: () => downloads.list(),
   download: (tracks) => downloads.enqueue(tracks),
@@ -376,8 +420,14 @@ if (!app.requestSingleInstanceLock()) {
       app.quit();
       return;
     }
+    remote.start();
     const win = createWindow();
     createTray(win);
+    quick.setupQuickMenu(win, {
+      preload: path.join(__dirname, 'preload.cjs'),
+      url: process.env.VITE_DEV_URL || null,
+      file: path.join(__dirname, '..', 'dist', 'index.html'),
+    });
     // Warm up in the background so the first click plays quickly.
     getClient().catch(() => {});
   });

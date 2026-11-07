@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Maximize2, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
+import { useRadio } from '../../store/radio.js';
 import { useUI } from '../../store/ui.js';
 import { api } from '../../lib/api.js';
 import { artistNames, fmtTime } from '../../lib/util.js';
@@ -11,7 +12,48 @@ import { Slider } from './PlayerDock.jsx';
 import logo from '../../assets/logo-mark.png';
 import { tr } from '../../lib/i18n.js';
 
+function RadioMini() {
+  const station = useRadio((s) => s.station);
+  const phase = useRadio((s) => s.phase);
+  const volume = usePlayer((s) => s.volume);
+  const muted = usePlayer((s) => s.muted);
+  const { setVolume, toggleMute } = usePlayer.getState();
+  const { toggle, step } = useRadio.getState();
+  const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  const setMini = useUI((s) => s.setMini);
+  return (
+    <div className="mini">
+      <div className="mini-art"><Thumb src={station?.logo} /></div>
+      <div className="mini-body">
+        <div className="mini-text">
+          <b title={station?.name}>{station?.name || tr('라디오')}</b>
+          <small>{station ? `${station.band} ${station.freq} · ${tr('실시간')}` : ''}</small>
+        </div>
+        <div className="mini-controls">
+          <button className="icon-btn" onClick={() => step(-1)} aria-label={tr('이전 채널')}><SkipBack size={18} fill="currentColor" /></button>
+          <PlayButton size={36} playing={phase !== 'ending'} onClick={toggle} />
+          <button className="icon-btn" onClick={() => step(1)} aria-label={tr('다음 채널')}><SkipForward size={18} fill="currentColor" /></button>
+          <div className="mini-volume">
+            <button className="icon-btn" onClick={toggleMute} aria-label={muted ? tr('음소거 해제') : tr('음소거')}><VolumeIcon size={16} /></button>
+            <Slider className="volume" value={muted ? 0 : volume} max={1} onChange={setVolume} />
+          </div>
+          <button className="icon-btn mini-expand" onClick={() => setMini(false)} title={tr('큰 화면으로')} aria-label={tr('큰 화면으로')}><Maximize2 size={16} /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MiniPlayer() {
+  const radio = useRadio((s) => s.on);
+  useEffect(() => {
+    api.setMiniMode(true).catch(() => {});
+    return () => { api.setMiniMode(false).catch(() => {}); };
+  }, []);
+  return radio ? <RadioMini /> : <MusicMini />;
+}
+
+function MusicMini() {
   const track = usePlayer((s) => s.queue[s.index]);
   const playing = usePlayer((s) => s.playing);
   const time = usePlayer((s) => s.time);
@@ -22,11 +64,6 @@ export default function MiniPlayer() {
   const { toggle, next, prev, seek, setVolume, toggleMute } = usePlayer.getState();
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const setMini = useUI((s) => s.setMini);
-
-  useEffect(() => {
-    api.setMiniMode(true).catch(() => {});
-    return () => { api.setMiniMode(false).catch(() => {}); };
-  }, []);
 
   return (
     <div className="mini">

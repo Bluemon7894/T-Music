@@ -470,7 +470,7 @@ export const useRoom = create((set, get) => {
     stopFollowing();
     for (const stop of stopListening) stop();
     stopListening = [];
-    set({ code: null, meta: null, members: {}, playback: null, queue: [], modes: null });
+    set({ code: null, meta: null, members: {}, playback: null, queue: [], modes: null, radio: null });
   };
 
   // Someone in the room resynced the lyrics or picked different ones.
@@ -535,6 +535,7 @@ export const useRoom = create((set, get) => {
           if (entry.by !== myUid()) applySharedLyrics(trackId, entry, announce).catch((e) => console.warn('[room]', e));
         }
       }),
+      onValue(dbRef(code, 'radio'), (snap) => set({ radio: snap.val() || null }), () => set({ radio: null })),
       onValue(dbRef(code, 'playback'), (snap) => {
         const playback = snap.val();
         set({ playback });
@@ -599,6 +600,7 @@ export const useRoom = create((set, get) => {
     playback: null,
     queue: [],
     modes: null, // the room's shuffle and repeat, the same for everyone
+    radio: null, // the radio channel the room is tuned to, if any
     attached: false, // following the room's playback right now
     connected: false,
     driftMs: null, // how far behind the room we are, in milliseconds
@@ -705,6 +707,32 @@ export const useRoom = create((set, get) => {
     },
 
     follow,
+
+    // The room's radio channel, or null for music. Tuning in stops the room's music for everyone;
+    // nothing is synced but the channel, since a live broadcast is at the same moment for all.
+    // Older versions don't know this part of the room and simply keep the music stopped.
+    setRadio(station) {
+      const { code, attached, playback } = get();
+      if (!code || !attached) return false;
+      if (!canControl()) return refuse();
+      if (station && playback?.playing) publish({ playing: false, positionMs: roomPlayer.time() * 1000 });
+      const value = station ? {
+        id: String(station.id).slice(0, 80),
+        kind: station.kind === 'youtube' ? 'youtube' : 'station',
+        name: String(station.name || '').slice(0, 80),
+        band: station.band === 'AM' ? 'AM' : 'FM',
+        freq: Number(station.freq) || 0,
+        ...(station.url ? { url: String(station.url).slice(0, 500) } : {}),
+        ...(station.videoId ? { videoId: station.videoId } : {}),
+        ...(station.logo ? { logo: String(station.logo).slice(0, 500) } : {}),
+        hls: station.hls === true,
+        by: myUid(),
+        at: serverTimestamp(),
+      } : null;
+      dbSet(dbRef(code, 'radio'), value).catch(() => toast(tr('같이듣기 상태를 보내지 못했습니다')));
+      return true;
+    },
+    canControl: () => canControl(),
 
     // Back to listening alone, still a member of the room.
     pause() {

@@ -7,7 +7,7 @@ import { useLibrary } from '../store/library.js';
 import { api } from '../lib/api.js';
 import { dragProps, itemPayload } from '../lib/drag.js';
 import { usePrefs } from '../store/prefs.js';
-import { useTilt, useEnter, animate, ease, utils } from '../lib/motion.js';
+import { useTilt, useEnter, animate, ease, utils, launchFlight } from '../lib/motion.js';
 import { Thumb, PlayButton } from './common.jsx';
 import { trackMenuItems } from './TrackList.jsx';
 import { tr } from '../lib/i18n.js';
@@ -69,7 +69,11 @@ export function Card({ item, size }) {
     <div
       className={`card ${round ? 'is-artist' : ''}`}
       data-enter
-      onClick={() => openItem(item, go)}
+      onClick={() => {
+        // Albums and playlists open with their cover flying into the page (see landFlight).
+        if (!round && ['album', 'playlist', 'local', 'liked'].includes(item.kind)) launchFlight(art.current?.querySelector('img'), item.thumb);
+        openItem(item, go);
+      }}
       onContextMenu={onContextMenu}
       style={size ? { width: size } : undefined}
       {...dragProps(() => itemPayload(item))}

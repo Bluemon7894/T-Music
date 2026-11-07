@@ -22,6 +22,7 @@ import { photoToShow, useProfile } from './profile.js';
 import { useRoom } from './room.js';
 import { toast } from './ui.js';
 import { clearUndo, record } from './undo.js';
+import { recordVersion } from '../lib/telemetry.js';
 import { tr } from '../lib/i18n.js';
 
 const AUTH_ERRORS = {
@@ -87,6 +88,7 @@ export const useAccount = create((set, get) => {
       carriedOver = null;
       owner = uid;
       if (uid) {
+        recordVersion(uid);
         startLibrarySync(uid);
         startSharedPlaylists();
         useRoom.getState().resume();

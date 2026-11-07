@@ -18,6 +18,7 @@ import { api } from '../lib/api.js';
 import { troubleNotes } from '../lib/trouble.js';
 import { useAsync } from '../components/common.jsx';
 import { AccountCard, FriendPrivacyCard } from '../components/Account.jsx';
+import EqualizerCard from '../components/EqualizerCard.jsx';
 import { useLibrary } from '../store/library.js';
 import { usePlayer, applyOutputDevice } from '../store/player.js';
 import { useDeck } from '../store/deck.js';
@@ -65,10 +66,89 @@ function SleepTimerRow() {
   );
 }
 
+// Keys as people know them on Windows, one <kbd> each.
+const keyParts = (accel) => accel.split('+').map((p) => ({ Super: 'Win', Control: 'Ctrl', Plus: '+', Up: '↑', Down: '↓', Left: '←', Right: '→' }[p] || p));
+const keyLabel = (accel) => keyParts(accel).join(' + ');
+const Keys = ({ accel }) => <span className="key-combo">{keyParts(accel).map((k, i) => <kbd key={i}>{k}</kbd>)}</span>;
+
+// A key press as an Electron accelerator ("Super+Y"), or null while only modifiers are down.
+function accelOf(e) {
+  const code = e.code;
+  let key = null;
+  if (/^Key[A-Z]$/.test(code)) key = code.slice(3);
+  else if (/^Digit\d$/.test(code)) key = code.slice(5);
+  else if (/^F\d{1,2}$/.test(code)) key = code;
+  else key = { Space: 'Space', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert', Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/' }[code] || null;
+  if (!key) return null;
+  const mods = [e.metaKey && 'Super', e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift'].filter(Boolean);
+  return [...mods, key].join('+');
+}
+
+// The quick menu's shortcut works across Windows. "바꾸기" listens for the next key combination; another
+// program may already hold it, in which case the old key stays and this says so.
+function QuickShortcutRow() {
+  const [info, setInfo] = useState(null);
+  const [listening, setListening] = useState(false);
+  const [note, setNote] = useState(null);
+  useEffect(() => { api.quickShortcut().then(setInfo).catch(() => {}); }, []);
+
+  useEffect(() => {
+    if (!listening) return undefined;
+    api.pauseQuickShortcut(true).catch(() => {});
+    const onKey = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') { setListening(false); return; }
+      const accel = accelOf(e);
+      if (!accel) return; // still holding modifiers
+      if (!accel.includes('+') && !/^F\d+$/.test(accel)) { setNote(tr('Ctrl, Alt, Shift, Win 중 하나와 함께 눌러 주세요.')); return; }
+      setListening(false);
+      api.setQuickShortcut(accel).then((next) => {
+        setInfo(next);
+        setNote(next.ok ? null : next.reason === 'taken' ? tr('{0} 키는 다른 프로그램이 쓰고 있어요. 다른 키를 골라 주세요.', keyLabel(accel)) : tr('이 키는 단축키로 쓸 수 없어요.'));
+      }).catch(() => {});
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      api.pauseQuickShortcut(false).then(setInfo).catch(() => {});
+    };
+  }, [listening]);
+
+  if (!info) return null;
+  const set = (key) => api.setQuickShortcut(key).then((next) => { setInfo(next); setNote(next.ok ? null : tr('{0} 키는 다른 프로그램이 쓰고 있어요. 다른 키를 골라 주세요.', keyLabel(key))); }).catch(() => {});
+  const off = info.chosen === 'off';
+  const moved = !off && info.active && info.active !== info.chosen;
+  const message = note
+    || (listening ? tr('원하는 키 조합을 누르세요. 취소하려면 Esc를 누르세요.')
+      : !off && !info.active ? tr('등록할 수 있는 단축키가 없어요. 다른 키를 골라 주세요.')
+        : moved ? tr('다른 프로그램이 {0} 키를 쓰고 있어서 {1}로 바꿨어요.', keyLabel(info.chosen), keyLabel(info.active))
+          : tr('어디서든 단축키로 재생 조작, 라디오, 친구 초대를 바로 열어요.'));
+  return (
+    <div className="set-item quick-key" style={{ cursor: 'default' }}>
+      <div className="set-item-text">
+        <span className="set-item-title">{tr('빠른 메뉴')}</span>
+        <span className={`muted small ${note ? 'warn' : ''}`}>{message}</span>
+      </div>
+      <div className="quick-key-side">
+        <span className={`quick-key-now ${listening ? 'listening' : ''}`}>
+          {listening ? tr('입력 대기 중…') : off ? tr('끔') : <Keys accel={info.active || info.chosen} />}
+        </span>
+        <div className="row-btns">
+          <button className="btn" onClick={() => { setNote(null); setListening(!listening); }}>{listening ? tr('취소') : tr('바꾸기')}</button>
+          {info.chosen !== info.standard && <button className="btn" onClick={() => set(info.standard)}>{tr('기본값')}</button>}
+          {!off && <button className="btn" onClick={() => set('off')}>{tr('끄기')}</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ConvenienceCard() {
   const resume = usePrefs((s) => s.resumeOnLaunch);
   const lyricSize = usePrefs((s) => s.lyricSize);
   const calm = usePrefs((s) => s.calmMotion);
+  const greetName = usePrefs((s) => s.greetName);
   const setPref = usePrefs((s) => s.setPref);
   return (
     <section className="set-card" data-enter>
@@ -97,6 +177,13 @@ function ConvenienceCard() {
           <span className="muted small">{tr('화면 전환과 배경 움직임을 줄입니다. 기기가 느릴 때 좋아요.')}</span>
         </div>
         <div className={`switch ${calm ? 'on' : ''}`} />
+      </div>
+      <div className="set-item" onClick={() => setPref({ greetName: !greetName })}>
+        <div className="set-item-text">
+          <span className="set-item-title">{tr('홈 인사말에 이름 표시')}</span>
+          <span className="muted small">{tr('홈 화면 인사말에서 이름을 불러 줘요. 화면을 공유할 때는 꺼 두세요.')}</span>
+        </div>
+        <div className={`switch ${greetName ? 'on' : ''}`} />
       </div>
     </section>
   );
@@ -341,20 +428,11 @@ export default function Settings() {
             )}
           </section>
 
-          <section className="set-card" data-enter>
-            <h2><Download size={18} />{' '}{tr('다운로드 저장소')}</h2>
-            <p className="muted">{tr('{0}곡 저장됨 · {1}', dl.items.length, fmtBytes(dl.totalSize))}</p>
-            {!IS_ANDROID && <p className="muted small path">{dl.dir}</p>}
-            {!IS_ANDROID && (
-              <div className="row-btns">
-                <button className="btn" onClick={openDownloads}><FolderOpen size={15} />{' '}{tr('폴더 열기')}</button>
-                <button className="btn" onClick={changeDownloadsDir}><FolderEdit size={15} />{' '}{tr('폴더 변경')}</button>
-              </div>
-            )}
-          </section>
+          <EqualizerCard />
 
           {!IS_ANDROID && <section className="set-card" data-enter>
             <h2><Keyboard size={18} />{' '}{tr('단축키')}</h2>
+            <QuickShortcutRow />
             <div className="shortcuts">
               <span><kbd>Space</kbd>{' '}{tr('재생 / 일시정지')}</span>
               <span><kbd>↑</kbd> <kbd>↓</kbd>{' '}{tr('음량 조절')}</span>
@@ -448,6 +526,18 @@ export default function Settings() {
           </section>
 
           <ConvenienceCard />
+
+          <section className="set-card" data-enter>
+            <h2><Download size={18} />{' '}{tr('다운로드 저장소')}</h2>
+            <p className="muted">{tr('{0}곡 저장됨 · {1}', dl.items.length, fmtBytes(dl.totalSize))}</p>
+            {!IS_ANDROID && <p className="muted small path">{dl.dir}</p>}
+            {!IS_ANDROID && (
+              <div className="row-btns">
+                <button className="btn" onClick={openDownloads}><FolderOpen size={15} />{' '}{tr('폴더 열기')}</button>
+                <button className="btn" onClick={changeDownloadsDir}><FolderEdit size={15} />{' '}{tr('폴더 변경')}</button>
+              </div>
+            )}
+          </section>
 
           <section className="set-card" data-enter>
             <h2><Library size={18} />{' '}{tr('보관함')}</h2>

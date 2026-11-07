@@ -17,7 +17,7 @@ export const SEARCH_LIMIT = 14;
 export const LISTEN_RETENTION_DAYS = 60;
 const LISTEN_LIMIT = 2000;
 
-export const EMPTY_LIBRARY = { liked: [], playlists: [], recent: [], savedAlbums: [], followed: [], listens: [], searches: [] };
+export const EMPTY_LIBRARY = { liked: [], playlists: [], recent: [], savedAlbums: [], followed: [], savedStations: [], listens: [], searches: [] };
 
 export const uniqueStrings = (list) => [...new Set(list)];
 
@@ -122,6 +122,13 @@ export const useLibrary = create(
         const item = { id: album.id, title: album.title, artists: album.artists || [], thumb: album.thumb, type: album.type, year: album.year, addedAt: Date.now() };
         set({ savedAlbums: list.some((a) => a.id === album.id) ? list.filter((a) => a.id !== album.id) : [item, ...list] });
       },
+      // Radio stations kept like liked songs. Only what's needed to tune in again is stored.
+      isStationSaved: (id) => get().savedStations.some((s) => s.id === id),
+      toggleStation(station) {
+        const list = get().savedStations;
+        const item = { id: station.id, kind: station.kind, name: station.name, url: station.url || null, hls: station.hls === true, logo: station.logo || null, freq: station.freq, band: station.band, country: station.country || null, addedAt: Date.now() };
+        set({ savedStations: list.some((s) => s.id === station.id) ? list.filter((s) => s.id !== station.id) : [item, ...list] });
+      },
       toggleFollow(artist) {
         const list = get().followed;
         const item = { id: artist.id, name: artist.name, thumb: artist.thumb, addedAt: Date.now() };
@@ -169,6 +176,7 @@ function mergeLibraries(a, b) {
     playlists: unionById(a.playlists, b.playlists),
     savedAlbums: stamped(unionById(a.savedAlbums, b.savedAlbums), now),
     followed: stamped(unionById(a.followed, b.followed), now),
+    savedStations: stamped(unionById(a.savedStations, b.savedStations), now),
     recent: unionById(a.recent, b.recent).slice(0, RECENT_LIMIT),
     searches: uniqueStrings([...(a.searches || []), ...(b.searches || [])]).slice(0, SEARCH_LIMIT),
     listens: [...byKey.values()].sort((x, y) => y.at - x.at).slice(0, LISTEN_LIMIT),

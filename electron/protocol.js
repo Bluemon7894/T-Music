@@ -38,7 +38,28 @@ function serveFile({ file, mime }, range) {
   });
 }
 
+// ytm://radio/?u=URL — a radio stream, or a piece of a livestream's HLS playlist, fetched here because
+// the page may only load media and data through this scheme (and the stations send no CORS headers).
+const RADIO_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
+async function handleRadio(req) {
+  const target = new URL(req.url).searchParams.get('u') || '';
+  if (!/^https?:\/\//i.test(target)) return new Response('bad url', { status: 400, headers: CORS });
+  try {
+    const res = await net.fetch(target, { headers: { 'User-Agent': RADIO_UA, 'Icy-MetaData': '0' }, bypassCustomProtocolHandlers: true });
+    const h = new Headers(CORS);
+    const type = res.headers.get('content-type');
+    if (type) h.set('content-type', type);
+    const length = res.headers.get('content-length');
+    if (length) h.set('content-length', length);
+    h.set('cache-control', 'no-store');
+    return new Response(res.body, { status: res.status, headers: h });
+  } catch (e) {
+    return new Response(String(e.message || e), { status: 502, headers: CORS });
+  }
+}
+
 async function handleStream(req) {
+  if (new URL(req.url).host === 'radio') return handleRadio(req);
   const id = new URL(req.url).pathname.slice(1);
   if (!/^[\w-]{11}$/.test(id)) return new Response('bad id', { status: 400 });
   const range = req.headers.get('range');

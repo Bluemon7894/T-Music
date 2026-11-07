@@ -5,6 +5,8 @@ import { useLibrary, weeklyStats } from '../store/library.js';
 import { useDownloads } from '../store/downloads.js';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
+import { useAccount } from '../store/account.js';
+import { usePrefs } from '../store/prefs.js';
 import { dailyOrder, greeting, fmtBytes } from '../lib/util.js';
 import { artistsOfTheDay, hasTaste, mixSeeds, rankMix, recentlyPlayedIds, tasteProfile } from '../lib/taste.js';
 import { useEnter, animate, stagger, ease, reduced } from '../lib/motion.js';
@@ -26,14 +28,19 @@ const MOODS = [
 
 function Greeting() {
   const ref = useRef(null);
+  const name = useAccount((s) => s.user?.name);
+  const greetName = usePrefs((s) => s.greetName);
+  const text = greeting(greetName ? name : null);
   useLayoutEffect(() => {
-    if (reduced) return;
+    if (reduced) return undefined;
+    let split = null;
     try {
-      const { chars } = splitText(ref.current, { chars: true });
-      animate(chars, { opacity: [0, 1], translateY: [40, 0], rotateX: [-90, 0], delay: stagger(28), ease: ease.bouncy });
+      split = splitText(ref.current, { chars: true });
+      animate(split.chars, { opacity: [0, 1], translateY: [40, 0], rotateX: [-90, 0], delay: stagger(28), ease: ease.bouncy });
     } catch { /* plain text fallback */ }
-  }, []);
-  return <h1 className="greeting" ref={ref}>{greeting()}</h1>;
+  }, [text]);
+  // A new key gives the split-up letters a fresh element when the name arrives after sign-in.
+  return <h1 key={text} className="greeting" ref={ref}>{text}</h1>;
 }
 
 function QuickTile({ item, onPlay }) {

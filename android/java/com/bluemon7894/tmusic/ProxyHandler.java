@@ -25,16 +25,32 @@ import java.util.regex.Pattern;
 final class ProxyHandler {
     private static final Pattern ALLOWED = Pattern.compile(
         "(.+\\.)?(youtube\\.com|googlevideo\\.com|ytimg\\.com|lrclib\\.net|music\\.163\\.com|qq\\.com|kugou\\.com|naver\\.com"
-            + "|api\\.github\\.com|github\\.com|githubusercontent\\.com|oauth2\\.googleapis\\.com|translate\\.googleapis\\.com|itunes\\.apple\\.com)");
+            + "|api\\.github\\.com|github\\.com|githubusercontent\\.com|radio-browser\\.info|oauth2\\.googleapis\\.com|translate\\.googleapis\\.com|itunes\\.apple\\.com)");
+    // Radio stations live on any host, often without https, so a radio request may go anywhere, but
+    // only to read: no body and no headers of the page's choosing.
+    private static final int RADIO_TOKENS = 32;
     private static final String[] SKIPPED_REQUEST_HEADERS = { "host", "content-length", "connection", "accept-encoding" };
 
     private final Map<String, JSONObject> pending = new ConcurrentHashMap<>();
+    // Radio tokens can be used again, since an audio element reconnects; the oldest are dropped.
+    private final java.util.LinkedHashMap<String, JSONObject> radio = new java.util.LinkedHashMap<String, JSONObject>(16, 0.75f, false) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, JSONObject> eldest) {
+            return size() > RADIO_TOKENS;
+        }
+    };
 
     String prepare(String json) {
         try {
             JSONObject request = new JSONObject(json);
             String token = UUID.randomUUID().toString();
-            pending.put(token, request);
+            if (request.optBoolean("radio", false)) {
+                synchronized (radio) {
+                    radio.put(token, request);
+                }
+            } else {
+                pending.put(token, request);
+            }
             return token;
         } catch (JSONException e) {
             return "";
@@ -43,17 +59,29 @@ final class ProxyHandler {
 
     WebResourceResponse serve(String token) {
         JSONObject request = pending.remove(token);
+        boolean isRadio = false;
+        if (request == null) {
+            synchronized (radio) {
+                request = radio.get(token);
+            }
+            isRadio = request != null;
+        }
         if (request == null) return failure();
         HttpURLConnection c = null;
         try {
             URL url = new URL(request.getString("url"));
-            if (!"https".equals(url.getProtocol()) || !ALLOWED.matcher(url.getHost().toLowerCase(Locale.ROOT)).matches()) return failure();
+            String protocol = url.getProtocol();
+            boolean allowed = isRadio
+                ? ("https".equals(protocol) || "http".equals(protocol))
+                : "https".equals(protocol) && ALLOWED.matcher(url.getHost().toLowerCase(Locale.ROOT)).matches();
+            if (!allowed) return failure();
             c = (HttpURLConnection) url.openConnection();
             c.setConnectTimeout(15000);
-            c.setReadTimeout(30000);
-            String method = request.optString("method", "GET");
+            c.setReadTimeout(isRadio ? 60000 : 30000);
+            String method = isRadio ? "GET" : request.optString("method", "GET");
             c.setRequestMethod(method);
-            JSONObject headers = request.optJSONObject("headers");
+            if (isRadio) c.setRequestProperty("Icy-MetaData", "0");
+            JSONObject headers = isRadio ? null : request.optJSONObject("headers");
             if (headers != null) {
                 for (Iterator<String> names = headers.keys(); names.hasNext(); ) {
                     String name = names.next();

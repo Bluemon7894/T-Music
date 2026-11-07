@@ -1,8 +1,11 @@
 // The full-screen player. On a phone it also holds what desktop keeps in the side panel: lyrics and
 // the queue are tabs here.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ChevronDown, ListMusic, Mic2, MoreHorizontal, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Sparkles } from 'lucide-react';
+import { ChevronDown, ListMusic, Mic2, MoreHorizontal, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Music2, Bookmark, BookmarkCheck } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
+import { useRadio } from '../../store/radio.js';
+import { useLibrary } from '../../store/library.js';
+import { BANDS } from '../RadioDial.jsx';
 import { useUI } from '../../store/ui.js';
 import { useNav } from '../../store/nav.js';
 import { animate } from '../../lib/motion.js';
@@ -17,7 +20,7 @@ import { NextTrack, StageProgress } from '../layout/Stage.jsx';
 import { tr } from '../../lib/i18n.js';
 
 const TABS = [
-  { id: 'now', label: tr('지금 재생'), icon: Sparkles },
+  { id: 'now', label: tr('지금 재생'), icon: Music2 },
   { id: 'lyrics', label: tr('가사'), icon: Mic2 },
   { id: 'queue', label: tr('대기열'), icon: ListMusic },
 ];
@@ -118,7 +121,51 @@ function StageView({ track }) {
   );
 }
 
+// The phone's full-screen radio: the radio set, the channel and channel controls.
+function RadioView() {
+  const setStage = useUI((s) => s.setStage);
+  const station = useRadio((s) => s.station);
+  const phase = useRadio((s) => s.phase);
+  const buffering = useRadio((s) => s.buffering);
+  const saved = useLibrary((s) => Boolean(station) && s.savedStations.some((x) => x.id === station.id));
+  const { toggle, step, toggleSave } = useRadio.getState();
+  const root = useRef(null);
+  useLayoutEffect(() => {
+    animate(root.current, { translateY: ['100%', '0%'], duration: 320, ease: 'out(3)' });
+  }, []);
+  const close = () => animate(root.current, { translateY: '100%', duration: 220, ease: 'in(2)', onComplete: () => setStage(false) });
+  const band = BANDS[station?.band || 'FM'];
+  return (
+    <div className="stage m-stage" ref={root}>
+      <div className="stage-bg" style={{ backgroundImage: station?.logo ? `url("${station.logo}")` : undefined }} />
+      <div className="stage-shade" />
+      <header className="m-stage-top">
+        <button className="icon-btn circle glass" onClick={close} aria-label={tr('닫기')}><ChevronDown size={22} /></button>
+        <span className="m-stage-radio-label">{tr('라디오')}</span>
+        <span />
+      </header>
+      <div className="m-stage-body tab-now"><Deck /></div>
+      <div className="m-stage-meta">
+        <div className="m-stage-text">
+          <h1>{station?.name || tr('라디오')}</h1>
+          <span className="stage-artist">{station ? `${band.fmt(station.freq)} ${station.band}` : ''}{buffering && phase === 'on' ? ` · ${tr('연결 중…')}` : ''}</span>
+        </div>
+        <button className={`icon-btn like ${saved ? 'on' : ''}`} onClick={toggleSave} aria-label={tr('주파수 저장')}>
+          {saved ? <BookmarkCheck size={23} /> : <Bookmark size={23} />}
+        </button>
+      </div>
+      <div className="stage-controls m-stage-controls">
+        <button className="icon-btn" onClick={() => step(-1)} aria-label={tr('이전 채널')}><SkipBack size={30} fill="currentColor" /></button>
+        <PlayButton size={70} playing={phase !== 'ending'} onClick={toggle} />
+        <button className="icon-btn" onClick={() => step(1)} aria-label={tr('다음 채널')}><SkipForward size={30} fill="currentColor" /></button>
+      </div>
+    </div>
+  );
+}
+
 export default function MobileStage() {
   const track = usePlayer((s) => s.queue[s.index]);
+  const radio = useRadio((s) => s.on);
+  if (radio) return <RadioView />;
   return track ? <StageView track={track} /> : null;
 }

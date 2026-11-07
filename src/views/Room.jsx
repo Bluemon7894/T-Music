@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy, Crown, GripVertical, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Share2, UserPlus, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { Empty, ArtistLinks, Thumb } from '../components/common.jsx';
 import LyricsView from '../components/layout/LyricsView.jsx';
@@ -52,11 +52,18 @@ function FriendInvites({ members }) {
   const friends = useFriends((s) => s.friends);
   const inviteFriend = useFriends((s) => s.inviteFriend);
   const list = Object.entries(friends).filter(([uid]) => !members[uid]).sort(([, a], [, b]) => Number(b.online) - Number(a.online));
+  const listRef = useRef(null);
+  const [more, setMore] = useState(false);
+  const measure = () => {
+    const el = listRef.current;
+    setMore(Boolean(el) && el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+  };
+  useLayoutEffect(measure, [list.length]);
   return (
     <section className="room-card room-friends" data-enter>
       <h3><Send size={16} />{' '}{tr('친구 초대')}</h3>
       {list.length ? (
-        <ul>
+        <ul ref={listRef} className={more ? 'more' : ''} onScroll={measure}>
           {list.map(([uid, f]) => (
             <li key={uid}>
               <i className={`room-dot ${f.online ? 'on' : ''}`} />

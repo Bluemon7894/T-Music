@@ -6,6 +6,23 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // What went wrong in the app (src/lib/telemetry.js). Anyone signed in may add a small report about
+    // themselves; nobody can read, change or delete them from the app. Firestore's TTL on expireAt
+    // removes them after 30 days.
+    match /errorReports/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'kind', 'message', 'detail', 'version', 'platform', 'at', 'expireAt'])
+        && request.resource.data.kind is string && request.resource.data.kind.size() <= 40
+        && request.resource.data.message is string && request.resource.data.message.size() <= 500
+        && request.resource.data.detail is map && request.resource.data.detail.size() <= 12
+        && request.resource.data.version is string && request.resource.data.version.size() <= 20
+        && request.resource.data.platform in ['windows', 'android']
+        && request.resource.data.at == request.time
+        && request.resource.data.expireAt is timestamp
+        && request.resource.data.expireAt < request.time + duration.value(31, 'd');
+    }
+
     // Shared playlists: the long random id is the link. Whoever has it can read, nobody can list
     // them, and others can edit only the contents and only while the owner allows it.
     match /sharedPlaylists/{id} {

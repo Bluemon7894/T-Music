@@ -1,0 +1,111 @@
+/* ---------- radio ---------- */
+.radio-tools { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.radio-tools .btn { white-space: nowrap; }
+
+/* the dial: a glass strip like an old receiver's window, warm when the radio is on */
+.rdial { position: relative; display: flex; align-items: center; gap: 18px; width: 100%; padding: 14px 18px; box-sizing: border-box; border-radius: var(--r); background: linear-gradient(180deg, rgba(10, 6, 22, 0.75), rgba(26, 17, 48, 0.6)); border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -18px 30px -24px rgba(0, 0, 0, 0.8); transition: box-shadow 0.6s var(--out), border-color 0.6s var(--out); }
+.rdial.lit { border-color: var(--line-2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 40px -18px rgba(139, 92, 246, 0.8); }
+.rdial-readout { flex: none; display: flex; align-items: baseline; gap: 6px; min-width: 150px; font-variant-numeric: tabular-nums; color: var(--dim); transition: color 0.5s, text-shadow 0.5s; }
+.rdial-readout b { font-size: 32px; font-weight: 900; letter-spacing: -0.03em; }
+.rdial-readout small { font-size: 12px; font-weight: 700; }
+.rdial-band { align-self: center; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 800; border: 1px solid currentColor; opacity: 0.8; }
+.rdial.lit .rdial-readout { color: var(--v-100); text-shadow: 0 0 18px rgba(196, 181, 253, 0.7); }
+.rdial-scale { position: relative; flex: 1; min-width: 0; height: 46px; margin: 0 8px; }
+.rdial-scale::before { content: ''; position: absolute; left: 0; right: 0; top: 18px; height: 1px; background: rgba(196, 181, 253, 0.25); }
+.rdial-major { position: absolute; top: 8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.rdial-major i { width: 1px; height: 12px; background: rgba(196, 181, 253, 0.4); }
+.rdial-major em { font-style: normal; font-size: 10px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.rdial-mark { position: absolute; top: 13px; width: 7px; height: 11px; margin-left: -3.5px; border-radius: 3px; background: rgba(196, 181, 253, 0.35); transition: background 0.2s, transform 0.25s var(--spring), box-shadow 0.2s; }
+.rdial-mark.yt { background: rgba(240, 171, 252, 0.4); }
+.rdial-mark:hover { transform: scaleY(1.4); background: var(--v-200); }
+.rdial-mark.on { background: #fff; box-shadow: 0 0 10px rgba(196, 181, 253, 0.9); }
+.rdial-needle { position: absolute; top: -2px; bottom: 4px; width: 2px; margin-left: -1px; border-radius: 2px; background: var(--dim); pointer-events: none; transition: background 0.5s, box-shadow 0.5s; }
+.rdial.lit .rdial-needle { background: linear-gradient(180deg, #fff, var(--pink)); box-shadow: 0 0 12px rgba(240, 171, 252, 0.9); }
+.rdial.compact { padding: 10px 12px; gap: 10px; }
+.rdial.compact .rdial-readout { min-width: 0; }
+.rdial.compact .rdial-readout b { font-size: 22px; }
+
+.radio-hero { display: flex; flex-direction: column; gap: 16px; padding: 18px; margin-bottom: 26px; border-radius: var(--r-lg); background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)); border: 1px solid var(--line); }
+.radio-now { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.radio-now-logo { width: 64px; height: 64px; flex: none; border-radius: 14px; object-fit: cover; }
+.radio-now-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.radio-now-text b { font-size: 20px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-now-text small { color: var(--sub); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.radio-kicker { font-size: 11.5px; font-weight: 700; color: var(--v-300); text-transform: uppercase; letter-spacing: 0.04em; }
+.radio-kicker em { font-style: normal; color: var(--pink); }
+.radio-now-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.radio-now-actions .icon-btn.on { color: var(--pink); }
+.radio-power { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; color: var(--sub); background: var(--glass-2); border: 1px solid var(--line-2); transition: background 0.3s, color 0.3s, box-shadow 0.3s, transform 0.25s var(--spring); }
+.radio-power:hover { transform: scale(1.06); color: #fff; }
+.radio-power:active { transform: scale(0.94); }
+.radio-power.on { color: #fff; background: var(--grad); box-shadow: var(--glow); border-color: transparent; }
+
+.radio-section { margin-bottom: 26px; }
+.radio-section h2 { display: flex; align-items: baseline; gap: 8px; font-size: 20px; font-weight: 800; margin: 0 0 12px; }
+.radio-section h2 small { font-size: 12.5px; font-weight: 600; }
+.radio-saved { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.radio-chip { flex: none; display: flex; align-items: center; gap: 10px; max-width: 240px; padding: 8px 14px 8px 8px; border-radius: 14px; text-align: left; background: var(--glass-2); border: 1px solid var(--line); transition: background 0.2s, border-color 0.2s; }
+.radio-chip:hover { background: var(--glass-3); }
+.radio-chip.on { border-color: rgba(167, 139, 250, 0.6); background: rgba(139, 92, 246, 0.2); }
+.radio-chip-logo { width: 36px; height: 36px; flex: none; border-radius: 9px; }
+.radio-chip span { display: flex; flex-direction: column; min-width: 0; }
+.radio-chip b { font-size: 13px; font-variant-numeric: tabular-nums; }
+.radio-chip small { font-size: 11.5px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.radio-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.radio-row { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 8px 12px 8px 8px; border-radius: 14px; text-align: left; background: var(--glass); border: 1px solid transparent; transition: background 0.2s, border-color 0.2s; }
+.radio-row:hover { background: var(--glass-2); border-color: var(--line); }
+.radio-row.on { background: rgba(139, 92, 246, 0.18); border-color: rgba(167, 139, 250, 0.45); }
+.radio-row-sk { height: 58px; border-radius: 14px; }
+.radio-freq { flex: none; display: flex; flex-direction: column; align-items: center; width: 52px; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--v-100); }
+.radio-freq small { font-size: 10px; font-weight: 700; color: var(--dim); }
+.radio-logo { width: 42px; height: 42px; flex: none; border-radius: 10px; }
+.radio-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.radio-text b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-text small { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-live { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 8px rgba(74, 222, 128, 0.8); }
+.radio-row .eq { flex: none; }
+
+/* the stage's radio set (RadioDevice.jsx draws it in SVG; this lights it). The set is its own body, so
+   the square case the turntable and the cassette deck sit in is left out. */
+.rd-deck { background: none !important; border: none !important; box-shadow: none !important; }
+.rd-set { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 3cqw 5cqw rgba(8, 4, 20, 0.7)); transition: filter 1.2s; }
+.rd-deck.lit .rd-set { filter: drop-shadow(0 3cqw 5cqw rgba(8, 4, 20, 0.7)) drop-shadow(0 0 6cqw rgba(167, 139, 250, 0.35)); }
+.rd-label { font: 800 2px 'Pretendard Variable', sans-serif; letter-spacing: 0.3px; fill: rgba(221, 214, 254, 0.7); }
+.rd-num { font: 700 2.4px 'Pretendard Variable', sans-serif; fill: rgba(196, 181, 253, 0.35); transition: fill 0.8s; }
+.rd-band-name { font: 900 2.1px 'Pretendard Variable', sans-serif; letter-spacing: 0.25px; fill: rgba(196, 181, 253, 0.3); transition: fill 0.8s; white-space: pre; }
+.rd-rule { stroke: rgba(196, 181, 253, 0.3); stroke-width: 0.25; transition: stroke 0.8s; }
+.rd-key-text { font: 900 2.6px 'Pretendard Variable', sans-serif; fill: #3b2a6e; }
+.rd-backlight { opacity: 0; transition: opacity 1.4s ease-in; }
+.rd-deck.lit .rd-backlight { opacity: 1; }
+.rd-deck[data-phase='ending'] .rd-backlight { opacity: 0; transition-duration: 2.2s; transition-timing-function: ease-out; }
+.rd-deck.lit .rd-num, .rd-deck.lit .rd-band-name { fill: rgba(46, 16, 101, 0.8); }
+.rd-deck.lit .rd-band-name.on { fill: #86198f; }
+.rd-deck.lit .rd-rule { stroke: rgba(46, 16, 101, 0.6); }
+.rd-pointer { fill: rgba(240, 171, 252, 0.45); transition: fill 0.8s; }
+.rd-deck.lit .rd-pointer { fill: #c026d3; }
+.rd-pointer-glow { opacity: 0; transition: opacity 0.8s; }
+.rd-deck.lit .rd-pointer-glow { opacity: 0.35; }
+.rd-cloth-glow { opacity: 0; }
+.rd-deck.live .rd-cloth-glow { animation: rd-breathe 1.2s ease-in-out infinite; }
+@keyframes rd-breathe { 0%, 100% { opacity: 0.02; } 50% { opacity: 0.09; } }
+.rd-eye { opacity: 0.15; transition: opacity 1.2s; }
+.rd-deck.lit .rd-eye { opacity: 1; }
+.rd-lamp { opacity: 0.2; transition: opacity 0.6s; }
+.rd-deck.lit .rd-lamp { opacity: 1; filter: drop-shadow(0 0 1.2px #e879f9); }
+html[data-motion='calm'] .rd-deck.live .rd-cloth-glow { animation: none; }
+
+/* the dock on the radio */
+.radio-live-bar { gap: 10px; }
+.radio-onair { flex: none; padding: 2px 7px; border-radius: 6px; font-size: 10.5px; font-weight: 900; letter-spacing: 0.06em; color: var(--dim); border: 1px solid var(--line-2); transition: color 0.4s, background 0.4s, box-shadow 0.4s; }
+.radio-onair.on { color: #fff; background: rgba(217, 70, 239, 0.35); border-color: rgba(240, 171, 252, 0.6); box-shadow: 0 0 14px -2px rgba(217, 70, 239, 0.8); }
+.radio-live-track { position: relative; flex: 1; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.radio-live-track i { position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(196, 181, 253, 0.7), transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: radio-sweep 2.6s linear infinite; }
+@keyframes radio-sweep { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+html[data-motion='calm'] .radio-live-track i { animation: none; background: rgba(196, 181, 253, 0.4); }
+.m-stage-radio-label { font-size: 14px; font-weight: 800; color: var(--v-200); letter-spacing: 0.02em; }
+.radio-panel { display: flex; flex-direction: column; gap: 12px; }
+.radio-panel .np-card { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.radio-panel-logo { width: 120px; height: 120px; border-radius: 20px; }
+.radio-panel-name { font-size: 16px; }
+.radio-panel .radio-row { width: 100%; }

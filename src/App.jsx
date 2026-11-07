@@ -30,11 +30,31 @@ import Downloads from './views/Downloads.jsx';
 import Settings from './views/Settings.jsx';
 import Room from './views/Room.jsx';
 import Friends from './views/Friends.jsx';
+import Radio from './views/Radio.jsx';
 import InvitePrompt from './components/InvitePrompt.jsx';
 import MobileShell from './components/mobile/MobileShell.jsx';
 import { IS_ANDROID } from './lib/platform.js';
 import { Album, Playlist, Liked, LocalPlaylist } from './views/Collection.jsx';
-import { tr } from './lib/i18n.js';
+import { LANGUAGE, tr } from './lib/i18n.js';
+import { installErrorReporting, reportError } from './lib/telemetry.js';
+import './store/equalizer.js'; // applies the saved equalizer before anything plays
+import { startQuickBridge } from './lib/quickBridge.js';
+
+installErrorReporting();
+
+// A notice from remote-config.json, shown once per notice on this device.
+const NOTICE_KEY = 't-music-notice-seen';
+function showRemoteNotice() {
+  api.remoteNotice().then((n) => {
+    const text = n && (LANGUAGE === 'en' ? n.en || n.ko : n.ko || n.en);
+    if (!text) return;
+    try {
+      if (localStorage.getItem(NOTICE_KEY) === n.id) return;
+      localStorage.setItem(NOTICE_KEY, n.id);
+    } catch { /* show it anyway */ }
+    setTimeout(() => toast(text), 2500);
+  }).catch(() => {});
+}
 
 function View({ route }) {
   const p = route.params;
@@ -51,6 +71,7 @@ function View({ route }) {
     case 'room': return <Room />;
     case 'friends': return <Friends />;
     case 'friend': return <FriendProfile key={p.uid} uid={p.uid} />;
+    case 'radio': return <Radio />;
     default: return <Home />;
   }
 }
@@ -179,6 +200,8 @@ function MainApp() {
   useEffect(() => {
     initDownloads();
     useUpdater.getState().init();
+    showRemoteNotice();
+    startQuickBridge();
     return watchForeground();
   }, []);
 
@@ -206,6 +229,12 @@ function MainApp() {
   // Handle media controls from system tray
   useEffect(() => {
     return api.onMediaControl((action) => {
+      const radio = globalThis.__tmRadioControl;
+      if (radio?.active()) {
+        if (action === 'toggle') radio.toggle();
+        else radio.step(action === 'next' ? 1 : -1);
+        return;
+      }
       const p = usePlayer.getState();
       if (action === 'toggle') p.toggle();
       else if (action === 'next') p.next();
@@ -284,8 +313,9 @@ class CrashScreen extends Component {
     return { failed: true };
   }
 
-  componentDidCatch(error) {
+  componentDidCatch(error, info) {
     console.error('[app]', error);
+    reportError('crash', error?.message || String(error), { screen: true, stack: String(info?.componentStack || '').slice(0, 400) });
     recoverFromCrash();
   }
 

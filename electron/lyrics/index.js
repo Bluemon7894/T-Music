@@ -8,6 +8,7 @@ import path from 'path';
 import { parseLrc, cleanLines, isPlausibleTiming, isUsableText, stripTimestamps, scriptProfile, looksRomanizedKorean, decodeEntities } from './lrc.js';
 import { parseTrack, buildQueries, scoreCandidate } from './match.js';
 import { SYNC_SOURCES, videoCaptions, youtubeMusicPlain, naverPlain } from './sources.js';
+import * as remote from '../remoteConfig.js';
 
 const CACHE_VERSION = 3;
 const EMPTY_TTL = 30 * 60 * 1000;
@@ -86,10 +87,14 @@ function rank(items, meta, seen) {
     .sort((a, b) => b.meta.score - a.meta.score);
 }
 
+// The timed-lyrics databases still switched on in remote-config.json.
+const syncSources = () => Object.keys(SYNC_SOURCES).filter((name) => remote.lyricsOn(name));
+
 // Asks every source; settles early as soon as one answer is clearly the right song.
 function searchRound(query, meta, state) {
   return new Promise((resolve) => {
-    const names = Object.keys(SYNC_SOURCES);
+    const names = syncSources();
+    if (!names.length) { resolve(null); return; }
     const all = [];
     let pending = names.length;
     let finished = false;
@@ -134,6 +139,7 @@ function searchRound(query, meta, state) {
 }
 
 async function fromCaptions(track, meta) {
+  if (!remote.lyricsOn('captions')) return null;
   try {
     const raw = await videoCaptions(track.id, meta);
     if (!raw) return null;
@@ -175,13 +181,13 @@ async function search(track) {
   if (best) return { result: timedResult(best.c, best.e, meta.duration), answered: true };
 
   // No timed lyrics anywhere. Licensed text first, then the best entry we saw.
-  const ytm = await youtubeMusicPlain(track.id);
+  const ytm = remote.lyricsOn('ytmusic') ? await youtubeMusicPlain(track.id) : null;
   if (ytm && isUsableText(ytm.text)) return { result: plainResult(ytm.text, 'YouTube Music', ytm.footer), answered: true };
   if (state.text) {
     const { c, e } = state.text;
     return { result: plainResult(e.plain ? decodeEntities(e.plain) : stripTimestamps(e.synced), c.source, creditOf(c)), answered: true };
   }
-  const naver = await naverPlain(meta.titles[0], meta.artists[0] || '');
+  const naver = remote.lyricsOn('naver') ? await naverPlain(meta.titles[0], meta.artists[0] || '') : null;
   if (naver && isUsableText(naver)) return { result: plainResult(naver, '네이버', '출처: 네이버'), answered: true };
   // A database that didn't answer might have had it, so this isn't "no lyrics" yet.
   return { result: NOTHING(), answered: state.answered && !state.flaky };
@@ -282,7 +288,7 @@ export async function getCandidates(track, customQuery) {
   const queries = typed ? [{ free: typed, title: typed, artist: '' }] : buildQueries(meta).slice(0, 2);
 
   const rounds = await Promise.all(queries.map(async (q) => {
-    const settled = await Promise.allSettled(Object.values(SYNC_SOURCES).map((fn) => fn(q, meta)));
+    const settled = await Promise.allSettled(syncSources().map((name) => SYNC_SOURCES[name](q, meta)));
     return settled.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
   }));
   const seen = new Set();

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, ChevronsUp, Radio, X, Maximize2, ListMusic, Sparkles, Mic2, MoreHorizontal } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronsUp, Radio, Radio as RadioIcon, X, Maximize2, ListMusic, Sparkles, Mic2, MoreHorizontal, Music2 } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
+import { useRadio } from '../../store/radio.js';
+import RadioDial, { BANDS } from '../RadioDial.jsx';
 import { useUI } from '../../store/ui.js';
 import { useLibrary } from '../../store/library.js';
 import { useRoom } from '../../store/room.js';
@@ -13,13 +15,16 @@ import LyricsView from './LyricsView.jsx';
 import { fmtTime } from '../../lib/util.js';
 import { auth } from '../../lib/firebase.js';
 import { dragProps, dropOnQueue, trackPayload, useDrop } from '../../lib/drag.js';
-import { useTilt, animate, ease } from '../../lib/motion.js';
+import { useTilt, animate, ease, useFlip } from '../../lib/motion.js';
 import { IS_ANDROID } from '../../lib/platform.js';
 import logo from '../../assets/logo-mark.png';
 import { tr } from '../../lib/i18n.js';
 
 // `order` identifies the row within its list, and `onMove(from, to)` takes a row dropped onto this one.
-function QueueRow({ track, onPlay, current, menu, index, order, onMove }) {
+// The same track can be in the queue twice; this tells the copies apart for the reorder animation.
+const flipKey = (queue, i) => `${queue[i].id}:${queue.slice(0, i).filter((t) => t.id === queue[i].id).length}`;
+
+function QueueRow({ track, onPlay, current, menu, index, order, onMove, flip }) {
   const openMenu = useUI((s) => s.openMenu);
   const playing = usePlayer((s) => s.playing);
   const { over, dropProps } = useDrop((payload) => {
@@ -29,6 +34,7 @@ function QueueRow({ track, onPlay, current, menu, index, order, onMove }) {
   return (
     <div
       className={`q-row ${current ? 'current' : ''} ${over ? 'drag-over' : ''}`}
+      data-flip={flip}
       onClick={IS_ANDROID ? onPlay : undefined}
       onDoubleClick={IS_ANDROID ? undefined : onPlay}
       onContextMenu={(e) => openMenu(e, menu)}
@@ -141,7 +147,7 @@ export function QueueList() {
         <>
           <div className="np-section"><span>{tr('다음 곡')}</span><small>{tr('{0}곡', manualUpcoming.length)}</small></div>
           {manualUpcoming.map(({ t, i }) => (
-            <QueueRow key={t.id + i} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeAt(i) }])} />
+            <QueueRow key={t.id + i} flip={flipKey(queue, i)} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeAt(i) }])} />
           ))}
         </>
       )}
@@ -153,7 +159,7 @@ export function QueueList() {
             <small>{tr('{0}곡', autoUpcoming.length)}</small>
           </div>
           {autoUpcoming.map(({ t, i }) => (
-            <QueueRow key={t.id + i} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeAt(i) }])} />
+            <QueueRow key={t.id + i} flip={flipKey(queue, i)} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t, [{ divider: true }, { label: tr('대기열에서 삭제'), icon: X, onClick: () => removeAt(i) }])} />
           ))}
         </>
       )}
@@ -184,7 +190,50 @@ export function AutoplayToggle() {
   );
 }
 
+// The side panel while the radio is on: the channel, a small dial, and saved frequencies. No queue or
+// lyrics tabs, since a broadcast has neither.
+function RadioPanel() {
+  const station = useRadio((s) => s.station);
+  const channels = useRadio((s) => s.channels);
+  const savedStations = useLibrary((s) => s.savedStations);
+  const togglePanel = useUI((s) => s.togglePanel);
+  const { tune } = useRadio.getState();
+  const bandId = station?.band || 'FM';
+  return (
+    <aside className="now-panel">
+      <div className="np-head">
+        <div className="seg"><button className="on"><RadioIcon size={14} />{' '}{tr('라디오')}</button></div>
+        <button className="icon-btn circle" onClick={togglePanel} aria-label={tr('패널 닫기')}><X size={16} /></button>
+      </div>
+      <div className="np-body radio-panel">
+        <div className="np-card">
+          <Thumb src={station?.logo} className="radio-panel-logo" />
+          <b className="radio-panel-name">{station?.name}</b>
+          <small className="muted">{station ? `${BANDS[bandId].fmt(station.freq)} ${bandId}` : ''}</small>
+        </div>
+        <RadioDial compact bandId={bandId} channels={channels.filter((c) => c.band === bandId)} current={station} onPick={tune} />
+        {savedStations.length > 0 && (
+          <>
+            <div className="np-section"><span>{tr('저장한 주파수')}</span></div>
+            {savedStations.map((s) => (
+              <button key={s.id} className={`radio-row ${s.id === station?.id ? 'on' : ''}`} onClick={() => tune(s)}>
+                <span className="radio-freq">{BANDS[s.band]?.fmt(s.freq)}<small>{s.band}</small></span>
+                <span className="radio-text"><b>{s.name}</b></span>
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 export default function NowPanel() {
+  const radioOn = useRadio((s) => s.on);
+  return radioOn ? <RadioPanel /> : <MusicPanel />;
+}
+
+function MusicPanel() {
   const queue = usePlayer((s) => s.queue);
   const index = usePlayer((s) => s.index);
   const autoplay = usePlayer((s) => s.autoplay);
@@ -200,19 +249,21 @@ export default function NowPanel() {
   const autoUpcoming = upcoming.filter(({ t }) => t.isAutoplay);
   const { over, dropProps } = useDrop((payload) => (Number.isInteger(payload.order) ? null : dropOnQueue(payload)));
   const move = { list: 'mine', to: usePlayer.getState().reorderQueue };
+  const body = useRef(null);
+  useFlip(body);
 
   return (
     <aside className={`now-panel ${over ? 'drag-over' : ''}`} {...dropProps}>
       <div className="np-head">
         <div className="seg">
-          <button className={panelTab === 'next' ? 'on' : ''} onClick={() => setPanelTab('next')}><Sparkles size={14} />{' '}{tr('지금 재생')}</button>
+          <button className={panelTab === 'next' ? 'on' : ''} onClick={() => setPanelTab('next')}><Music2 size={14} />{' '}{tr('지금 재생')}</button>
           <button className={panelTab === 'queue' ? 'on' : ''} onClick={() => setPanelTab('queue')}><ListMusic size={14} />{' '}{tr('대기열')}</button>
           <button className={panelTab === 'lyrics' ? 'on' : ''} onClick={() => setPanelTab('lyrics')}><Mic2 size={14} />{' '}{tr('가사')}</button>
         </div>
         <button className="icon-btn circle" onClick={togglePanel} aria-label={tr('패널 닫기')}><X size={16} /></button>
       </div>
 
-      <div className="np-body">
+      <div className="np-body" ref={body}>
         {!cur && <Idle />}
         {cur && panelTab === 'lyrics' && <LyricsView key={cur.id} track={cur} />}
         {cur && panelTab === 'next' && (
@@ -226,7 +277,7 @@ export default function NowPanel() {
                   {contextName && <small>{contextName}</small>}
                 </div>
                 {manualUpcoming.slice(0, 6).map(({ t, i }) => (
-                  <QueueRow key={t.id + i} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
+                  <QueueRow key={t.id + i} flip={flipKey(queue, i)} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
                 ))}
               </>
             )}
@@ -238,7 +289,7 @@ export default function NowPanel() {
                   <small>{tr('{0}곡', autoUpcoming.length)}</small>
                 </div>
                 {autoUpcoming.slice(0, manualUpcoming.length > 0 ? Math.max(2, 6 - manualUpcoming.length) : 6).map(({ t, i }) => (
-                  <QueueRow key={t.id + i} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
+                  <QueueRow key={t.id + i} flip={flipKey(queue, i)} index={i - index} order={i} onMove={move} track={t} onPlay={() => jumpTo(i)} menu={trackMenuItems(t)} />
                 ))}
               </>
             )}

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { Heart, Clock3, ListPlus, ListEnd, Disc3, User, Plus, Trash2, Radio, ArrowDownToLine, Play, MoreHorizontal, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, GripVertical } from 'lucide-react';
+import { Heart, Clock3, ListPlus, ListEnd, ListChecks, Disc3, User, Plus, Trash2, Radio, ArrowDownToLine, Play, MoreHorizontal, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, GripVertical } from 'lucide-react';
 import { usePlayer } from '../store/player.js';
+import { useRoom } from '../store/room.js';
 import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { useUI, toast } from '../store/ui.js';
@@ -10,7 +11,7 @@ import { canEditPlaylist } from '../lib/sharedPlaylists.js';
 import { fmtTime } from '../lib/util.js';
 import { IS_ANDROID } from '../lib/platform.js';
 import { dragProps, trackPayload } from '../lib/drag.js';
-import { burst, useEnter } from '../lib/motion.js';
+import { burst, flyToQueue, useEnter } from '../lib/motion.js';
 import { Thumb, ArtistLinks, Equalizer } from './common.jsx';
 import DownloadButton from './DownloadButton.jsx';
 import { tr } from '../lib/i18n.js';
@@ -26,6 +27,19 @@ export async function startRadio(track) {
   }
 }
 
+// Whether this exact video is waiting to play: in the shared queue while listening together, otherwise
+// after the current track in this device's queue (tracks the app added as recommendations don't count).
+function isQueued(id, player, room) {
+  if (room.code && room.attached) return room.queue.some((item) => item.track?.id === id);
+  return player.queue.some((t, i) => i > player.index && !t.isAutoplay && t.id === id);
+}
+
+export const useInQueue = (id) => {
+  const solo = usePlayer((s) => s.queue.some((t, i) => i > s.index && !t.isAutoplay && t.id === id));
+  const shared = useRoom((s) => (s.code && s.attached ? s.queue.some((item) => item.track?.id === id) : null));
+  return shared ?? solo;
+};
+
 export function trackMenuItems(track, extra = []) {
   const p = usePlayer.getState();
   const lib = useLibrary.getState();
@@ -33,9 +47,11 @@ export function trackMenuItems(track, extra = []) {
   const liked = lib.isLiked(track.id);
   const downloaded = useDownloads.getState().done.has(track.id);
   const artist = track.artists?.find((a) => a.id);
+  const queued = isQueued(track.id, p, useRoom.getState());
   return [
-    { label: tr('다음에 재생'), icon: ListPlus, onClick: () => p.playNext(track) },
-    { label: tr('대기열에 추가'), icon: ListEnd, onClick: () => p.addToQueue(track) },
+    { label: tr('다음에 재생'), icon: ListPlus, onClick: () => { flyToQueue(track.thumb); p.playNext(track); } },
+    // Still adds another copy when it's already waiting: that can be on purpose.
+    { label: queued ? tr('대기열에 있음 ✓') : tr('대기열에 추가'), icon: queued ? ListChecks : ListEnd, onClick: () => { flyToQueue(track.thumb); p.addToQueue(track); } },
     { label: tr('이 곡으로 라디오 시작'), icon: Radio, onClick: () => startRadio(track) },
     { divider: true },
     {
@@ -100,6 +116,11 @@ export function LikeButton({ track, size = 16, className = '' }) {
       <Heart size={size} fill={liked ? 'currentColor' : 'none'} />
     </button>
   );
+}
+
+function QueuedMark({ id }) {
+  if (!useInQueue(id)) return null;
+  return <span className="tl-queued" title={tr('대기열에 있음')} aria-label={tr('대기열에 있음')}><ListChecks size={12} /></span>;
 }
 
 export default function TrackList({ tracks, context, showAlbum = true, showThumb = true, numbered = true, onRemove, onReorder, compact, animate = true, playSingle = false }) {
@@ -196,7 +217,7 @@ export default function TrackList({ tracks, context, showAlbum = true, showThumb
             <span className="c-title">
               {showThumb && <Thumb src={t.thumb} className="tl-thumb" videoId={t.id} />}
               <span className="tl-text">
-                <span className="tl-name">{t.title}</span>
+                <span className="tl-name-row"><span className="tl-name">{t.title}</span>{!isCur && <QueuedMark id={t.id} />}</span>
                 <ArtistLinks artists={t.artists} className="tl-artist" />
               </span>
             </span>

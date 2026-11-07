@@ -3,7 +3,13 @@
 // Firebase talks to its own servers directly and doesn't come through here.
 import { Native } from './native.js';
 
-const PROXIED = /^https:\/\/([^/]+\.)?(youtube\.com|googlevideo\.com|lrclib\.net|music\.163\.com|qq\.com|kugou\.com|naver\.com|api\.github\.com|oauth2\.googleapis\.com|translate\.googleapis\.com|itunes\.apple\.com)(\/|$)/i;
+const PROXIED = /^https:\/\/([^/]+\.)?(youtube\.com|googlevideo\.com|lrclib\.net|music\.163\.com|qq\.com|kugou\.com|naver\.com|api\.github\.com|raw\.githubusercontent\.com|radio-browser\.info|oauth2\.googleapis\.com|translate\.googleapis\.com|itunes\.apple\.com)(\/|$)/i;
+
+// A radio stream or a piece of a livestream's playlist, from any station. The token stays valid, since
+// a media element may ask again (to reconnect, or for a range).
+export function radioProxyUrl(url) {
+  return `/__proxy/${Native.proxyPrepare(JSON.stringify({ url, method: 'GET', headers: {}, radio: true }))}`;
+}
 
 const realFetch = window.fetch.bind(window);
 

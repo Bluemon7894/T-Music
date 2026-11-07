@@ -1,7 +1,7 @@
 // Runs before anything else in the app: answers window.api, which is what the page uses to reach the
 // desktop app's main process, from the same code running right here.
 import { Native, onNative } from './native.js';
-import './proxyFetch.js';
+import { radioProxyUrl } from './proxyFetch.js';
 import * as catalog from '../../electron/youtube/catalog.js';
 import * as stream from '../../electron/youtube/stream.js';
 import * as lyrics from '../../electron/lyrics/index.js';
@@ -12,6 +12,8 @@ import * as downloads from './downloads.js';
 import * as updater from './updater.js';
 import * as auth from './auth.js';
 import { noteTrouble } from '../lib/trouble.js';
+import * as remote from '../../electron/remoteConfig.js';
+import * as radio from '../../electron/radio.js';
 
 const info = JSON.parse(Native.appInfo());
 updater.setCurrentVersion(info.version);
@@ -39,6 +41,8 @@ window.__tm.resolveStream = async (id, request) => {
   }
 };
 window.__tm.invalidateStream = (id, method, fresh) => stream.invalidate(id, method, fresh);
+// Radio streams come through the phone too: the page may only load media from itself.
+window.__tmRadioProxy = radioProxyUrl;
 
 // ---- whether the app is on screen ----
 let visible = true;
@@ -97,6 +101,9 @@ const api = {
   setCustomLyrics: (trackId, data) => lyrics.setCustom(trackId, data),
   prefetch: (id) => { if (!downloads.localFile(id)) stream.prefetch(id); return true; },
   status: () => ({ methods: stream.status(), version: info.version }),
+  remoteNotice: async () => { await remote.start(); return remote.notice(); },
+  radioChannels: (country) => radio.channels(String(country || 'KR')),
+  radioLive: (videoId) => radio.liveManifest(String(videoId)),
   diagnose: () => stream.diagnose(),
   downloads: () => downloads.snapshot(),
   download: (tracks) => downloads.enqueue(tracks),
@@ -130,4 +137,5 @@ window.api = {
 };
 
 // Warm up in the background so the first tap plays quickly.
+remote.start();
 getClient().catch(noop);

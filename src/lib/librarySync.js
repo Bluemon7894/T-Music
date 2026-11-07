@@ -20,6 +20,7 @@ const KEYED = {
   liked: newestFirst('addedAt'),
   savedAlbums: newestFirst('addedAt'),
   followed: newestFirst('addedAt'),
+  savedStations: newestFirst('addedAt'),
   playlists: newestFirst('created'),
 };
 const COLLECTIONS = [...Object.keys(KEYED), 'listens', 'state'];

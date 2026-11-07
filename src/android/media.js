@@ -2,6 +2,8 @@
 // what's pressed there, on a headset or by the system comes back here.
 import { Native, onNative } from './native.js';
 import { usePlayer } from '../store/player.js';
+import { useRadio } from '../store/radio.js';
+import { tr } from '../lib/i18n.js';
 import { useRoom } from '../store/room.js';
 import { useNav } from '../store/nav.js';
 import { useUI } from '../store/ui.js';
@@ -13,6 +15,19 @@ import { safeTrack } from '../lib/safeTrack.js';
 const POSITION_EVERY_MS = 5000;
 
 function publish() {
+  const r = useRadio.getState();
+  if (r.on && r.station) {
+    Native.playbackState(JSON.stringify({
+      playing: r.phase !== 'ending',
+      title: r.station.name,
+      artist: `${r.station.band} ${r.station.freq}`,
+      album: tr('라디오'),
+      thumb: r.station.logo || '',
+      duration: 0,
+      position: 0,
+    }));
+    return;
+  }
   const p = usePlayer.getState();
   const track = p.current();
   rememberPlayback(track ? { id: track.id, track: safeTrack(track), time: p.getPreciseTime(), playing: p.playing, at: Date.now() } : null);
@@ -52,7 +67,16 @@ function play() {
   else p.toggle();
 }
 
+useRadio.subscribe((s, prev) => { if (s.on !== prev.on || s.station !== prev.station || s.phase !== prev.phase) publish(); });
+
 onNative('media', ({ action, seconds }) => {
+  const r = useRadio.getState();
+  if (r.on) {
+    if (action === 'play' || action === 'pause') r.toggle();
+    else if (action === 'next') r.step(1);
+    else if (action === 'prev') r.step(-1);
+    return;
+  }
   const p = usePlayer.getState();
   if (action === 'play') play();
   else if (action === 'pause') pause();

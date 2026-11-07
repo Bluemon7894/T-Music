@@ -1,0 +1,7 @@
+{
+  "streamClients": ["VISIONOS", "IOS", "ANDROID_VR"],
+  "lastResortClients": ["TV", "TV_EMBEDDED", "WEB_EMBEDDED", "MWEB", "ANDROID", "YTMUSIC", "WEB"],
+  "lyricsOff": [],
+  "radioOff": [],
+  "notice": null
+}

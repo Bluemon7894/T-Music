@@ -58,8 +58,9 @@ function smallerThumb(url) {
 export function Thumb({ src, round, className = '', size, alt = '', videoId }) {
   const [url, setUrl] = useState(src);
   const [failed, setFailed] = useState(false);
+  const [missing, setMissing] = useState(false); // YouTube has no picture at all for this video
   const tries = useRef(0);
-  useEffect(() => { setUrl(src); setFailed(false); tries.current = 0; }, [src]);
+  useEffect(() => { setUrl(src); setFailed(false); setMissing(false); tries.current = 0; }, [src]);
   // Many pictures loading at once can lose a few to the network. A picture that failed isn't a missing
   // picture, so it's asked for again, and again whenever the connection returns.
   useEffect(() => {
@@ -77,12 +78,19 @@ export function Thumb({ src, round, className = '', size, alt = '', videoId }) {
   };
   // Missing YouTube video thumbnails come back as a 120x90 grey picture with 3 dots, not a network error.
   // default.jpg is really that size, and album art can be too, so only sizes that should be larger count.
+  // hqdefault exists for every video that has a picture, so the grey one there means there is none:
+  // the video's own picture is tried once, and otherwise the app's own placeholder beats YouTube's.
   const onLoad = (e) => {
     if (e.currentTarget.naturalWidth > 120) return;
-    const next = smallerThumb(url);
-    if (next && !url.endsWith('/hqdefault.jpg')) setUrl(next);
+    if (!url.endsWith('/hqdefault.jpg')) {
+      const next = smallerThumb(url);
+      if (next) setUrl(next);
+      return;
+    }
+    if (videoId && !url.includes(`/vi/${videoId}/`)) setUrl(`https://i.ytimg.com/vi/${videoId}/hq720.jpg`);
+    else setMissing(true);
   };
-  if (!url || failed) {
+  if (!url || failed || missing) {
     return (
       <div className={`thumb placeholder ${round ? 'round' : ''} ${className}`} style={style}>
         <Music size={size ? size * 0.4 : 20} />
@@ -116,7 +124,10 @@ export function PlayButton({ playing, onClick, size = 48, className = '', label 
       onClick={(e) => { e.stopPropagation(); pop(ref.current, 0.86); onClick(); }}
       aria-label={label || (playing ? tr('일시정지') : tr('재생'))}
     >
-      {playing ? <Pause size={size * 0.4} fill="currentColor" /> : <Play size={size * 0.4} fill="currentColor" style={{ marginLeft: size * 0.05 }} />}
+      {/* A new key on each change lets the new icon morph in (see .play-icon). */}
+      <span className="play-icon" key={playing ? 'pause' : 'play'}>
+        {playing ? <Pause size={size * 0.4} fill="currentColor" /> : <Play size={size * 0.4} fill="currentColor" style={{ marginLeft: size * 0.05 }} />}
+      </span>
     </button>
   );
 }

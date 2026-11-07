@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Home, Search, Library, ArrowDownToLine, Users, UserRoundPlus, Plus, Heart, ListMusic, Trash2, Pencil, Disc3, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Home, Search, Library, ArrowDownToLine, Users, UserRoundPlus, Plus, Heart, ListMusic, Trash2, Pencil, Disc3, PanelLeftClose, PanelLeftOpen, Radio } from 'lucide-react';
 import { useLibrary } from '../../store/library.js';
 import { canEditPlaylist, confirmDeletePlaylist } from '../../lib/sharedPlaylists.js';
 import { useNav, useRoute } from '../../store/nav.js';
@@ -17,6 +17,7 @@ import { tr } from '../../lib/i18n.js';
 const NAV = [
   { id: 'home', label: tr('홈'), icon: Home },
   { id: 'search', label: tr('검색'), icon: Search },
+  { id: 'radio', label: tr('라디오'), icon: Radio },
   { id: 'library', label: tr('보관함'), icon: Library },
   { id: 'downloads', label: tr('다운로드'), icon: ArrowDownToLine },
   { id: 'room', label: tr('같이 듣기'), icon: Users },

@@ -122,6 +122,46 @@
             ".validate": "newData.isBoolean()"
           }
         },
+        "radio": {
+          ".write": "auth != null && (root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid || (root.child('rooms').child($code).child('meta/controlMode').val() === 'everyone' && root.child('rooms').child($code).child('members').child(auth.uid).exists()))",
+          ".validate": "newData.hasChildren(['id', 'kind', 'name', 'band', 'freq', 'by', 'at'])",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 80 && newData.val().matches(/^(rb|yt):/)"
+          },
+          "kind": {
+            ".validate": "newData.val() === 'station' || newData.val() === 'youtube'"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "band": {
+            ".validate": "newData.val() === 'FM' || newData.val() === 'AM'"
+          },
+          "freq": {
+            ".validate": "newData.isNumber()"
+          },
+          "url": {
+            ".validate": "newData.isString() && newData.val().length <= 500 && newData.val().matches(/^https?:\\/\\//)"
+          },
+          "videoId": {
+            ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{11}$/)"
+          },
+          "logo": {
+            ".validate": "newData.isString() && newData.val().length <= 500 && newData.val().matches(/^https:\\/\\//)"
+          },
+          "hls": {
+            ".validate": "newData.isBoolean()"
+          },
+          "by": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "at": {
+            ".validate": "newData.val() === now"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
         "queue": {
           ".write": "auth != null && root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid",
           "$key": {

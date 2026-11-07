@@ -1,6 +1,10 @@
 import { useRef, useState } from 'react';
-import { Shuffle, SkipBack, SkipForward, Repeat, Repeat1, ListMusic, Volume2, Volume1, VolumeX, Maximize2, Mic2, PictureInPicture2 } from 'lucide-react';
+import { Shuffle, SkipBack, SkipForward, Repeat, Repeat1, ListMusic, Volume2, Volume1, VolumeX, Maximize2, Mic2, PictureInPicture2, Bookmark, BookmarkCheck } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
+import { useRadio } from '../../store/radio.js';
+import { useLibrary } from '../../store/library.js';
+import { BANDS } from '../RadioDial.jsx';
+import { burst } from '../../lib/motion.js';
 import { useUI } from '../../store/ui.js';
 import { useNav } from '../../store/nav.js';
 import { fmtTime } from '../../lib/util.js';
@@ -68,7 +72,65 @@ export function Slider({ value, max, onChange, onCommit, buffered = 0, className
   );
 }
 
+// The dock while the radio is on: the channel instead of a track, channel up and down instead of
+// tracks, a live bar instead of a seek bar, and no lyrics, queue or download.
+function RadioDock() {
+  const station = useRadio((s) => s.station);
+  const phase = useRadio((s) => s.phase);
+  const buffering = useRadio((s) => s.buffering);
+  const saved = useLibrary((s) => Boolean(station) && s.savedStations.some((x) => x.id === station.id));
+  const { toggle, step, toggleSave } = useRadio.getState();
+  const muted = usePlayer((s) => s.muted);
+  const volume = usePlayer((s) => s.volume);
+  const { setVolume, toggleMute } = usePlayer.getState();
+  const setStage = useUI((s) => s.setStage);
+  const go = useNav((s) => s.go);
+  const VolIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  const band = BANDS[station?.band || 'FM'];
+  return (
+    <footer className="dock radio-dock">
+      <div className="dock-left">
+        <button className="dock-art" onClick={() => setStage(true)} title={tr('크게 보기')}>
+          <Thumb src={station?.logo} />
+          <span className="dock-art-hint"><Maximize2 size={16} /></span>
+        </button>
+        <div className="dock-text">
+          <div className="dock-title" onClick={() => go('radio', {})}>{station?.name || tr('라디오')}</div>
+          <div className="dock-artist">{station ? `${band.fmt(station.freq)} ${station.band}` : ''}</div>
+        </div>
+        <button className={`icon-btn like ${saved ? 'on' : ''}`} onClick={(e) => { if (!saved) burst(e.currentTarget, '#f0abfc'); toggleSave(); }} title={saved ? tr('저장한 주파수에서 빼기') : tr('주파수 저장')} aria-label={tr('주파수 저장')}>
+          {saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}
+        </button>
+      </div>
+      <div className="dock-center">
+        <div className="dock-controls">
+          <button className="icon-btn" onClick={() => step(-1)} title={tr('이전 채널')}><SkipBack size={20} fill="currentColor" /></button>
+          <PlayButton size={42} playing={phase !== 'ending'} onClick={toggle} className={`dock-play ${buffering ? 'loading' : ''}`} />
+          <button className="icon-btn" onClick={() => step(1)} title={tr('다음 채널')}><SkipForward size={20} fill="currentColor" /></button>
+        </div>
+        <div className="dock-progress radio-live-bar">
+          <span className={`radio-onair ${phase === 'on' && !buffering ? 'on' : ''}`}>{tr('ON AIR')}</span>
+          <div className="radio-live-track"><i /></div>
+          <span className="time">{tr('실시간')}</span>
+        </div>
+      </div>
+      <div className="dock-right">
+        <button className="icon-btn" onClick={() => useUI.getState().setMini(true)} title={tr('미니 플레이어')}><PictureInPicture2 size={17} /></button>
+        <button className="icon-btn" onClick={() => setStage(true)} title={tr('전체 화면')}><Maximize2 size={16} /></button>
+        <button className="icon-btn" onClick={toggleMute} title={tr('음소거')}><VolIcon size={18} /></button>
+        <Slider className="volume" value={muted ? 0 : volume} max={1} onChange={setVolume} />
+      </div>
+    </footer>
+  );
+}
+
 export default function PlayerDock() {
+  const radioOn = useRadio((s) => s.on);
+  if (radioOn) return <RadioDock />;
+  return <MusicDock />;
+}
+
+function MusicDock() {
   const p = usePlayer();
   const track = p.queue[p.index];
   const openMenu = useUI((s) => s.openMenu);
@@ -91,7 +153,7 @@ export default function PlayerDock() {
         {track ? (
           <>
             <button className="dock-art" onClick={() => setStage(true)} title={tr('크게 보기')}>
-              <Thumb src={track.thumb} />
+              <Thumb key={track.id} src={track.thumb} className="art-swap" />
               <span className="dock-art-hint"><Maximize2 size={16} /></span>
             </button>
             <div className="dock-text" onContextMenu={(e) => openMenu(e, trackMenuItems(track))} {...dragProps(() => trackPayload(track))}>
@@ -133,7 +195,7 @@ export default function PlayerDock() {
 
       <div className="dock-right">
         <button className={`icon-btn toggle ${lyricsOn ? 'on' : ''}`} onClick={() => (lyricsOn ? useUI.getState().togglePanel() : setPanelTab('lyrics'))} title={tr('가사')} disabled={!track}><Mic2 size={18} /></button>
-        <button className={`icon-btn toggle ${queueOn ? 'on' : ''}`} onClick={() => (queueOn ? useUI.getState().togglePanel() : setPanelTab('queue'))} title={tr('대기열')}><ListMusic size={18} /></button>
+        <button className={`icon-btn toggle ${queueOn ? 'on' : ''}`} onClick={() => (queueOn ? useUI.getState().togglePanel() : setPanelTab('queue'))} title={tr('대기열')} data-queue-target><ListMusic size={18} /></button>
         <button className="icon-btn" onClick={() => useUI.getState().setMini(true)} title={tr('미니 플레이어')}><PictureInPicture2 size={17} /></button>
         <button className="icon-btn" onClick={() => setStage(true)} title={tr('전체 화면')} disabled={!track}><Maximize2 size={16} /></button>
         <button className="icon-btn" onClick={p.toggleMute} title={tr('음소거')}><VolIcon size={18} /></button>

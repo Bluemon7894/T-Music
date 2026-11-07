@@ -6,6 +6,7 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { getClient, getPlayerClient, resetClient } from './client.js';
+import * as remote from '../remoteConfig.js';
 
 const CLIENTS = ['VISIONOS', 'IOS', 'ANDROID_VR'];
 // Tried only once all of the above fail, with a session that can also unscramble web addresses.
@@ -87,7 +88,9 @@ function coolingDown(name) {
 }
 
 // Clients that have been failing go last rather than being dropped: one may have recovered.
-const clientOrder = () => [...CLIENTS.filter((c) => !coolingDown(c)), ...CLIENTS.filter(coolingDown)];
+// remote-config.json can reorder these when YouTube starts refusing one.
+const clients = () => remote.streamClients(CLIENTS);
+const clientOrder = () => [...clients().filter((c) => !coolingDown(c)), ...clients().filter(coolingDown)];
 
 async function tryClients(id) {
   let unplayable = null;
@@ -95,7 +98,7 @@ async function tryClients(id) {
   for (const name of clientOrder()) {
     try {
       const r = await withTimeout(innertube(id, name), TIMEOUT_MS);
-      if (name !== CLIENTS[0] && !(await withTimeout(servesWholeFile(r), TIMEOUT_MS))) throw new Error('only serves the start of the file');
+      if (name !== clients()[0] && !(await withTimeout(servesWholeFile(r), TIMEOUT_MS))) throw new Error('only serves the start of the file');
       mark(name, true);
       return { ...r, method: name };
     } catch (e) {
@@ -111,7 +114,7 @@ async function tryClients(id) {
 }
 
 async function tryLastResort(id) {
-  for (const name of LAST_RESORT_CLIENTS) {
+  for (const name of remote.lastResortClients(LAST_RESORT_CLIENTS)) {
     try {
       const r = await withTimeout(innertube(id, name, getPlayerClient), TIMEOUT_MS);
       if (await withTimeout(servesWholeFile(r), TIMEOUT_MS)) return { ...r, method: name };
@@ -169,7 +172,7 @@ export function prefetch(id) {
 
 export async function diagnose(id = 'OIHlzvEKncQ') {
   const results = [];
-  for (const name of CLIENTS) {
+  for (const name of clients()) {
     const t = Date.now();
     try {
       const r = await withTimeout(innertube(id, name), TIMEOUT_MS);
@@ -184,5 +187,5 @@ export async function diagnose(id = 'OIHlzvEKncQ') {
 
 export function status() {
   const st = loadStats();
-  return CLIENTS.map((name) => ({ name, ...(st[name] || { ok: 0, fail: 0 }) }));
+  return clients().map((name) => ({ name, ...(st[name] || { ok: 0, fail: 0 }) }));
 }

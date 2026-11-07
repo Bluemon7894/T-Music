@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search, X, Settings, PanelRight, Sparkles, History } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X, Settings, PanelRight, Download, History } from 'lucide-react';
 import { useNav, useRoute } from '../../store/nav.js';
 import { useUI } from '../../store/ui.js';
 import { useDownloads } from '../../store/downloads.js';
@@ -20,7 +20,7 @@ export function UpdatePill() {
 
   return (
     <button className="update-pill" onClick={openModal} title={tr('새로운 업데이트가 있습니다')}>
-      <Sparkles size={14} />
+      <Download size={14} />
       <span>{tr('v{0} 업데이트', latestVersion)}</span>
     </button>
   );

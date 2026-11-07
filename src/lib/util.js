@@ -21,13 +21,12 @@ export function fmtBytes(n) {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
-export function greeting() {
+// `name` is added to every greeting except the small-hours one, which reads better on its own.
+export function greeting(name) {
   const h = new Date().getHours();
   if (h < 5) return tr('깊은 밤이에요');
-  if (h < 11) return tr('좋은 아침이에요');
-  if (h < 17) return tr('좋은 오후예요');
-  if (h < 21) return tr('좋은 저녁이에요');
-  return tr('편안한 밤이에요');
+  const text = h < 11 ? tr('좋은 아침이에요') : h < 17 ? tr('좋은 오후예요') : h < 21 ? tr('좋은 저녁이에요') : tr('편안한 밤이에요');
+  return name ? tr('{0}, {1}님', text, name) : text;
 }
 
 // Stable violet-family hue per id, for headers without artwork colour.

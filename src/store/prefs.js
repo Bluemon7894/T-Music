@@ -19,12 +19,13 @@ export const usePrefs = create((set, get) => ({
   lyricSize: ['small', 'normal', 'large'].includes(saved.lyricSize) ? saved.lyricSize : 'normal',
   calmMotion: saved.calmMotion === true,
   lyricLanguage: ['original', 'ko', 'en'].includes(saved.lyricLanguage) ? saved.lyricLanguage : 'original',
+  greetName: saved.greetName !== false, // the home greeting calls you by name
 
   setPref(patch) {
     set(patch);
-    const { resumeOnLaunch, lyricSize, calmMotion, lyricLanguage } = get();
+    const { resumeOnLaunch, lyricSize, calmMotion, lyricLanguage, greetName } = get();
     apply({ lyricSize, calmMotion });
-    try { localStorage.setItem(KEY, JSON.stringify({ resumeOnLaunch, lyricSize, calmMotion, lyricLanguage })); } catch { /* it still applies this session */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ resumeOnLaunch, lyricSize, calmMotion, lyricLanguage, greetName })); } catch { /* it still applies this session */ }
   },
 }));
 

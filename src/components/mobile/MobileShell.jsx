@@ -1,9 +1,11 @@
 // The phone layout: pages on top, then the mini player and tab bar. Desktop's sidebar, top bar, side
 // panel and dock don't exist here; their jobs move to the tabs, the top bar and the full-screen player.
-import { ArrowDownToLine, ChevronLeft, Home, Library, Search, Settings, SkipForward, UserRoundPlus, Users } from 'lucide-react';
+import { ArrowDownToLine, ChevronLeft, Home, Library, Radio, Search, Settings, SkipForward, UserRoundPlus, Users } from 'lucide-react';
 import { useNav, useRoute } from '../../store/nav.js';
 import { useUI } from '../../store/ui.js';
 import { usePlayer } from '../../store/player.js';
+import { useRadio } from '../../store/radio.js';
+import { BANDS } from '../RadioDial.jsx';
 import { useFriends } from '../../store/friends.js';
 import { useRoom } from '../../store/room.js';
 import { artistNames } from '../../lib/util.js';
@@ -21,6 +23,7 @@ import { tr } from '../../lib/i18n.js';
 const TABS = [
   { id: 'home', label: tr('홈'), icon: Home },
   { id: 'search', label: tr('검색'), icon: Search },
+  { id: 'radio', label: tr('라디오'), icon: Radio },
   { id: 'library', label: tr('보관함'), icon: Library },
   { id: 'room', label: tr('같이 듣기'), icon: Users },
   { id: 'friends', label: tr('친구'), icon: UserRoundPlus },
@@ -74,6 +77,26 @@ function MiniBar({ track }) {
   );
 }
 
+function RadioMiniBar() {
+  const station = useRadio((s) => s.station);
+  const phase = useRadio((s) => s.phase);
+  const buffering = useRadio((s) => s.buffering);
+  const { toggle, step } = useRadio.getState();
+  const setStage = useUI((s) => s.setStage);
+  const band = BANDS[station?.band || 'FM'];
+  return (
+    <div className="m-mini" onClick={() => setStage(true)}>
+      <Thumb src={station?.logo} className="m-mini-art" />
+      <div className="m-mini-text">
+        <b>{station?.name || tr('라디오')}</b>
+        <small>{station ? `${band.fmt(station.freq)} ${station.band}` : ''}</small>
+      </div>
+      <PlayButton size={40} playing={phase !== 'ending'} onClick={toggle} className={`dock-play ${buffering ? 'loading' : ''}`} />
+      <button className="icon-btn m-mini-next" onClick={(e) => { e.stopPropagation(); step(1); }} aria-label={tr('다음 채널')}><SkipForward size={22} fill="currentColor" /></button>
+    </div>
+  );
+}
+
 function TabBar() {
   const route = useRoute();
   const go = useNav((s) => s.go);
@@ -98,13 +121,14 @@ function TabBar() {
 
 export default function MobileShell({ mainRef, children }) {
   const track = usePlayer((s) => s.queue[s.index]);
+  const radio = useRadio((s) => s.on);
   const stage = useUI((s) => s.stage);
   return (
-    <div className={`m-app ${track ? 'has-mini' : ''} ${stage ? 'stage-open' : ''}`}>
+    <div className={`m-app ${track || radio ? 'has-mini' : ''} ${stage ? 'stage-open' : ''}`}>
       <div className="m-bg" />
       <MobileTop />
       <main className="main" ref={mainRef}>{children}</main>
-      {track && <MiniBar track={track} />}
+      {radio ? <RadioMiniBar /> : track && <MiniBar track={track} />}
       <TabBar />
       {stage && <MobileStage />}
       <ContextMenu />

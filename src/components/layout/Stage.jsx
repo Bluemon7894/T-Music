@@ -1,7 +1,10 @@
 // Fullscreen "stage": the deck, synchronized lyrics and the up-next strip. Esc or the button closes it.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ChevronDown, Shuffle, SkipBack, SkipForward, Repeat, Repeat1, Mic2, Volume2, Volume1, VolumeX } from 'lucide-react';
+import { ChevronDown, Shuffle, SkipBack, SkipForward, Repeat, Repeat1, Mic2, Volume2, Volume1, VolumeX, Bookmark, BookmarkCheck } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
+import { useRadio } from '../../store/radio.js';
+import { useLibrary } from '../../store/library.js';
+import { BANDS } from '../RadioDial.jsx';
 import { useRoom } from '../../store/room.js';
 import { useUI } from '../../store/ui.js';
 import { api } from '../../lib/api.js';
@@ -12,7 +15,7 @@ import { Slider } from './PlayerDock.jsx';
 import LyricsView from './LyricsView.jsx';
 import Deck from './Deck.jsx';
 import { fmtTime } from '../../lib/util.js';
-import { animate, createTimeline, ease, stagger } from '../../lib/motion.js';
+import { animate, burst, createTimeline, ease, stagger } from '../../lib/motion.js';
 import { tr } from '../../lib/i18n.js';
 
 const VOLUME_WHEEL_STEP = 0.05;
@@ -226,7 +229,70 @@ function StageView({ track }) {
   );
 }
 
+// The stage while the radio is on: the radio set, the channel, and channel controls. No lyrics, seek
+// bar or up-next: a broadcast has none of those.
+function RadioStage() {
+  const setStage = useUI((s) => s.setStage);
+  const station = useRadio((s) => s.station);
+  const phase = useRadio((s) => s.phase);
+  const buffering = useRadio((s) => s.buffering);
+  const saved = useLibrary((s) => Boolean(station) && s.savedStations.some((x) => x.id === station.id));
+  const { toggle, step, toggleSave } = useRadio.getState();
+  const root = useRef(null);
+
+  useLayoutEffect(() => {
+    const el = root.current;
+    createTimeline({ defaults: { ease: ease.soft } })
+      .add(el, { opacity: [0, 1], duration: 260, ease: 'out(2)' })
+      .add(el.querySelector('.tt-deck'), { rotateX: [40, 0], translateZ: [-240, 0], scale: [0.7, 1] }, 60)
+      .add(el.querySelectorAll('[data-rise]'), { opacity: [0, 1], translateY: [30, 0], delay: stagger(50) }, 160);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && setStage(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [setStage]);
+
+  const close = () => animate(root.current, { opacity: 0, scale: 1.04, duration: 220, ease: 'in(2)', onComplete: () => setStage(false) });
+  const band = BANDS[station?.band || 'FM'];
+  const status = phase === 'tuning' ? tr('주파수를 맞추는 중…') : phase === 'ending' ? tr('끄는 중…') : buffering ? tr('연결 중…') : tr('지금 듣는 중');
+
+  return (
+    <div className="stage" ref={root}>
+      <div className="stage-bg" style={{ backgroundImage: station?.logo ? `url("${station.logo}")` : undefined }} />
+      <div className="stage-shade" />
+      <div className="stage-top-gradient" />
+      <div className="stage-top-drag" />
+      <button className="icon-btn circle glass stage-close" onClick={close} title={tr('닫기 (Esc)')}><ChevronDown size={22} /></button>
+      <div className="stage-main">
+        <div className="stage-deck-col"><Deck /></div>
+        <div className="stage-info">
+          <div className="stage-header" data-rise>
+            <span className="stage-kicker">{tr('라디오')}{' · '}{status}</span>
+            <h1 title={station?.name}>{station?.name || tr('라디오')}</h1>
+            <div className="stage-artist">{station ? `${band.fmt(station.freq)} ${station.band}${station.channel ? ` · ${station.channel}` : ''}` : ''}</div>
+            <div className="stage-actions">
+              <button className={`icon-btn like ${saved ? 'on' : ''}`} onClick={(e) => { if (!saved) burst(e.currentTarget, '#f0abfc'); toggleSave(); }} title={saved ? tr('저장한 주파수에서 빼기') : tr('주파수 저장')} aria-label={tr('주파수 저장')}>
+                {saved ? <BookmarkCheck size={22} /> : <Bookmark size={22} />}
+              </button>
+            </div>
+          </div>
+          <div className="stage-controls" data-rise>
+            <button className="icon-btn" onClick={() => step(-1)} aria-label={tr('이전 채널')}><SkipBack size={28} fill="currentColor" /></button>
+            <PlayButton size={72} playing={phase !== 'ending'} onClick={toggle} />
+            <button className="icon-btn" onClick={() => step(1)} aria-label={tr('다음 채널')}><SkipForward size={28} fill="currentColor" /></button>
+            <StageVolume />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Stage() {
   const track = usePlayer((s) => s.queue[s.index]);
+  const radio = useRadio((s) => s.on);
+  if (radio) return <RadioStage />;
   return track ? <StageView track={track} /> : null;
 }

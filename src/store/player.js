@@ -19,6 +19,29 @@ const audios = [new Audio(), new Audio()];
 let cur = 0;
 const active = () => audios[cur];
 const spare = () => audios[1 - cur];
+
+// Every pause the app makes goes through here, so a pause that didn't is known to come from the system.
+// Android's WebView pauses on its own when it loses the audio for a moment (a notification, Bluetooth
+// dropping out) and can leave the element unable to start again until it gets a new source.
+const hush = (el) => {
+  if (!el.paused) el.dataset.hush = '1';
+  el.pause();
+};
+let systemPaused = false;
+let resumeCheck = null;
+const RESUME_CHECK_MS = 3500;
+
+// Asked to play: if the time hasn't moved a few seconds later, the element is stuck and gets a fresh
+// source from where it was. Skipping did that before, which is why only skipping used to help.
+function checkResume(a, from) {
+  clearTimeout(resumeCheck);
+  resumeCheck = setTimeout(() => {
+    if (a !== active() || !usePlayer.getState().playing || isWaitingForMusic() || navigator.onLine === false) return;
+    if (a.currentTime > from + 0.3) return;
+    noteTrouble('resume stuck', { id: a.dataset.id, time: a.currentTime, net: a.networkState, ready: a.readyState });
+    recover(from);
+  }, RESUME_CHECK_MS);
+}
 for (const a of audios) {
   a.preload = 'auto';
   a.crossOrigin = 'anonymous'; // lets the visualizer read samples
@@ -370,7 +393,8 @@ export const usePlayer = create((set, get) => ({
       set({ playing: false });
       return;
     }
-    if (isDead(a)) {
+    if (isDead(a) || (a.paused && systemPaused)) {
+      systemPaused = false;
       recover(get().time);
       return;
     }
@@ -381,8 +405,9 @@ export const usePlayer = create((set, get) => ({
         try { a.currentTime = targetTime; } catch {}
       }
       playWithDeck();
+      checkResume(a, a.currentTime);
     } else {
-      a.pause();
+      hush(a);
     }
   },
 
@@ -438,7 +463,7 @@ export const usePlayer = create((set, get) => ({
         // Autoplay is OFF: do not play auto-recommended tracks!
         room?.onStopped();
         queueFinished();
-        active().pause();
+        hush(active());
         active().currentTime = 0;
         set({ playing: false, loading: false, time: 0 });
         savePlayerState({ time: 0, wasPlaying: false });
@@ -463,7 +488,7 @@ export const usePlayer = create((set, get) => ({
     if (!autoplay) {
       room?.onStopped();
       queueFinished();
-      active().pause();
+      hush(active());
       active().currentTime = 0;
       set({ playing: false, loading: false, time: 0 });
       savePlayerState({ time: 0, wasPlaying: false });
@@ -484,7 +509,7 @@ export const usePlayer = create((set, get) => ({
       // If truly all network/fallback attempts failed:
       room?.onStopped();
       queueFinished();
-      active().pause();
+      hush(active());
       active().currentTime = 0;
       set({ playing: false, loading: false, time: 0 });
       savePlayerState({ time: 0, wasPlaying: false });
@@ -602,11 +627,11 @@ export const usePlayer = create((set, get) => ({
     if (isEnding()) dropSound();
     if (spare().dataset.id === track.id) {
       // Already buffered by _preloadNext: just swap.
-      active().pause();
+      hush(active());
       cur = 1 - cur;
       if (active().currentTime > 0) active().currentTime = 0; // it may have played before (short repeat loops)
     } else {
-      active().pause();
+      hush(active());
       active().src = src;
       active().dataset.id = track.id;
     }
@@ -649,7 +674,7 @@ export const usePlayer = create((set, get) => ({
       if (s.dataset.id) { s.removeAttribute('src'); s.load(); s.dataset.id = ''; }
       return;
     }
-    s.pause();
+    hush(s);
     s.src = streamUrl(track.id);
     s.dataset.id = track.id;
     s.load();
@@ -814,12 +839,12 @@ export const roomPlayer = {
       dropSound();
       setStarted(false);
     }
-    active().pause();
+    hush(active());
   },
   // Waiting for the moment the room's new track starts.
   hold(secondsUntilMusic) {
     attach(active());
-    active().pause();
+    hush(active());
     firstPlayInRoom(secondsUntilMusic);
   },
   finished: queueFinished,
@@ -883,12 +908,12 @@ export function restorePlayerState(s) {
     if (!room) {
       const a = active();
       if (s.time > 0) try { a.currentTime = s.time; } catch { /* set once it loads */ }
-      if (!s.playing) a.pause();
+      if (!s.playing) hush(a);
     } else if (s.time > 0) {
       room.seek(s.time);
     }
   } else if (!id && wasId) {
-    active().pause();
+    hush(active());
     active().removeAttribute('src');
     active().load();
     active().dataset.id = '';
@@ -907,7 +932,7 @@ export function resetPlayer() {
   dropSound();
   setStarted(false);
   for (const a of audios) {
-    a.pause();
+    hush(a);
     a.removeAttribute('src');
     a.load();
     a.dataset.id = '';
@@ -970,7 +995,7 @@ function recover(from) {
 function giveUp(why) {
   const a = active();
   noteTrouble('gave up', { why, id: a.dataset.id });
-  a.pause();
+  hush(a);
   usePlayer.setState({ playing: false, loading: false });
   toast(tr('재생이 잘 되지 않아 잠시 멈췄어요. 연결이 돌아오면 이어서 재생해요.'));
   consecutiveErrors = 0;
@@ -1061,7 +1086,9 @@ const appHidden = () => document.hidden || (IS_ANDROID && !document.hasFocus());
 audios.forEach((a, i) => {
   const isActive = () => i === cur;
   a.addEventListener('playing', () => {
+    delete a.dataset.hush;
     if (isActive()) {
+      systemPaused = false;
       clearTimeout(errorSkipTimer);
       usePlayer.setState({ playing: true, loading: false });
       wakeAudio();
@@ -1074,7 +1101,20 @@ audios.forEach((a, i) => {
     }
   });
   a.addEventListener('pause', () => {
+    const asked = a.dataset.hush === '1';
+    delete a.dataset.hush;
     if (isActive()) {
+      // Nobody here asked for this pause, and the track isn't over: the system did it.
+      if (!asked && !a.ended && a.dataset.id) {
+        systemPaused = true;
+        noteTrouble('paused by system', { id: a.dataset.id, time: a.currentTime, ready: a.readyState, net: a.networkState, hidden: appHidden() });
+        // Out of data rather than told to stop (a call or another app takes the sound with its data
+        // still there): carry on from a fresh source instead of sitting there stopped.
+        if (a.readyState < a.HAVE_FUTURE_DATA && navigator.onLine !== false && !room) {
+          const from = a.currentTime;
+          setTimeout(() => { if (active() === a && a.paused && systemPaused) { systemPaused = false; recover(from); } }, 300);
+        }
+      }
       goodSince = 0;
       usePlayer.setState({ playing: false, time: a.currentTime, ...(a.paused ? { loading: false } : {}) });
       if (isEnding() && !isEndCommitted() && a.duration - a.currentTime > 0.5) dropSound();
@@ -1201,10 +1241,12 @@ function updateMediaSession(track) {
 
 if ('mediaSession' in navigator) {
   const p = () => usePlayer.getState();
-  navigator.mediaSession.setActionHandler('play', () => p().toggle());
-  navigator.mediaSession.setActionHandler('pause', () => p().toggle());
-  navigator.mediaSession.setActionHandler('nexttrack', () => p().next());
-  navigator.mediaSession.setActionHandler('previoustrack', () => p().prev());
+  // While the radio is on, the media keys work the radio (see store/radio.js).
+  const radio = () => (globalThis.__tmRadioControl?.active() ? globalThis.__tmRadioControl : null);
+  navigator.mediaSession.setActionHandler('play', () => (radio() ? radio().toggle() : p().toggle()));
+  navigator.mediaSession.setActionHandler('pause', () => (radio() ? radio().toggle() : p().toggle()));
+  navigator.mediaSession.setActionHandler('nexttrack', () => (radio() ? radio().step(1) : p().next()));
+  navigator.mediaSession.setActionHandler('previoustrack', () => (radio() ? radio().step(-1) : p().prev()));
   navigator.mediaSession.setActionHandler('seekto', (d) => p().seek(d.seekTime));
 }
 

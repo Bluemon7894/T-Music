@@ -1,5 +1,5 @@
 // Motion helpers on top of anime.js v4.
-import { useLayoutEffect, useEffect } from 'react';
+import { useLayoutEffect, useEffect, useRef } from 'react';
 import { animate as animeAnimate, stagger, spring, createAnimatable, createTimeline, utils } from 'animejs';
 import { IS_ANDROID } from './platform.js';
 
@@ -105,6 +105,95 @@ export function burst(el, color = '#c4b5fd') {
     onComplete: () => dots.forEach((d) => d.remove()),
   });
   animate(el, { scale: [1, 1.35, 1], duration: 420, ease: 'out(3)' });
+}
+
+// ---- the desktop's bigger moves. Phones and "fewer animations" skip them. ----
+const big = () => !reduced && !IS_ANDROID;
+
+// Where the pointer last went down, for animations that start "where you clicked" (a menu item is
+// gone by the time its action runs).
+let lastPointer = { x: innerWidth / 2, y: innerHeight / 2 };
+if (typeof window !== 'undefined') window.addEventListener('pointerdown', (e) => { lastPointer = { x: e.clientX, y: e.clientY }; }, true);
+
+function ghost(src, rect, radius) {
+  const g = document.createElement('img');
+  g.className = 'flight-ghost';
+  g.src = src;
+  Object.assign(g.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, borderRadius: radius || '12px' });
+  document.body.appendChild(g);
+  return g;
+}
+
+// A card's cover flies into the page it opens. The card calls launchFlight; the page's header calls
+// landFlight on its cover when it appears, and the cover is hidden until the flight lands on it.
+let flight = null;
+const FLIGHT_WAIT_MS = 2500;
+export function launchFlight(el, src) {
+  if (!big() || !el || !src) { flight = null; return; }
+  const rect = el.getBoundingClientRect();
+  if (!rect.width) return;
+  flight = { rect, src, at: performance.now(), radius: getComputedStyle(el).borderRadius };
+}
+export function landFlight(target) {
+  const f = flight;
+  flight = null;
+  if (!f || !target || !big() || performance.now() - f.at > FLIGHT_WAIT_MS) return;
+  const to = target.getBoundingClientRect();
+  if (!to.width) return;
+  const g = ghost(f.src, f.rect, f.radius);
+  target.style.visibility = 'hidden';
+  animeAnimate(g, {
+    left: to.left, top: to.top, width: to.width, height: to.height,
+    borderRadius: getComputedStyle(target).borderRadius,
+    boxShadow: ['0 10px 30px rgba(0,0,0,0.4)', '0 40px 90px -20px rgba(8,4,20,0.85)'],
+    ease: spring({ bounce: 0.22, duration: 640 }),
+    onComplete: () => { target.style.visibility = ''; g.remove(); },
+  });
+}
+
+// A track added to the queue: its cover leaves from where you clicked and drops into the queue,
+// or onto the queue button when the panel is closed.
+export function flyToQueue(src) {
+  if (!big() || !src) return;
+  const target = document.querySelector('.now-panel .np-body') || document.querySelector('[data-queue-target]');
+  if (!target) return;
+  const to = target.getBoundingClientRect();
+  const size = 46;
+  const g = ghost(src, { left: lastPointer.x - size / 2, top: lastPointer.y - size / 2, width: size, height: size }, '10px');
+  const endX = to.left + to.width / 2 - size / 2;
+  const endY = to.top + Math.min(to.height / 2, 60) - size / 2;
+  const lift = Math.min(lastPointer.y, endY) - 80;
+  animeAnimate(g, {
+    left: [lastPointer.x - size / 2, endX],
+    top: [lastPointer.y - size / 2, lift, endY],
+    scale: [1, 1.15, 0.35],
+    opacity: [1, 1, 0],
+    duration: 700,
+    ease: 'inOut(2)',
+    onComplete: () => {
+      g.remove();
+      animeAnimate(target, { scale: [1, 1.04, 1], duration: 380, ease: 'out(3)' });
+    },
+  });
+}
+
+// Rows marked data-flip glide to their new places when a list is reordered, instead of jumping.
+export function useFlip(ref) {
+  const last = useRef(new Map());
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const next = new Map();
+    root.querySelectorAll('[data-flip]').forEach((n) => next.set(n.dataset.flip, n.offsetTop));
+    if (big()) {
+      root.querySelectorAll('[data-flip]').forEach((n) => {
+        const before = last.current.get(n.dataset.flip);
+        const now = next.get(n.dataset.flip);
+        if (before != null && Math.abs(before - now) > 1) animeAnimate(n, { translateY: [before - now, 0], ease: spring({ bounce: 0.3, duration: 480 }) });
+      });
+    }
+    last.current = next;
+  });
 }
 
 export { stagger, utils, createTimeline };

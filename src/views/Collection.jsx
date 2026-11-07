@@ -3,7 +3,7 @@ import { ListEnd } from 'lucide-react';
 import SharePanel from '../components/SharePanel.jsx';
 import { auth } from '../lib/firebase.js';
 import { canEditPlaylist, confirmDeletePlaylist } from '../lib/sharedPlaylists.js';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Heart, ListMusic, Shuffle, PlusCircle, CheckCircle2, Pencil, Trash2, Search as SearchIcon, Radio } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { usePlayer } from '../store/player.js';
@@ -11,7 +11,7 @@ import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { useUI, toast } from '../store/ui.js';
 import { totalTime, colorFor } from '../lib/util.js';
-import { useEnter, useTilt } from '../lib/motion.js';
+import { flyToQueue, landFlight, useEnter, useTilt } from '../lib/motion.js';
 import { IS_ANDROID } from '../lib/platform.js';
 import { dropOnLiked, dropOnPlaylist, useDrop } from '../lib/drag.js';
 import { useAsync, Thumb, PlayButton, ArtistLinks, PageSkeleton, ErrorMsg, Empty } from '../components/common.jsx';
@@ -23,6 +23,7 @@ import { tr } from '../lib/i18n.js';
 function Header({ kind, title, thumb, art, color, meta, description }) {
   const artRef = useRef(null);
   useTilt(artRef, { max: 10, scale: 1.02 });
+  useLayoutEffect(() => { landFlight(artRef.current?.querySelector('img, .ph-art')); }, []);
   return (
     <div className="page-header" style={{ '--hdr': color }}>
       {thumb && <div className="ph-backdrop" style={{ backgroundImage: `url("${thumb}")` }} />}
@@ -59,7 +60,7 @@ function ActionBar({ tracks, context, children }) {
       <PlayButton size={58} playing={isThis && playing} onClick={playAll} />
       <button className="icon-btn big" title={tr('셔플 재생')} onClick={shuffleAll}><Shuffle size={24} /></button>
       {tracks[0] && <button className="icon-btn big" title={tr('비슷한 곡 라디오')} onClick={() => startRadio(tracks[0])}><Radio size={24} /></button>}
-      {tracks.length > 0 && <button className="icon-btn big" title={tr('전체를 대기열에 추가')} onClick={() => usePlayer.getState().addToQueue(tracks)}><ListEnd size={24} /></button>}
+      {tracks.length > 0 && <button className="icon-btn big" title={tr('전체를 대기열에 추가')} onClick={() => { flyToQueue(tracks[0]?.thumb); usePlayer.getState().addToQueue(tracks); }}><ListEnd size={24} /></button>}
       <DownloadAllButton tracks={tracks} />
       {children}
     </div>

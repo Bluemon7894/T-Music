@@ -3,7 +3,9 @@
 .page section { margin-top: 32px; position: relative; }
 .page h2 { margin-bottom: 12px; }
 .page-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 8px 0 22px; }
-.page-title h1 { font-size: 40px; font-weight: 900; letter-spacing: -0.045em; background: var(--grad-text); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* The tight letter spacing lets the last letter reach past the box, and gradient text is painted only
+   inside the box, so its right edge was cut. A little padding gives the gradient room there. */
+.page-title h1 { font-size: 40px; font-weight: 900; letter-spacing: -0.045em; background: var(--grad-text); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 0.12em; margin-right: -0.12em; }
 .count { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 22px; padding: 0 7px; border-radius: 11px; background: var(--glass-3); font-size: 12px; vertical-align: middle; margin-left: 6px; }
 
 /* ---------- home ---------- */
@@ -238,6 +240,25 @@
 .set-stats b { font-size: 22px; font-weight: 900; }
 .set-stats span { font-size: 11.5px; color: var(--dim); white-space: nowrap; }
 .path { word-break: break-all; user-select: text; }
+
+/* equalizer */
+.eq-presets { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.eq-presets button { height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--sub); background: var(--glass); border: 1px solid var(--line); transition: background 0.2s, color 0.2s, border-color 0.2s; }
+.eq-presets button:hover { color: #fff; background: var(--glass-2); }
+.eq-presets button.on { color: #fff; background: rgba(139, 92, 246, 0.3); border-color: rgba(167, 139, 250, 0.55); box-shadow: var(--glow); }
+.eq-bands { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; width: 100%; padding: 10px 4px 2px; box-sizing: border-box; border-radius: 14px; background: var(--glass); border: 1px solid var(--line); }
+.eq-band { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 0 8px; transition: opacity 0.25s; }
+.eq-band.off { opacity: 0.45; }
+.eq-db { font-size: 11.5px; font-weight: 800; color: var(--v-200); font-variant-numeric: tabular-nums; min-height: 15px; }
+.eq-slider { position: relative; width: 28px; height: 132px; display: flex; justify-content: center; cursor: pointer; touch-action: none; outline: none; }
+.eq-track { position: relative; width: 4px; height: 100%; border-radius: 4px; background: rgba(255, 255, 255, 0.12); transition: width 0.2s var(--out); }
+.eq-slider:hover .eq-track, .eq-slider.dragging .eq-track, .eq-slider:focus-visible .eq-track { width: 6px; }
+.eq-zero { position: absolute; left: -5px; right: -5px; top: 50%; height: 1px; background: rgba(255, 255, 255, 0.22); }
+.eq-fill { position: absolute; left: 0; right: 0; border-radius: 4px; background: var(--grad); }
+.eq-knob { position: absolute; left: 50%; width: 14px; height: 14px; margin: 0 0 -7px -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.35), 0 2px 8px rgba(0, 0, 0, 0.5); pointer-events: none; transition: transform 0.25s var(--spring); }
+.eq-slider:hover .eq-knob, .eq-slider.dragging .eq-knob { transform: scale(1.15); }
+.eq-name { font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.eq-hz { font-size: 10.5px; color: var(--dim); font-variant-numeric: tabular-nums; margin-top: -4px; }
 .set-item {
   display: flex;
   align-items: center;
@@ -725,10 +746,15 @@
 .lyr-pill.action:hover:not(:disabled) { background: rgba(139, 92, 246, 0.28); border-color: rgba(167, 139, 250, 0.55); color: #fff; }
 .lyr-pill.action:disabled { opacity: 0.7; cursor: default; }
 .lyr-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+/* A scroller clips sideways too, which cut the active line's glow off at its left edge. The box reaches
+   out by the glow's width on each side and pads it back, so the words stay where they were. */
 .lyr-scroll {
+  --lyr-bleed: 40px;
   position: relative;
   flex: 1 1 0;
   min-height: 0;
+  margin-inline: calc(-1 * var(--lyr-bleed));
+  padding-inline: var(--lyr-bleed);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -777,6 +803,7 @@
 .lyr-stage .lyr-line.active { font-size: calc(clamp(24px, 2.6vw, 32px) * var(--lyric-scale, 1)); }
 .lyr-stage .lyr-plain { font-size: calc(18px * var(--lyric-scale, 1)); }
 
+.lyr-panel .lyr-scroll { --lyr-bleed: 20px; }
 .lyr-panel .lyr-lines { gap: 8px; }
 .lyr-panel .lyr-line { font-size: calc(15.5px * var(--lyric-scale, 1)); padding: 4px 8px; }
 .lyr-panel .lyr-line.active { font-size: calc(18px * var(--lyric-scale, 1)); }
@@ -1319,7 +1346,9 @@
 .friend-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
 .friend-accept { height: 36px; padding: 0 14px; font-size: 13px; }
 .set-item.disabled { opacity: 0.45; cursor: default; }
-.room-friends ul { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+/* About eight friends, then the list scrolls inside the card, fading at the bottom while there's more. */
+.room-friends ul { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0 0 8px; list-style: none; max-height: 330px; overflow-y: auto; scrollbar-width: thin; }
+.room-friends ul.more { -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(180deg, #000 calc(100% - 36px), transparent); }
 .room-friends li { display: flex; align-items: center; gap: 10px; min-height: 34px; }
 
 /* invitation card */
@@ -1432,3 +1461,14 @@ html[data-motion="calm"] .eq i { height: 60% !important; }
 .profile-photo-add { cursor: pointer; }
 
 .fp-grid section, .fp-grid .room-card { margin-top: 0; }
+
+/* the quick menu's shortcut in settings */
+.quick-key { align-items: flex-start; gap: 14px; }
+.quick-key .warn { color: var(--danger); }
+.quick-key-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: none; }
+.quick-key-now { display: inline-flex; align-items: center; min-height: 30px; font-size: 13px; font-weight: 700; color: var(--v-200); }
+.quick-key-now.listening { padding: 0 12px; border-radius: 10px; border: 1px dashed var(--v-400); animation: quick-listen 1.2s ease-in-out infinite; }
+@keyframes quick-listen { 50% { border-color: transparent; } }
+.key-combo { display: inline-flex; align-items: center; gap: 4px; }
+.key-combo kbd { min-width: 22px; text-align: center; }
+.quick-key .row-btns .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }

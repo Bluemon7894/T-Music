@@ -13,6 +13,29 @@ const IDLE_SLEEP_MS = 4000;
 const sources = new WeakMap();
 const FADE_CURVE_POINTS = 48;
 
+// Five bands, in Hz: low shelf, three peaks, high shelf.
+export const EQ_BANDS = [60, 250, 1000, 4000, 12000];
+const EQ_SMOOTH_S = 0.05;
+let eqPreamp = null;
+let eqFilters = [];
+let eqGains = [0, 0, 0, 0, 0];
+
+function applyEqualizer() {
+  if (!ctx || !eqFilters.length) return;
+  const now = ctx.currentTime;
+  eqFilters.forEach((f, i) => f.gain.setTargetAtTime(eqGains[i] || 0, now, EQ_SMOOTH_S));
+  // Boosting a band can push loud music past full scale and crackle; the louder the boost, the more
+  // the whole signal is lowered first.
+  const boost = Math.max(0, ...eqGains);
+  eqPreamp.gain.setTargetAtTime(10 ** (-boost * 0.6 / 20), now, EQ_SMOOTH_S);
+}
+
+// gains: dB per band (-12 to 12), or null for flat.
+export function setEqualizer(gains) {
+  eqGains = EQ_BANDS.map((_, i) => Math.max(-12, Math.min(12, Number(gains?.[i]) || 0)));
+  applyEqualizer();
+}
+
 let normalizeEnabled = (() => {
   try {
     return localStorage.getItem('t-music-normalize') === '1';
@@ -41,7 +64,21 @@ function setupGraph() {
 
     // Ahead of the analyser, so everything that reacts to the music follows the fades too.
     musicFade = ctx.createGain();
-    musicFade.connect(analyser);
+
+    // The equalizer sits between the fade and the analyser, so the visualizer shows what's heard.
+    // A flat band does nothing, so it's always connected and "off" is simply every band at 0 dB.
+    eqPreamp = ctx.createGain();
+    eqFilters = EQ_BANDS.map((band, i) => {
+      const f = ctx.createBiquadFilter();
+      f.type = i === 0 ? 'lowshelf' : i === EQ_BANDS.length - 1 ? 'highshelf' : 'peaking';
+      f.frequency.value = band;
+      f.Q.value = 1;
+      f.gain.value = 0;
+      return f;
+    });
+    musicFade.connect(eqPreamp);
+    eqFilters.reduce((prev, f) => { prev.connect(f); return f; }, eqPreamp).connect(analyser);
+    applyEqualizer();
 
     compressor = ctx.createDynamicsCompressor();
     // Broadcasting standard multiband-style dynamic loudness leveling:
