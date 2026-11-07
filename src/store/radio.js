@@ -144,7 +144,7 @@ async function attachStream(station) {
 
 function onStreamError(why) {
   const { on, station } = useRadio.getState();
-  if (!on || !station) return;
+  if (!on || !station || useRadio.getState().phase === 'ending') return;
   noteTrouble('radio', { id: station.id, why: String(why).slice(0, 80) });
   if (retries++ < MAX_RETRIES) {
     useRadio.setState({ buffering: true });
@@ -168,7 +168,8 @@ audio.addEventListener('waiting', () => {
   clearTimeout(stallTimer);
   stallTimer = setTimeout(() => onStreamError('stalled'), STALL_RETRY_MS);
 });
-audio.addEventListener('error', () => { if (!hls) onStreamError(audio.error?.code || 'error'); });
+// Clearing the element for the next channel also raises an error; only a stream we gave it counts.
+audio.addEventListener('error', () => { if (!hls && audio.getAttribute('src')) onStreamError(audio.error?.code || 'error'); });
 
 // The radio follows the player's volume.
 usePlayer.subscribe((p, prev) => {
@@ -190,12 +191,12 @@ async function start(station, { quiet = false, retry = false } = {}) {
   if (!retry) retries = 0;
   const sounds = !quiet && !wasOn && useDeck.getState().sounds;
   const fromFreq = wasOn && prev.station?.band === station.band ? prev.station.freq : null;
-  useRadio.setState({ on: true, phase: 'tuning', station, buffering: true, failed: false, band: station.band, tune: { at: performance.now(), ms: QUIET_TUNE_MS, from: fromFreq, to: station.freq, kind: 'on' } });
+  useRadio.setState({ on: true, phase: 'tuning', station, buffering: true, failed: false, band: station.band, sweep: { at: performance.now(), ms: QUIET_TUNE_MS, from: fromFreq, to: station.freq, kind: 'on' } });
   savePrefs({ last: station, band: station.band });
   const soundMs = sounds ? await playSound('start') : 0;
   if (mine !== token) return;
   const ms = soundMs || QUIET_TUNE_MS;
-  useRadio.setState({ tune: { at: performance.now(), ms, from: fromFreq, to: station.freq, kind: 'on' } });
+  useRadio.setState({ sweep: { at: performance.now(), ms, from: fromFreq, to: station.freq, kind: 'on' } });
   try {
     await attachStream(station);
   } catch (e) {
@@ -226,7 +227,7 @@ export const useRadio = create((set, get) => ({
   updatedAt: 0,
   buffering: false,
   failed: false,
-  tune: null, // { at, ms, from, to, kind }: what the dial is doing, for the radio's drawing
+  sweep: null, // { at, ms, from, to, kind }: what the dial is doing, for the radio's drawing
   last: saved.last || null,
 
   async refresh() {
@@ -280,14 +281,14 @@ export const useRadio = create((set, get) => ({
     if (quiet || !useDeck.getState().sounds) {
       stopSound();
       release();
-      set({ on: false, phase: 'off', buffering: false, tune: { at: performance.now(), ms: QUIET_TUNE_MS, from: freq, to: null, kind: 'off' } });
+      set({ on: false, phase: 'off', buffering: false, sweep: { at: performance.now(), ms: QUIET_TUNE_MS, from: freq, to: null, kind: 'off' } });
       return;
     }
     set({ phase: 'ending', buffering: false });
     playSound('end').then((ms) => {
       if (mine !== token) return;
       const length = ms || QUIET_TUNE_MS;
-      set({ tune: { at: performance.now(), ms: length, from: freq, to: null, kind: 'off' } });
+      set({ sweep: { at: performance.now(), ms: length, from: freq, to: null, kind: 'off' } });
       fadeTo(0, length, () => {
         if (mine !== token) return;
         release();

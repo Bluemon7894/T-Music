@@ -1,6 +1,7 @@
 // Offline downloads: audio files saved under the app's data folder, with an index
 // so the stream protocol can serve them without touching the network.
 import { app, net, shell, BrowserWindow, dialog } from 'electron';
+import { mainWindow } from './mainWindow.js';
 import fs from 'fs';
 import path from 'path';
 import { say } from './lang.js';
@@ -210,7 +211,7 @@ export function openFolder() {
 }
 
 export async function chooseFolder() {
-  const [win] = BrowserWindow.getAllWindows();
+  const win = mainWindow();
   const res = await dialog.showOpenDialog(win, {
     title: say('다운로드 저장 폴더 선택', 'Choose a download folder'),
     defaultPath: dir(),

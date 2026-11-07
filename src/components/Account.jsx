@@ -3,7 +3,6 @@ import { CloudCheck, CloudOff, Copy, Eye, ImagePlus, Library, LogIn, LogOut, Plu
 import { useAccount } from '../store/account.js';
 import { useFriends } from '../store/friends.js';
 import { GENRE_CHOICES, MAX_BIO, MAX_GENRE_LENGTH, MAX_GENRES, useProfile } from '../store/profile.js';
-import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { useUpdater } from '../store/updater.js';
 import { toast, useUI } from '../store/ui.js';
@@ -206,7 +205,6 @@ function ProfileEditor({ user }) {
   const bio = useProfile((s) => s.bio);
   const genres = useProfile((s) => s.genres);
   const sharing = useFriends((s) => s.sharing);
-  const recent = useLibrary((s) => s.recent);
   const { setDisplay } = useAccount.getState();
   const { save } = useProfile.getState();
   const [name, setName] = useState(user.name);
@@ -220,7 +218,6 @@ function ProfileEditor({ user }) {
     setDisplay({ name: clean }).catch(() => toast(tr('저장하지 못했습니다')));
   };
   const commitBio = () => { if (about.trim() !== bio) save({ bio: about.trim().slice(0, MAX_BIO) }, sharing); };
-  const covers = [...new Set(recent.map((t) => t.thumb).filter(Boolean))].slice(0, 6);
   const setPhoto = (photo) => setDisplay({ photo }).catch(() => toast(tr('저장하지 못했습니다')));
   const picker = useRef(null);
   const uploaded = String(user.photo || '').startsWith('data:');
@@ -255,7 +252,6 @@ function ProfileEditor({ user }) {
           {uploaded && <span className="profile-photo on" title={tr('내가 올린 사진')}><img src={user.photo} alt="" /></span>}
           <button className={`profile-photo ${!user.photo ? 'on' : ''}`} onClick={() => setPhoto(null)} title={tr('기본 사진')}><UserRound size={20} /></button>
           {user.googlePhoto && <button className={`profile-photo ${user.photo === user.googlePhoto ? 'on' : ''}`} onClick={() => setPhoto(user.googlePhoto)} title={tr('Google 사진')}><img src={user.googlePhoto} alt="" referrerPolicy="no-referrer" /></button>}
-          {covers.map((cover) => <button key={cover} className={`profile-photo ${user.photo === cover ? 'on' : ''}`} onClick={() => setPhoto(cover)} title={tr('최근 들은 곡의 앨범 아트')}><img src={cover} alt="" /></button>)}
         </div>
       </div>
       <GenreField genres={genres} onSave={(next) => save({ genres: next }, sharing)} />

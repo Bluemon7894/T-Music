@@ -17,6 +17,8 @@ import { registerScheme, handleProtocol } from './protocol.js';
 import * as remote from './remoteConfig.js';
 import * as radio from './radio.js';
 import * as quick from './quickMenu.js';
+import { mainWindow, setMainWindow } from './mainWindow.js';
+import { trackArt } from './youtube/art.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BG = '#0a0712';
@@ -76,7 +78,7 @@ function keepMiniOnTop(win, on) {
 }
 
 function setMiniMode(on) {
-  const [win] = BrowserWindow.getAllWindows();
+  const win = mainWindow();
   if (!win || on === Boolean(sizeBeforeMini)) return;
   if (on) {
     sizeBeforeMini = { bounds: win.getNormalBounds(), maximized: win.isMaximized() };
@@ -129,6 +131,7 @@ const api = {
   quickShortcut: () => quick.shortcutInfo(),
   setQuickShortcut: (key) => quick.setShortcut(String(key)),
   pauseQuickShortcut: (paused) => quick.pauseShortcut(Boolean(paused)),
+  trackArt: (videoId) => trackArt(String(videoId)),
   radioChannels: (country) => radio.channels(String(country || 'KR')),
   radioLive: (videoId) => radio.liveManifest(String(videoId)),
   diagnose: () => stream.diagnose(),
@@ -140,7 +143,7 @@ const api = {
   openDownloads: () => downloads.openFolder(),
   checkUpdate: () => updater.checkUpdate(),
   downloadUpdate: () => {
-    const [win] = BrowserWindow.getAllWindows();
+    const win = mainWindow();
     return updater.downloadUpdate(win?.webContents);
   },
   installUpdate: () => updater.installUpdate(),
@@ -162,7 +165,7 @@ const api = {
     }
   },
   setTitleBarOverlay: (opts) => {
-    const [win] = BrowserWindow.getAllWindows();
+    const win = mainWindow();
     if (win && typeof win.setTitleBarOverlay === 'function') {
       try {
         win.setTitleBarOverlay(opts);
@@ -215,7 +218,7 @@ const api = {
   copyText: (text) => clipboard.writeText(String(text)),
   setMiniMode: (on) => setMiniMode(Boolean(on)),
   showWindow: () => {
-    const [win] = BrowserWindow.getAllWindows();
+    const win = mainWindow();
     if (!win) return;
     if (win.isMinimized()) win.restore();
     win.show();
@@ -404,7 +407,7 @@ if (!app.requestSingleInstanceLock()) {
   rememberInvite(process.argv);
 
   app.on('second-instance', (_e, argv) => {
-    const [win] = BrowserWindow.getAllWindows();
+    const win = mainWindow();
     if (win) {
       if (!win.isVisible()) win.show();
       if (win.isMinimized()) win.restore();
@@ -422,6 +425,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     remote.start();
     const win = createWindow();
+    setMainWindow(win);
     createTray(win);
     quick.setupQuickMenu(win, {
       preload: path.join(__dirname, 'preload.cjs'),

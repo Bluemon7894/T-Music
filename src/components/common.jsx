@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Music, Play, Pause, RotateCw } from 'lucide-react';
 import { useNav } from '../store/nav.js';
-import { errorText } from '../lib/api.js';
+import { api, errorText } from '../lib/api.js';
 import { pop } from '../lib/motion.js';
 import { tr } from '../lib/i18n.js';
 
@@ -54,6 +54,13 @@ function smallerThumb(url) {
   return m[2] in SMALLER_THUMB ? (SMALLER_THUMB[m[2]] && m[1] + SMALLER_THUMB[m[2]]) : `${m[1].replace('vi_webp', 'vi')}hq720.jpg`;
 }
 
+// Album covers found for videos without a picture, shared by every Thumb on screen.
+const arts = new Map();
+const albumArt = (id) => {
+  if (!arts.has(id)) arts.set(id, Promise.resolve(api.trackArt(id)).catch(() => null));
+  return arts.get(id);
+};
+
 // `videoId`: when the picture it came with won't load, the video's own picture stands in.
 export function Thumb({ src, round, className = '', size, alt = '', videoId }) {
   const [url, setUrl] = useState(src);
@@ -87,8 +94,12 @@ export function Thumb({ src, round, className = '', size, alt = '', videoId }) {
       if (next) setUrl(next);
       return;
     }
-    if (videoId && !url.includes(`/vi/${videoId}/`)) setUrl(`https://i.ytimg.com/vi/${videoId}/hq720.jpg`);
-    else setMissing(true);
+    if (videoId && !url.includes(`/vi/${videoId}/`)) { setUrl(`https://i.ytimg.com/vi/${videoId}/hq720.jpg`); return; }
+    // No video picture at all: ask YouTube Music for the album's cover before falling back to ours.
+    const id = videoId || /\/vi(?:_webp)?\/([\w-]{11})\//.exec(url)?.[1];
+    if (!id) { setMissing(true); return; }
+    setMissing(true);
+    albumArt(id).then((art) => { if (art) { setUrl(art); setMissing(false); } });
   };
   if (!url || failed || missing) {
     return (

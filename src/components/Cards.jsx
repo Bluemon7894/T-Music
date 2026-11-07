@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
@@ -7,7 +7,7 @@ import { useLibrary } from '../store/library.js';
 import { api } from '../lib/api.js';
 import { dragProps, itemPayload } from '../lib/drag.js';
 import { usePrefs } from '../store/prefs.js';
-import { useTilt, useEnter, animate, ease, utils, launchFlight } from '../lib/motion.js';
+import { useTilt, useEnter, animate, ease, utils, launchFlight, landFlight } from '../lib/motion.js';
 import { Thumb, PlayButton } from './common.jsx';
 import { trackMenuItems } from './TrackList.jsx';
 import { tr } from '../lib/i18n.js';
@@ -50,6 +50,8 @@ export function Card({ item, size }) {
   const openMenu = useUI((s) => s.openMenu);
   const removeRecent = useLibrary((s) => s.removeRecent);
   const art = useRef(null);
+  // Coming back from this album's page, its cover lands here again.
+  useLayoutEffect(() => { if (!round) landFlight(art.current?.querySelector('img'), item.thumb); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useTilt(art, { max: 9, scale: 1.04 });
   const round = item.kind === 'artist';
 

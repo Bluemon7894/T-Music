@@ -14,6 +14,7 @@ import * as auth from './auth.js';
 import { noteTrouble } from '../lib/trouble.js';
 import * as remote from '../../electron/remoteConfig.js';
 import * as radio from '../../electron/radio.js';
+import { trackArt } from '../../electron/youtube/art.js';
 
 const info = JSON.parse(Native.appInfo());
 updater.setCurrentVersion(info.version);
@@ -102,6 +103,7 @@ const api = {
   prefetch: (id) => { if (!downloads.localFile(id)) stream.prefetch(id); return true; },
   status: () => ({ methods: stream.status(), version: info.version }),
   remoteNotice: async () => { await remote.start(); return remote.notice(); },
+  trackArt: (videoId) => trackArt(String(videoId)),
   radioChannels: (country) => radio.channels(String(country || 'KR')),
   radioLive: (videoId) => radio.liveManifest(String(videoId)),
   diagnose: () => stream.diagnose(),

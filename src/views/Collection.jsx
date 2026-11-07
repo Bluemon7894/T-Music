@@ -11,7 +11,7 @@ import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { useUI, toast } from '../store/ui.js';
 import { totalTime, colorFor } from '../lib/util.js';
-import { flyToQueue, landFlight, useEnter, useTilt } from '../lib/motion.js';
+import { flyToQueue, landFlight, launchFlight, useEnter, useTilt } from '../lib/motion.js';
 import { IS_ANDROID } from '../lib/platform.js';
 import { dropOnLiked, dropOnPlaylist, useDrop } from '../lib/drag.js';
 import { useAsync, Thumb, PlayButton, ArtistLinks, PageSkeleton, ErrorMsg, Empty } from '../components/common.jsx';
@@ -23,7 +23,12 @@ import { tr } from '../lib/i18n.js';
 function Header({ kind, title, thumb, art, color, meta, description }) {
   const artRef = useRef(null);
   useTilt(artRef, { max: 10, scale: 1.02 });
-  useLayoutEffect(() => { landFlight(artRef.current?.querySelector('img, .ph-art')); }, []);
+  useLayoutEffect(() => {
+    landFlight(artRef.current?.querySelector('img, .ph-art'));
+    // Leaving the page: the cover flies back to the card it came from, if that card is on the next page.
+    const el = artRef.current;
+    return () => launchFlight(el?.querySelector('img'), thumb);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="page-header" style={{ '--hdr': color }}>
       {thumb && <div className="ph-backdrop" style={{ backgroundImage: `url("${thumb}")` }} />}

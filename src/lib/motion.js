@@ -42,7 +42,8 @@ export function enter(root, selector = '[data-enter]', { delay = 40, step = 42 }
     scale: 1,
     delay: stagger(step, { start: delay }),
     ease: ease.soft,
-    onComplete: () => utils.cleanInlineStyles?.(els),
+    // Done: hand the elements back to their stylesheet (hover effects etc. use transform too).
+    onComplete: () => els.forEach((el) => { el.style.opacity = ''; el.style.transform = ''; }),
   });
 }
 
@@ -134,8 +135,10 @@ export function launchFlight(el, src) {
   if (!rect.width) return;
   flight = { rect, src, at: performance.now(), radius: getComputedStyle(el).borderRadius };
 }
-export function landFlight(target) {
+// `src`: land only on this picture (a card among many, on the way back); others leave the flight be.
+export function landFlight(target, src) {
   const f = flight;
+  if (src && f?.src !== src) return;
   flight = null;
   if (!f || !target || !big() || performance.now() - f.at > FLIGHT_WAIT_MS) return;
   const to = target.getBoundingClientRect();

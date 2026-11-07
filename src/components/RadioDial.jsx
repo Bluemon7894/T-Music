@@ -30,7 +30,7 @@ function needleAt(tune, t, band) {
 
 export function useNeedle(bandId) {
   const band = BANDS[bandId] || BANDS.FM;
-  const tune = useRadio((s) => s.tune);
+  const tune = useRadio((s) => s.sweep);
   const station = useRadio((s) => s.station);
   const phase = useRadio((s) => s.phase);
   const rest = phase !== 'off' && station?.band === bandId && Number.isFinite(station.freq) ? station.freq : band.min;

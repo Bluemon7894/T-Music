@@ -39,6 +39,7 @@ import { LANGUAGE, tr } from './lib/i18n.js';
 import { installErrorReporting, reportError } from './lib/telemetry.js';
 import './store/equalizer.js'; // applies the saved equalizer before anything plays
 import { startQuickBridge } from './lib/quickBridge.js';
+import { tintFrom } from './lib/tint.js';
 
 installErrorReporting();
 
@@ -279,6 +280,9 @@ function MainApp() {
   }, [currentTrack?.id, currentTrack?.title, playing]);
 
   useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [index]);
+
+  // The background takes the colour of the cover that's playing.
+  useEffect(() => { tintFrom(currentTrack?.thumb); }, [currentTrack?.thumb]);
 
   if (IS_ANDROID) return <MobileShell mainRef={mainRef}><View route={route} key={index} /></MobileShell>;
   if (mini) return <><MiniPlayer /><Toast /></>;

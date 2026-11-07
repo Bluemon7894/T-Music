@@ -6,6 +6,7 @@ import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import { say } from './lang.js';
+import { mainWindow } from './mainWindow.js';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -112,7 +113,7 @@ export async function googleSignIn() {
   const tokens = await res.json().catch(() => ({}));
   if (!res.ok || !tokens.id_token) throw new Error('구글 로그인에 실패했습니다');
 
-  const [win] = BrowserWindow.getAllWindows();
+  const win = mainWindow();
   if (win) {
     win.show();
     win.focus();

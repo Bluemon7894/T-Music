@@ -28,6 +28,7 @@ export const api = {
   setQuickShortcut: (key) => call('setQuickShortcut', key),
   pauseQuickShortcut: (paused) => call('pauseQuickShortcut', paused),
   onQuick: (event, cb) => window.api?.onQuick?.(event, cb) || (() => {}),
+  trackArt: (videoId) => call('trackArt', videoId),
   radioChannels: (country) => call('radioChannels', country),
   radioLive: (videoId) => call('radioLive', videoId),
   diagnose: () => call('diagnose'),
