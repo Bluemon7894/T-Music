@@ -104,7 +104,7 @@ export default function QuickMenu() {
   const title = radioOn ? radio.station?.name : s?.track?.title;
   const sub = radioOn ? (radio.station ? `${radio.station.band} ${radio.station.freq}` : '') : s?.track?.artist;
   const art = radioOn ? radio.station?.logo : s?.track?.thumb;
-  const playing = radioOn ? radio.phase !== 'ending' : s?.playing;
+  const playing = radioOn ? !radio.paused && radio.phase !== 'ending' : s?.playing;
   const progress = !radioOn && s?.duration ? Math.min(1, s.time / s.duration) : 0;
 
   return (

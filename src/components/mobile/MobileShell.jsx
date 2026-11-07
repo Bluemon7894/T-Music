@@ -81,7 +81,8 @@ function RadioMiniBar() {
   const station = useRadio((s) => s.station);
   const phase = useRadio((s) => s.phase);
   const buffering = useRadio((s) => s.buffering);
-  const { toggle, step } = useRadio.getState();
+  const { togglePause, step } = useRadio.getState();
+  const paused = useRadio((s) => s.paused);
   const setStage = useUI((s) => s.setStage);
   const band = BANDS[station?.band || 'FM'];
   return (
@@ -91,7 +92,7 @@ function RadioMiniBar() {
         <b>{station?.name || tr('라디오')}</b>
         <small>{station ? `${band.fmt(station.freq)} ${station.band}` : ''}</small>
       </div>
-      <PlayButton size={40} playing={phase !== 'ending'} onClick={toggle} className={`dock-play ${buffering ? 'loading' : ''}`} />
+      <PlayButton size={40} playing={!paused && phase !== 'ending'} onClick={togglePause} className={`dock-play ${buffering ? 'loading' : ''}`} />
       <button className="icon-btn m-mini-next" onClick={(e) => { e.stopPropagation(); step(1); }} aria-label={tr('다음 채널')}><SkipForward size={22} fill="currentColor" /></button>
     </div>
   );

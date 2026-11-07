@@ -18,7 +18,8 @@ function RadioMini() {
   const volume = usePlayer((s) => s.volume);
   const muted = usePlayer((s) => s.muted);
   const { setVolume, toggleMute } = usePlayer.getState();
-  const { toggle, step } = useRadio.getState();
+  const { togglePause, step } = useRadio.getState();
+  const paused = useRadio((s) => s.paused);
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const setMini = useUI((s) => s.setMini);
   return (
@@ -31,7 +32,7 @@ function RadioMini() {
         </div>
         <div className="mini-controls">
           <button className="icon-btn" onClick={() => step(-1)} aria-label={tr('이전 채널')}><SkipBack size={18} fill="currentColor" /></button>
-          <PlayButton size={36} playing={phase !== 'ending'} onClick={toggle} />
+          <PlayButton size={36} playing={!paused && phase !== 'ending'} onClick={togglePause} />
           <button className="icon-btn" onClick={() => step(1)} aria-label={tr('다음 채널')}><SkipForward size={18} fill="currentColor" /></button>
           <div className="mini-volume">
             <button className="icon-btn" onClick={toggleMute} aria-label={muted ? tr('음소거 해제') : tr('음소거')}><VolumeIcon size={16} /></button>

@@ -128,7 +128,8 @@ function RadioView() {
   const phase = useRadio((s) => s.phase);
   const buffering = useRadio((s) => s.buffering);
   const saved = useLibrary((s) => Boolean(station) && s.savedStations.some((x) => x.id === station.id));
-  const { toggle, step, toggleSave } = useRadio.getState();
+  const { togglePause, step, toggleSave } = useRadio.getState();
+  const paused = useRadio((s) => s.paused);
   const root = useRef(null);
   useLayoutEffect(() => {
     animate(root.current, { translateY: ['100%', '0%'], duration: 320, ease: 'out(3)' });
@@ -156,7 +157,7 @@ function RadioView() {
       </div>
       <div className="stage-controls m-stage-controls">
         <button className="icon-btn" onClick={() => step(-1)} aria-label={tr('이전 채널')}><SkipBack size={30} fill="currentColor" /></button>
-        <PlayButton size={70} playing={phase !== 'ending'} onClick={toggle} />
+        <PlayButton size={70} playing={!paused && phase !== 'ending'} onClick={togglePause} />
         <button className="icon-btn" onClick={() => step(1)} aria-label={tr('다음 채널')}><SkipForward size={30} fill="currentColor" /></button>
       </div>
     </div>

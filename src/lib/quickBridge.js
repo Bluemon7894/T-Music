@@ -54,6 +54,7 @@ function snapshot() {
     radio: {
       on: radio.on,
       phase: radio.phase,
+      paused: radio.paused,
       station: station(radio.station),
       saved: radio.station ? lib.isStationSaved(radio.station.id) : false,
       stations: lib.savedStations.slice(0, NEXT_COUNT).map(station),
@@ -64,7 +65,7 @@ function snapshot() {
 }
 
 const COMMANDS = {
-  toggle: () => (useRadio.getState().on ? useRadio.getState().toggle() : usePlayer.getState().toggle()),
+  toggle: () => (useRadio.getState().on ? useRadio.getState().togglePause() : usePlayer.getState().toggle()),
   prev: () => (useRadio.getState().on ? useRadio.getState().step(-1) : usePlayer.getState().prev()),
   next: () => (useRadio.getState().on ? useRadio.getState().step(1) : usePlayer.getState().next()),
   volume: (v) => usePlayer.getState().setVolume(Math.max(0, Math.min(1, Number(v) || 0))),

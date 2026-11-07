@@ -55,7 +55,8 @@ export default function RadioDevice() {
   useTilt(tilt, { max: 8, scale: 1 });
 
   const lit = phase !== 'off';
-  const live = phase === 'on' && !buffering;
+  const paused = useRadio((s) => s.paused);
+  const live = phase === 'on' && !buffering && !paused;
   const fm = BANDS.FM;
   const am = BANDS.AM;
   const pointerX = SCALE_X0 + pos * (SCALE_X1 - SCALE_X0);

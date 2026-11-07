@@ -18,7 +18,7 @@ function publish() {
   const r = useRadio.getState();
   if (r.on && r.station) {
     Native.playbackState(JSON.stringify({
-      playing: r.phase !== 'ending',
+      playing: !r.paused && r.phase !== 'ending',
       title: r.station.name,
       artist: `${r.station.band} ${r.station.freq}`,
       album: tr('라디오'),
@@ -67,12 +67,12 @@ function play() {
   else p.toggle();
 }
 
-useRadio.subscribe((s, prev) => { if (s.on !== prev.on || s.station !== prev.station || s.phase !== prev.phase) publish(); });
+useRadio.subscribe((s, prev) => { if (s.on !== prev.on || s.station !== prev.station || s.phase !== prev.phase || s.paused !== prev.paused) publish(); });
 
 onNative('media', ({ action, seconds }) => {
   const r = useRadio.getState();
   if (r.on) {
-    if (action === 'play' || action === 'pause') r.toggle();
+    if (action === 'play' || action === 'pause') r.togglePause();
     else if (action === 'next') r.step(1);
     else if (action === 'prev') r.step(-1);
     return;

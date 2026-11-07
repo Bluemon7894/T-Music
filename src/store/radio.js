@@ -144,7 +144,7 @@ async function attachStream(station) {
 
 function onStreamError(why) {
   const { on, station } = useRadio.getState();
-  if (!on || !station || useRadio.getState().phase === 'ending') return;
+  if (!on || !station || useRadio.getState().phase === 'ending' || useRadio.getState().paused) return;
   noteTrouble('radio', { id: station.id, why: String(why).slice(0, 80) });
   if (retries++ < MAX_RETRIES) {
     useRadio.setState({ buffering: true });
@@ -164,6 +164,7 @@ audio.addEventListener('playing', () => {
   useRadio.setState({ buffering: false, failed: false });
 });
 audio.addEventListener('waiting', () => {
+  if (useRadio.getState().paused) return;
   useRadio.setState({ buffering: true });
   clearTimeout(stallTimer);
   stallTimer = setTimeout(() => onStreamError('stalled'), STALL_RETRY_MS);
@@ -191,7 +192,7 @@ async function start(station, { quiet = false, retry = false } = {}) {
   if (!retry) retries = 0;
   const sounds = !quiet && !wasOn && useDeck.getState().sounds;
   const fromFreq = wasOn && prev.station?.band === station.band ? prev.station.freq : null;
-  useRadio.setState({ on: true, phase: 'tuning', station, buffering: true, failed: false, band: station.band, sweep: { at: performance.now(), ms: QUIET_TUNE_MS, from: fromFreq, to: station.freq, kind: 'on' } });
+  useRadio.setState({ on: true, paused: false, phase: 'tuning', station, buffering: true, failed: false, band: station.band, sweep: { at: performance.now(), ms: QUIET_TUNE_MS, from: fromFreq, to: station.freq, kind: 'on' } });
   savePrefs({ last: station, band: station.band });
   const soundMs = sounds ? await playSound('start') : 0;
   if (mine !== token) return;
@@ -227,6 +228,7 @@ export const useRadio = create((set, get) => ({
   updatedAt: 0,
   buffering: false,
   failed: false,
+  paused: false, // stopped for now but still tuned in; resuming picks the broadcast up live
   sweep: null, // { at, ms, from, to, kind }: what the dial is doing, for the radio's drawing
   last: saved.last || null,
 
@@ -281,7 +283,7 @@ export const useRadio = create((set, get) => ({
     if (quiet || !useDeck.getState().sounds) {
       stopSound();
       release();
-      set({ on: false, phase: 'off', buffering: false, sweep: { at: performance.now(), ms: QUIET_TUNE_MS, from: freq, to: null, kind: 'off' } });
+      set({ on: false, paused: false, phase: 'off', buffering: false, sweep: { at: performance.now(), ms: QUIET_TUNE_MS, from: freq, to: null, kind: 'off' } });
       return;
     }
     set({ phase: 'ending', buffering: false });
@@ -292,7 +294,7 @@ export const useRadio = create((set, get) => ({
       fadeTo(0, length, () => {
         if (mine !== token) return;
         release();
-        set({ on: false, phase: 'off' });
+        set({ on: false, paused: false, phase: 'off' });
       });
     });
   },
@@ -300,6 +302,29 @@ export const useRadio = create((set, get) => ({
   toggle() {
     if (get().on && get().phase !== 'ending') get().powerOff();
     else get().powerOn();
+  },
+
+  // Play/pause on the radio: the set stays on and tuned. A broadcast can't be paused, so resuming
+  // jumps to what's on air now rather than where it stopped.
+  togglePause() {
+    const s = get();
+    if (!s.on || s.phase === 'ending') { get().powerOn(); return; }
+    if (!s.paused) {
+      clearInterval(fadeTimer);
+      audio.pause();
+      set({ paused: true });
+      return;
+    }
+    set({ paused: false, buffering: true });
+    if (hls) {
+      const live = hls.liveSyncPosition;
+      if (Number.isFinite(live)) audio.currentTime = live;
+      hls.startLoad();
+      audio.play().catch(() => onStreamError('resume refused'));
+    } else if (s.station) {
+      start(s.station, { quiet: true, retry: true });
+    }
+    audio.volume = level();
   },
 
   // The next channel up or down the dial on the current band.
@@ -339,7 +364,7 @@ if (import.meta.env.DEV) window.__tmRadioStore = useRadio; // for poking at it w
 // For the media keys, the tray and the phone's notification, which are wired to the music player.
 globalThis.__tmRadioControl = {
   active: () => useRadio.getState().on,
-  toggle: () => useRadio.getState().toggle(),
+  toggle: () => useRadio.getState().togglePause(),
   step: (dir) => useRadio.getState().step(dir),
 };
 

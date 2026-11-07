@@ -79,7 +79,8 @@ function RadioDock() {
   const phase = useRadio((s) => s.phase);
   const buffering = useRadio((s) => s.buffering);
   const saved = useLibrary((s) => Boolean(station) && s.savedStations.some((x) => x.id === station.id));
-  const { toggle, step, toggleSave } = useRadio.getState();
+  const { togglePause, step, toggleSave } = useRadio.getState();
+  const paused = useRadio((s) => s.paused);
   const muted = usePlayer((s) => s.muted);
   const volume = usePlayer((s) => s.volume);
   const { setVolume, toggleMute } = usePlayer.getState();
@@ -105,11 +106,11 @@ function RadioDock() {
       <div className="dock-center">
         <div className="dock-controls">
           <button className="icon-btn" onClick={() => step(-1)} title={tr('이전 채널')}><SkipBack size={20} fill="currentColor" /></button>
-          <PlayButton size={42} playing={phase !== 'ending'} onClick={toggle} className={`dock-play ${buffering ? 'loading' : ''}`} />
+          <PlayButton size={42} playing={!paused && phase !== 'ending'} onClick={togglePause} className={`dock-play ${buffering ? 'loading' : ''}`} />
           <button className="icon-btn" onClick={() => step(1)} title={tr('다음 채널')}><SkipForward size={20} fill="currentColor" /></button>
         </div>
         <div className="dock-progress radio-live-bar">
-          <span className={`radio-onair ${phase === 'on' && !buffering ? 'on' : ''}`}>{tr('ON AIR')}</span>
+          <span className={`radio-onair ${phase === 'on' && !buffering && !paused ? 'on' : ''}`}>{tr('ON AIR')}</span>
           <div className="radio-live-track"><i /></div>
           <span className="time">{tr('실시간')}</span>
         </div>
