@@ -53,8 +53,7 @@ export default function Radio() {
   }, [refresh]);
 
   const on = phase !== 'off';
-  // Channels with a picture first: the rest are usually less tended streams.
-  const list = channels.filter((c) => c.band === band).sort((a, b) => Number(!a.logo) - Number(!b.logo));
+  const list = channels.filter((c) => c.band === band); // in dial order
   const bandOf = station && on ? station.band : band;
   const current = on ? station : null;
 

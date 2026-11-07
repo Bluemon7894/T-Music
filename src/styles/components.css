@@ -268,9 +268,8 @@ html[data-platform='desktop']:not([data-motion='calm']) .now-panel { animation: 
 html[data-platform='desktop']:not([data-motion='calm']) .mini { animation: mini-in 0.45s var(--spring); }
 @keyframes mini-in { from { transform: scale(0.92); opacity: 0; } to { transform: none; opacity: 1; } }
 
-/* Anything showing the app's placeholder instead of a cover goes to the end of its row or grid: shelves,
-   quick tiles, search and library cards, radio channels. When a cover turns up later it moves back. */
+/* Music showing the app's placeholder instead of a cover goes to the end of its row or grid (shelves,
+   quick tiles, search and library cards). When a cover turns up later it moves back. The radio stays
+   in dial order. */
 .card:has(> .card-art .thumb.placeholder),
-.quick-tile:has(.thumb.placeholder),
-.radio-row:has(> .thumb.placeholder),
-.radio-chip:has(> .thumb.placeholder) { order: 1; }
+.quick-tile:has(.thumb.placeholder) { order: 1; }
