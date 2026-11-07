@@ -267,3 +267,10 @@ html[data-platform='desktop']:not([data-motion='calm']) .now-panel { animation: 
 @keyframes panel-in { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
 html[data-platform='desktop']:not([data-motion='calm']) .mini { animation: mini-in 0.45s var(--spring); }
 @keyframes mini-in { from { transform: scale(0.92); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Anything showing the app's placeholder instead of a cover goes to the end of its row or grid: shelves,
+   quick tiles, search and library cards, radio channels. When a cover turns up later it moves back. */
+.card:has(> .card-art .thumb.placeholder),
+.quick-tile:has(.thumb.placeholder),
+.radio-row:has(> .thumb.placeholder),
+.radio-chip:has(> .thumb.placeholder) { order: 1; }
