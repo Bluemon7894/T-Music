@@ -74,7 +74,7 @@ export default function FriendProfile({ uid }) {
   const time = view.time;
   const hidden = listOf(view.hidden);
   const name = person.name || '...';
-  const status = isMe ? null : !friend.online ? tr('오프라인') : friend.track ? (friend.playing ? tr('듣는 중') : tr('일시정지')) : tr('온라인');
+  const status = isMe ? null : !friend.online ? tr('오프라인') : friend.radio ? (friend.playing ? tr('라디오 듣는 중') : tr('일시정지')) : friend.track ? (friend.playing ? tr('듣는 중') : tr('일시정지')) : tr('온라인');
 
   const confirmRemove = () => useUI.getState().prompt({
     title: tr('{0}님을 친구에서 삭제할까요?', name),
@@ -93,7 +93,6 @@ export default function FriendProfile({ uid }) {
         <div className="fp-title">
           <span className="fp-kicker">{isMe ? tr('친구에게 이렇게 보여요') : tr('친구')}</span>
           <h1 title={name}>{name}</h1>
-          {view.bio && <p className="fp-bio">{view.bio}</p>}
           {status && <small className={friend.online ? 'on' : ''}>{status}</small>}
         </div>
         <div className="fp-actions">

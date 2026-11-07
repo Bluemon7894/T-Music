@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CloudCheck, CloudOff, Copy, Eye, ImagePlus, Library, LogIn, LogOut, Plus, RefreshCw, Settings, Trash2, UserRound, Users, X } from 'lucide-react';
 import { useAccount } from '../store/account.js';
 import { useFriends } from '../store/friends.js';
-import { GENRE_CHOICES, MAX_BIO, MAX_GENRE_LENGTH, MAX_GENRES, useProfile } from '../store/profile.js';
+import { GENRE_CHOICES, MAX_GENRE_LENGTH, MAX_GENRES, useProfile } from '../store/profile.js';
 import { useNav } from '../store/nav.js';
 import { useUpdater } from '../store/updater.js';
 import { toast, useUI } from '../store/ui.js';
@@ -200,24 +200,20 @@ function GenreField({ genres, onSave }) {
   );
 }
 
-// A name, a line about yourself, a picture, and the genres you'd say you like.
+// A name, a picture, and the genres you'd say you like.
 function ProfileEditor({ user }) {
-  const bio = useProfile((s) => s.bio);
   const genres = useProfile((s) => s.genres);
   const sharing = useFriends((s) => s.sharing);
   const { setDisplay } = useAccount.getState();
   const { save } = useProfile.getState();
   const [name, setName] = useState(user.name);
-  const [about, setAbout] = useState(bio);
   useEffect(() => setName(user.name), [user.name]);
-  useEffect(() => setAbout(bio), [bio]);
 
   const commitName = () => {
     const clean = name.trim();
     if (clean === user.name) return;
     setDisplay({ name: clean }).catch(() => toast(tr('저장하지 못했습니다')));
   };
-  const commitBio = () => { if (about.trim() !== bio) save({ bio: about.trim().slice(0, MAX_BIO) }, sharing); };
   const setPhoto = (photo) => setDisplay({ photo }).catch(() => toast(tr('저장하지 못했습니다')));
   const picker = useRef(null);
   const uploaded = String(user.photo || '').startsWith('data:');
@@ -239,10 +235,6 @@ function ProfileEditor({ user }) {
         <span>{tr('보여질 이름')}</span>
         <input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} onBlur={commitName} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} placeholder={user.googleName || tr('게스트 {0}', user.tag)} />
         <small className="muted">{user.isGuest ? tr('비워 두면 게스트 번호로 보여요. 내 번호는 #{0}이에요.', user.tag) : tr('비워 두면 Google 이름으로 보여요.')}</small>
-      </label>
-      <label className="profile-field">
-        <span>{tr('한 줄 소개')}</span>
-        <input value={about} maxLength={MAX_BIO} onChange={(e) => setAbout(e.target.value)} onBlur={commitBio} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} placeholder={tr('친구에게 보일 한 줄을 적어 보세요')} />
       </label>
       <div className="profile-field">
         <span>{tr('프로필 사진')}</span>

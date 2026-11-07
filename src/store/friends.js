@@ -20,6 +20,7 @@ import { OFFLINE_MESSAGE, waitForConnection, within } from '../lib/online.js';
 import { safePhoto, safeTrack } from '../lib/safeTrack.js';
 import { useNav } from './nav.js';
 import { usePlayer } from './player.js';
+import { useRadio } from './radio.js';
 import { photoToShow, useProfile } from './profile.js';
 import { useRoom } from './room.js';
 import { toast, useUI } from './ui.js';
@@ -69,6 +70,12 @@ export const useFriends = create((set, get) => {
     const { sharing } = get();
     if (!sharing.online) return null;
     const player = usePlayer.getState();
+    const radio = useRadio.getState();
+    // The radio channel goes in its own field: older versions don't know it and simply show "online".
+    if (sharing.track && radio.on && radio.station) {
+      const s = radio.station;
+      return { online: true, track: null, playing: !radio.paused, radio: { id: String(s.id).slice(0, 80), name: String(s.name || '').slice(0, 80), band: s.band, freq: s.freq, ...(s.logo ? { logo: s.logo } : {}) }, updatedAt: serverTimestamp() };
+    }
     const track = sharing.track ? safeTrack(player.current()) : null;
     return { online: true, track, playing: Boolean(track && player.playing), updatedAt: serverTimestamp() };
   };
@@ -110,7 +117,8 @@ export const useFriends = create((set, get) => {
     const listen = () => {
       stopPresence = onValue(dbRef('presence', uid), (snap) => {
         const p = snap.val();
-        patchFriend(uid, { online: p?.online === true, track: p?.online ? safeTrack(p.track) : null, playing: p?.playing === true });
+        const radio = p?.online && p.radio && typeof p.radio.name === 'string' ? { name: p.radio.name.slice(0, 80), band: p.radio.band === 'AM' ? 'AM' : 'FM', freq: Number(p.radio.freq) || 0, logo: safePhoto(p.radio.logo) } : null;
+        patchFriend(uid, { online: p?.online === true, track: p?.online ? safeTrack(p.track) : null, radio, playing: p?.playing === true });
       }, () => {
         patchFriend(uid, { online: false, track: null, playing: false });
         if (!stopped) retry = setTimeout(listen, PRESENCE_RETRY_MS);
@@ -227,6 +235,9 @@ export const useFriends = create((set, get) => {
         // A late "gone" note from an old connection or another device says offline while we're right here.
         onValue(presenceRef(), (snap) => {
           if (connected && get().sharing.online && snap.val()?.online !== true) schedulePresence();
+        }),
+        useRadio.subscribe((s, prev) => {
+          if (s.station !== prev.station || s.on !== prev.on || s.paused !== prev.paused) schedulePresence();
         }),
         usePlayer.subscribe((s, prev) => {
           if (s.queue[s.index]?.id !== prev.queue[prev.index]?.id || s.playing !== prev.playing) schedulePresence();

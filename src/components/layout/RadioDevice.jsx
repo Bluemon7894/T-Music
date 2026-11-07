@@ -5,7 +5,9 @@
 // The pointer, the tuning knob and the eye follow the radio's `tune` (see store/radio.js): turning on,
 // the dial warms up and the pointer sweeps in time with the start sound, landing on the channel as the
 // broadcast comes in; turning off, the light fades and the pointer drifts back with the end sound.
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { getRadioAnalyser } from '../../lib/audio.js';
+import { reduced } from '../../lib/motion.js';
 import { useRadio } from '../../store/radio.js';
 import { usePlayer } from '../../store/player.js';
 import { useTilt } from '../../lib/motion.js';
@@ -53,10 +55,32 @@ export default function RadioDevice() {
   const bandId = station?.band || useRadio.getState().band;
   const { pos } = useNeedle(bandId);
   useTilt(tilt, { max: 8, scale: 1 });
+  const speaker = useRef(null);
 
   const lit = phase !== 'off';
   const paused = useRadio((s) => s.paused);
   const live = phase === 'on' && !buffering && !paused;
+
+  // The speaker follows how loud the low end is, smoothed so it breathes rather than jitters.
+  useEffect(() => {
+    const el = speaker.current;
+    const analyser = getRadioAnalyser();
+    if (!el || !live || !analyser || reduced) { el?.style.setProperty('--lvl', '0'); return undefined; }
+    const bins = new Uint8Array(analyser.frequencyBinCount);
+    let level = 0;
+    let raf = 0;
+    const step = () => {
+      analyser.getByteFrequencyData(bins);
+      let sum = 0;
+      for (let i = 1; i < 14; i++) sum += bins[i];
+      const now = Math.min(1, sum / 13 / 200);
+      level += (now - level) * (now > level ? 0.45 : 0.12);
+      el.style.setProperty('--lvl', level.toFixed(3));
+      raf = requestAnimationFrame(step);
+    };
+    step();
+    return () => { cancelAnimationFrame(raf); el.style.setProperty('--lvl', '0'); };
+  }, [live]);
   const fm = BANDS.FM;
   const am = BANDS.AM;
   const pointerX = SCALE_X0 + pos * (SCALE_X1 - SCALE_X0);
@@ -159,11 +183,13 @@ export default function RadioDevice() {
           </g>
           <path d={`M${GLASS.x + 1} ${GLASS.y + 1} H${GLASS.x + 30} L${GLASS.x + 18} ${GLASS.y + GLASS.h - 1} H${GLASS.x + 1} Z`} fill="rgba(255,255,255,0.07)" />
 
-          {/* speaker */}
+          {/* speaker: swells a little with the sound (--lvl, set from the radio's analyser) */}
+          <g className="rd-speaker" ref={speaker} style={{ transformOrigin: '34px 67px' }}>
           <rect x={SPEAKER.x} y={SPEAKER.y} width={SPEAKER.w} height={SPEAKER.h} rx="4" fill="url(#rd-cloth)" />
           <rect x={SPEAKER.x} y={SPEAKER.y} width={SPEAKER.w} height={SPEAKER.h} rx="4" className="rd-cloth-glow" fill="#c4b5fd" />
           {GRILLE_BARS.map((y) => <rect key={y} x={SPEAKER.x} y={y - 0.55} width={SPEAKER.w} height="1.1" rx="0.5" fill="url(#rd-trim)" opacity="0.8" />)}
           <rect x={SPEAKER.x} y={SPEAKER.y} width={SPEAKER.w} height={SPEAKER.h} rx="4" fill="none" stroke="url(#rd-trim)" strokeWidth="0.7" />
+          </g>
 
           {/* magic eye and power lamp */}
           <circle cx={EYE.cx} cy={EYE.cy} r="4.5" fill="url(#rd-trim)" />

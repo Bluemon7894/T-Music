@@ -200,3 +200,5 @@ export function useFlip(ref) {
 }
 
 export { stagger, utils, createTimeline };
+
+if (import.meta.env.DEV) window.__tmMotion = { flight: () => flight, big: () => big() }; // for testing

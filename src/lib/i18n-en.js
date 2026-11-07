@@ -190,6 +190,7 @@ export default {
   "대기열에 추가": "Add to queue",
   "대기열에 있음": "In queue",
   "라디오": "Radio",
+  "라디오 듣는 중": "Listening to the radio",
   "앱 열기": "Open the app",
   "무대": "Stage",
   "미니": "Mini",

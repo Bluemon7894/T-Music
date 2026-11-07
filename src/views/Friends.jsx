@@ -15,6 +15,7 @@ import { tr } from '../lib/i18n.js';
 
 function statusOf(friend) {
   if (!friend.online) return tr('오프라인');
+  if (friend.radio) return friend.playing ? tr('라디오 듣는 중') : tr('일시정지');
   if (!friend.track) return tr('온라인');
   return friend.playing ? tr('듣는 중') : tr('일시정지');
 }
@@ -48,6 +49,15 @@ function FriendRow({ uid, friend }) {
         <b>{friend.name || '...'}</b>
         <small>{statusOf(friend)}</small>
       </div>
+      {friend.radio && !friend.track && (
+        <div className="friend-track" title={tr('라디오')}>
+          <Thumb src={friend.radio.logo} />
+          <span>
+            <b>📻 {friend.radio.name}</b>
+            <small>{friend.radio.band} {friend.radio.freq}</small>
+          </span>
+        </div>
+      )}
       {friend.track && (
         <button className="friend-track" onClick={() => usePlayer.getState().playList([friend.track], 0, { name: tr('{0}님이 듣는 곡', friend.name) })} title={tr('이 곡 재생')}>
           <Thumb src={friend.track.thumb} />

@@ -115,6 +115,7 @@ function InRoom() {
   const listening = list.filter(([, m]) => m.listening).length;
   const hostListening = Boolean(members[meta?.hostUid]?.listening);
   const track = safeTrack(playback?.track);
+  const roomRadio = useRoom((st) => st.radio);
 
   const confirmLeave = () => useUI.getState().prompt({
     title: tr('방에서 나갈까요?'),
@@ -164,7 +165,15 @@ function InRoom() {
 
       <section className="room-card room-now" data-enter>
         <h3><Radio size={16} />{' '}{tr('지금 함께 듣는 곡')}</h3>
-        {track ? (
+        {roomRadio ? (
+          <div className="room-track">
+            <Thumb src={roomRadio.logo} />
+            <div className="room-track-text">
+              <b title={roomRadio.name}>📻 {roomRadio.name}</b>
+              <small>{roomRadio.band} {roomRadio.freq} · {tr('라디오')}</small>
+            </div>
+          </div>
+        ) : track ? (
           <div className="room-track">
             <Thumb src={track.thumb} />
             <div className="room-track-text">

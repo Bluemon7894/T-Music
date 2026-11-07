@@ -45,7 +45,10 @@ async function handleRadio(req) {
   const target = new URL(req.url).searchParams.get('u') || '';
   if (!/^https?:\/\//i.test(target)) return new Response('bad url', { status: 400, headers: CORS });
   try {
-    const res = await net.fetch(target, { headers: { 'User-Agent': RADIO_UA, 'Icy-MetaData': '0' }, bypassCustomProtocolHandlers: true });
+    // Node's fetch, not Chromium's: some broadcasters' certificates are refused by Chromium's stricter
+    // checks, which left those stations silent, while the station check (electron/radio.js, also Node)
+    // had found them working.
+    const res = await fetch(target, { headers: { 'User-Agent': RADIO_UA, 'Icy-MetaData': '0' } });
     const h = new Headers(CORS);
     const type = res.headers.get('content-type');
     if (type) h.set('content-type', type);

@@ -88,14 +88,13 @@
 .rd-deck.lit .rd-pointer { fill: #c026d3; }
 .rd-pointer-glow { opacity: 0; transition: opacity 0.8s; }
 .rd-deck.lit .rd-pointer-glow { opacity: 0.35; }
-.rd-cloth-glow { opacity: 0; }
-.rd-deck.live .rd-cloth-glow { animation: rd-breathe 1.2s ease-in-out infinite; }
-@keyframes rd-breathe { 0%, 100% { opacity: 0.02; } 50% { opacity: 0.09; } }
+.rd-speaker { --lvl: 0; transform: scale(calc(1 + var(--lvl) * 0.035)); }
+.rd-cloth-glow { opacity: calc(var(--lvl) * 0.16); }
 .rd-eye { opacity: 0.15; transition: opacity 1.2s; }
 .rd-deck.lit .rd-eye { opacity: 1; }
 .rd-lamp { opacity: 0.2; transition: opacity 0.6s; }
 .rd-deck.lit .rd-lamp { opacity: 1; filter: drop-shadow(0 0 1.2px #e879f9); }
-html[data-motion='calm'] .rd-deck.live .rd-cloth-glow { animation: none; }
+
 
 /* the dock on the radio */
 .radio-live-bar { gap: 10px; }

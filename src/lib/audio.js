@@ -141,10 +141,30 @@ export function wakeAudio() {
   if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {});
 }
 
+// The radio: its own path to the speakers with its own analyser (for the radio set's speaker), and no
+// equalizer or fade. Connected once; the element is reused for every channel.
+let radioAnalyser = null;
+let radioBusy = () => false;
+export function attachRadio(el, busy) {
+  radioBusy = busy;
+  try {
+    setupGraph();
+    if (!ctx || sources.has(el)) return;
+    const src = ctx.createMediaElementSource(el);
+    radioAnalyser = ctx.createAnalyser();
+    radioAnalyser.fftSize = 256;
+    radioAnalyser.smoothingTimeConstant = 0.6;
+    src.connect(radioAnalyser).connect(ctx.destination);
+    sources.set(el, src);
+  } catch { /* the radio still plays without the speaker following it */ }
+}
+export const getRadioAnalyser = () => radioAnalyser;
+
 export function sleepAudioSoon(stillIdle) {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
     idleTimer = null;
+    if (radioBusy()) return; // the radio goes through the same graph and must keep sounding
     const idle = stillIdle();
     if (idle === null) sleepAudioSoon(stillIdle); // a sound is still finishing: look again
     else if (idle && ctx?.state === 'running') ctx.suspend().catch(() => {});
@@ -274,3 +294,5 @@ export function startAudioOnsetDetection(audioEl, trackId) {
     }
   }, 40);
 }
+
+if (import.meta.env.DEV) window.__tmAudio = { radioAnalyser: () => radioAnalyser, ctx: () => ctx }; // for testing

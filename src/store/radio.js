@@ -8,7 +8,7 @@
 import { create } from 'zustand';
 import Hls from 'hls.js';
 import { api, errorText } from '../lib/api.js';
-import { getAudioContext } from '../lib/audio.js';
+import { attachRadio, getAudioContext, wakeAudio } from '../lib/audio.js';
 import { IS_ANDROID } from '../lib/platform.js';
 import { tr } from '../lib/i18n.js';
 import { noteTrouble } from '../lib/trouble.js';
@@ -81,6 +81,7 @@ function stopSound() {
 // ---- the broadcast ----
 const audio = new Audio();
 audio.preload = 'none';
+audio.crossOrigin = 'anonymous'; // lets the radio set's speaker read the sound (the proxy allows it)
 let hls = null;
 let fadeTimer = null;
 let retries = 0;
@@ -127,6 +128,8 @@ class ProxyLoader extends Hls.DefaultConfig.loader {
 
 async function attachStream(station) {
   release();
+  attachRadio(audio, () => useRadio.getState().on && !useRadio.getState().paused);
+  wakeAudio();
   let url = station.url;
   let useHls = station.hls;
   if (station.kind === 'youtube') {
@@ -144,7 +147,8 @@ async function attachStream(station) {
       loader: ProxyLoader,
       xhrSetup: (xhr, target) => { xhr.open('GET', proxied(target), true); },
     });
-    hls.on(Hls.Events.ERROR, (_e, data) => { if (data.fatal) onStreamError(data.details || data.type); });
+    hls.on(Hls.Events.ERROR, (_e, data) => { if (import.meta.env.DEV) (window.__tmHlsErrors ??= []).push(`${data.fatal ? 'FATAL ' : ''}${data.details}`); if (data.fatal) onStreamError(data.details || data.type); });
+    if (import.meta.env.DEV) window.__tmHls = hls;
     hls.loadSource(url);
     hls.attachMedia(audio);
   } else {
@@ -327,6 +331,7 @@ export const useRadio = create((set, get) => ({
       return;
     }
     set({ paused: false, buffering: true });
+    wakeAudio();
     if (hls) {
       const live = hls.liveSyncPosition;
       if (Number.isFinite(live)) audio.currentTime = live;
