@@ -104,7 +104,7 @@ function StatsRow() {
   );
 }
 
-const SHELF_ITEMS = 12;
+const SHELF_ITEMS = 16;
 const RECOMMEND_SEEDS = 10;
 const MIN_FRESH_PICKS = 6;
 

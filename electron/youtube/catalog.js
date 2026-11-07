@@ -19,6 +19,7 @@ const MIN = 60 * 1000;
 const VIDEOS_ONLY = 'EgIQAQ%3D%3D';
 const FEW_PLAYLIST_TRACKS = 20;
 let homeShelves = null;
+const HOME_SHELF_MAX = 16;
 const MAX_PLAYLIST_PAGES = 5;
 const INSTRUMENTAL = /\binst\b|instrumental|\bMR\b|반주/i;
 
@@ -400,14 +401,16 @@ const HOME_SHELVES = [
 
 export function home() {
   return cached('home', 60 * MIN, async () => {
+    // One search gives only eight or nine playlists, so each shelf also asks a second way and keeps up to
+    // HOME_SHELF_MAX, leaving room for ones dropped later for having no cover.
     const shelves = await Promise.all((homeShelves ?? HOME_SHELVES).map(async (s) => {
-      try {
-        const d = await call('/search', { client: 'YTMUSIC', query: s.query });
-        const items = P.findAll(d, 'musicResponsiveListItemRenderer').map((r) => P.parseResponsive(r)).filter((i) => i && (i.kind === 'playlist' || i.kind === 'album'));
-        return { title: s.title, items: uniqueBy(items, (x) => x.kind + x.id) };
-      } catch {
-        return { title: s.title, items: [] };
-      }
+      const queries = [s.query, `${s.query} ${homeShelves === HOME_SHELVES_EN ? 'playlist' : '플레이리스트'}`];
+      const found = await Promise.allSettled(queries.map(async (query) => {
+        const d = await call('/search', { client: 'YTMUSIC', query });
+        return P.findAll(d, 'musicResponsiveListItemRenderer').map((r) => P.parseResponsive(r)).filter((i) => i && (i.kind === 'playlist' || i.kind === 'album') && i.thumb);
+      }));
+      const items = found.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+      return { title: s.title, items: uniqueBy(items, (x) => x.kind + x.id).slice(0, HOME_SHELF_MAX) };
     }));
     return { shelves: shelves.filter((s) => s.items.length) };
   });

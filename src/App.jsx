@@ -289,7 +289,7 @@ function MainApp() {
 
   return (
     <div className={`app ${panelOpen ? 'with-panel' : ''} ${sideOpen ? '' : 'side-closed'}`} style={{ '--side': `${sideOpen ? sideWidth : SIDE.rail}px`, '--panel': `${panelWidth}px` }}>
-      <div className="aurora"><i className="a1" /><i className="a2" /><i className="a3" /></div>
+      <div className="aurora"><i className="a1" /><i className="a2" /><i className="a3" /><i className="a4" /></div>
       <Sidebar />
       <TopBar />
       <main className="main" ref={mainRef}>
