@@ -150,7 +150,7 @@ function onStreamError(why) {
     useRadio.setState({ buffering: true });
     setTimeout(() => {
       const s = useRadio.getState();
-      if (s.on && s.station?.id === station.id) start(station, { quiet: true, retry: true });
+      if (s.on && !s.paused && s.station?.id === station.id) start(station, { quiet: true, retry: true });
     }, 1500);
     return;
   }
@@ -311,6 +311,7 @@ export const useRadio = create((set, get) => ({
     if (!s.on || s.phase === 'ending') { get().powerOn(); return; }
     if (!s.paused) {
       clearInterval(fadeTimer);
+      clearTimeout(stallTimer);
       audio.pause();
       set({ paused: true });
       return;
