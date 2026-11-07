@@ -194,7 +194,12 @@ usePlayer.subscribe((p, prev) => {
   }
   if (soundSource && (p.volume !== prev.volume || p.muted !== prev.muted)) soundSource.gain.gain.value = level();
   // Music started: the radio goes quiet without ceremony.
-  if (p.playing && !prev.playing && useRadio.getState().on) useRadio.getState().powerOff({ quiet: true, local: true });
+  if (p.playing && !prev.playing) {
+    if (useRadio.getState().on) useRadio.getState().powerOff({ quiet: true, local: true });
+    // The room goes back to music too, if this person may change what it plays.
+    const room = useRoom.getState();
+    if (room.attached && room.radio && room.canControl()) room.setRadio(null);
+  }
 });
 
 let token = 0;
