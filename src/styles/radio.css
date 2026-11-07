@@ -38,8 +38,8 @@
 .radio-power { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; color: var(--sub); background: var(--glass-2); border: 1px solid var(--line-2); transition: background 0.3s, color 0.3s, box-shadow 0.3s, transform 0.25s var(--spring); }
 .radio-power:hover { transform: scale(1.06); color: #fff; }
 .radio-power:active { transform: scale(0.94); }
-.radio-power.on { color: #fff; background: linear-gradient(135deg, #8b5cf6, #6d28d9 60%, #4c1d95); box-shadow: var(--glow); border-color: transparent; }
-.radio-power { outline: none; background-clip: padding-box; }
+.radio-power.on { color: #fff; background: radial-gradient(circle at 50% 40%, #8b5cf6, #6d28d9 75%); box-shadow: var(--glow); border: 0; }
+.radio-power { outline: none; }
 .radio-power:focus-visible { box-shadow: 0 0 0 2px var(--v-300); }
 
 .radio-section { margin-bottom: 26px; }
