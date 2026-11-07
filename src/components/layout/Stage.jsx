@@ -267,7 +267,7 @@ function RadioStage() {
       <div className="stage-top-drag" />
       <button className="icon-btn circle glass stage-close" onClick={close} title={tr('닫기 (Esc)')}><ChevronDown size={22} /></button>
       <div className="stage-main">
-        <div className="stage-deck-col"><Deck /></div>
+        <div className="stage-deck-col"><Deck radio /></div>
         <div className="stage-info">
           <div className="stage-header" data-rise>
             <span className="stage-kicker">{tr('라디오')}{' · '}{status}</span>

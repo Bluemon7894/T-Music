@@ -116,6 +116,15 @@ function fadeTo(target, ms, then) {
   }, 30);
 }
 
+// Requests go through the proxy, but a playlist's relative entries must resolve against the station's
+// own address, not the proxy's: hls.js falls back to the address it asked for when a response has none.
+class ProxyLoader extends Hls.DefaultConfig.loader {
+  load(context, config, callbacks) {
+    const done = callbacks.onSuccess;
+    super.load(context, config, { ...callbacks, onSuccess: (response, ...rest) => done({ ...response, url: context.url }, ...rest) });
+  }
+}
+
 async function attachStream(station) {
   release();
   let url = station.url;
@@ -132,6 +141,7 @@ async function attachStream(station) {
       lowLatencyMode: false,
       liveSyncDurationCount: 3,
       maxBufferLength: 20,
+      loader: ProxyLoader,
       xhrSetup: (xhr, target) => { xhr.open('GET', proxied(target), true); },
     });
     hls.on(Hls.Events.ERROR, (_e, data) => { if (data.fatal) onStreamError(data.details || data.type); });
@@ -360,7 +370,7 @@ useRoom.subscribe((r, prev) => {
 });
 
 export const isRadioOn = () => useRadio.getState().on;
-if (import.meta.env.DEV) window.__tmRadioStore = useRadio; // for poking at it while testing
+if (import.meta.env.DEV) { window.__tmRadioStore = useRadio; window.__tmRadioAudio = audio; } // for poking at it while testing
 
 // For the media keys, the tray and the phone's notification, which are wired to the music player.
 globalThis.__tmRadioControl = {

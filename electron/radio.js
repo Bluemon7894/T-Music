@@ -149,12 +149,60 @@ async function livestreams(country) {
   return [...found.values()];
 }
 
+// The directory only says a station worked at its last check. Many have since gone: broadcasters'
+// signed addresses expire (403/400), some entries point at a web page, some servers are down. Each
+// stream is tried here before it's listed, and the answer is kept for a while.
+const PROBE_TIMEOUT_MS = 4500;
+const PROBE_KEEP_MS = 15 * 60 * 1000;
+const PROBE_PARALLEL = 12;
+const probes = new Map();
+const AUDIO = /^(audio\/|application\/ogg|video\/mp2t)/i;
+const PLAYLIST = /mpegurl|vnd\.apple/i;
+
+async function reachable(station) {
+  const hit = probes.get(station.url);
+  if (hit && Date.now() - hit.at < PROBE_KEEP_MS) return hit.ok;
+  const { signal, done } = withTimeout(PROBE_TIMEOUT_MS);
+  let ok = false;
+  try {
+    const res = await fetch(station.url, { signal, headers: { 'User-Agent': 'Mozilla/5.0', 'Icy-MetaData': '0' } });
+    const type = res.headers.get('content-type') || '';
+    if (res.ok && PLAYLIST.test(type)) {
+      const text = await res.text();
+      ok = text.trimStart().startsWith('#EXTM3U');
+      // A master playlist can open while the stream it points to is refused: try that one too.
+      const variant = ok && /#EXT-X-STREAM-INF/.test(text) && text.split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#'));
+      if (variant) {
+        const sub = await fetch(new URL(variant, res.url).href, { signal, headers: { 'User-Agent': 'Mozilla/5.0' } });
+        ok = sub.ok && (await sub.text()).includes('#EXTINF');
+      }
+    } else ok = res.ok && AUDIO.test(type);
+    if (!PLAYLIST.test(type)) res.body?.cancel();
+  } catch { ok = false; } finally {
+    done();
+  }
+  probes.set(station.url, { ok, at: Date.now() });
+  return ok;
+}
+
+async function onlyReachable(list) {
+  const keep = new Array(list.length).fill(false);
+  let next = 0;
+  await Promise.all(Array.from({ length: PROBE_PARALLEL }, async () => {
+    while (next < list.length) {
+      const i = next++;
+      keep[i] = await reachable(list[i]);
+    }
+  }));
+  return list.filter((_, i) => keep[i]);
+}
+
 const cache = new Map();
 export async function channels(country = 'KR') {
   const hit = cache.get(country);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.list;
   const [a, b] = await Promise.allSettled([
-    remote.radioOn('stations') ? stations(country) : [],
+    remote.radioOn('stations') ? stations(country).then(onlyReachable) : [],
     remote.radioOn('youtube') ? livestreams(country) : [],
   ]);
   const list = place([...(a.value || []), ...(b.value || [])]);

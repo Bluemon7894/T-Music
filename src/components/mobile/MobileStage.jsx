@@ -145,7 +145,7 @@ function RadioView() {
         <span className="m-stage-radio-label">{tr('라디오')}</span>
         <span />
       </header>
-      <div className="m-stage-body tab-now"><Deck /></div>
+      <div className="m-stage-body tab-now"><Deck radio /></div>
       <div className="m-stage-meta">
         <div className="m-stage-text">
           <h1>{station?.name || tr('라디오')}</h1>
