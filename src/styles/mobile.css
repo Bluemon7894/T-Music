@@ -134,13 +134,13 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
   z-index: 5;
   flex: none;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr)); /* one column per tab: 홈 검색 라디오 보관함 같이 듣기 친구 */
   height: calc(54px + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
   background: rgba(10, 7, 18, 0.92);
   border-top: 1px solid var(--line);
 }
-.m-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--dim); font-size: 10.5px; font-weight: 600; }
+.m-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; color: var(--dim); font-size: 10px; font-weight: 600; white-space: nowrap; letter-spacing: -0.02em; }
 .m-tab.on { color: #fff; }
 .m-tab.on svg { color: var(--v-300); filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.7)); }
 .m-tab-icon { position: relative; display: inline-flex; }
@@ -475,3 +475,25 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .bar-handle { display: none; }
 /* Backdrops and glows cost the most to repaint: with motion turned down they go entirely. */
 html[data-motion="calm"] .m-bg, html[data-motion="calm"] .ph-backdrop, html[data-motion="calm"] .m-stage .stage-bg { display: none; }
+
+
+/* radio on a phone: tools on two rows, the dial's number above its scale, controls under the name */
+.radio-page .page-title { flex-direction: column; align-items: stretch; }
+.radio-tools { flex-wrap: wrap; gap: 6px; }
+.radio-tools .set-select { flex: 1 1 auto; min-width: 0; }
+.radio-tools .btn { flex: 1 1 100%; justify-content: center; }
+.radio-hero { padding: 12px; gap: 12px; }
+.rdial { flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 12px; }
+.rdial-readout { min-width: 0; justify-content: center; }
+.rdial-readout b { font-size: 26px; }
+.rdial-scale { flex: none; margin: 0 4px; height: 44px; }
+.rdial-major em { font-size: 9px; }
+.radio-now { flex-wrap: wrap; }
+.radio-now-logo { width: 52px; height: 52px; }
+.radio-now-text { flex: 1 1 calc(100% - 66px); }
+.radio-now-text b { font-size: 17px; }
+.radio-now-actions { flex: 1 1 100%; justify-content: center; gap: 14px; }
+.radio-list { grid-template-columns: minmax(0, 1fr); }
+.radio-freq { width: 44px; font-size: 14px; }
+.rdial-major:nth-child(even) em { display: none; } /* every other number, so they never overlap */
+.rdial-mark { width: 5px; margin-left: -2.5px; }

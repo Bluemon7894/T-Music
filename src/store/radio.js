@@ -81,7 +81,7 @@ function stopSound() {
 // ---- the broadcast ----
 const audio = new Audio();
 audio.preload = 'none';
-audio.crossOrigin = 'anonymous'; // lets the radio set's speaker read the sound (the proxy allows it)
+if (!IS_ANDROID) audio.crossOrigin = 'anonymous'; // lets the radio set's speaker read the sound (the proxy allows it)
 let hls = null;
 let fadeTimer = null;
 let retries = 0;
@@ -93,7 +93,8 @@ const level = () => {
 };
 
 function proxied(url) {
-  if (IS_ANDROID) return window.__tmRadioProxy(url);
+  // The phone refuses plain http (rightly), so playlists' pieces are asked for over https too.
+  if (IS_ANDROID) return window.__tmRadioProxy(url.startsWith('http://') ? `https://${url.slice(7)}` : url);
   return `ytm://radio/?u=${encodeURIComponent(url)}`;
 }
 
@@ -128,7 +129,9 @@ class ProxyLoader extends Hls.DefaultConfig.loader {
 
 async function attachStream(station) {
   release();
-  attachRadio(audio, () => useRadio.getState().on && !useRadio.getState().paused);
+  // Not on a phone: a stream played straight from a station can't be read without its permission, and
+  // routed through Web Audio it would come out silent. The speaker just doesn't follow the sound there.
+  if (!IS_ANDROID) attachRadio(audio, () => useRadio.getState().on && !useRadio.getState().paused);
   wakeAudio();
   let url = station.url;
   let useHls = station.hls;
@@ -152,7 +155,9 @@ async function attachStream(station) {
     hls.loadSource(url);
     hls.attachMedia(audio);
   } else {
-    audio.src = proxied(url);
+    // On a phone a plain stream plays straight from the station over https: endless responses don't
+    // survive the phone's request interception, which HLS (short pieces) is fine with.
+    audio.src = IS_ANDROID ? (url.startsWith('http://') ? `https://${url.slice(7)}` : url) : proxied(url);
   }
 }
 

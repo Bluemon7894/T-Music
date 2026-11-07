@@ -104,6 +104,9 @@ final class ProxyHandler {
             String type = c.getContentType();
             String mime = "application/octet-stream";
             String charset = null;
+            // Many stations label HE-AAC "audio/aacp", which the phone's player doesn't know; it plays
+            // the same stream when it's called plain AAC.
+            if (isRadio && type != null && type.toLowerCase(Locale.ROOT).startsWith("audio/aacp")) type = "audio/aac";
             if (type != null) {
                 out.put("Content-Type", type);
                 mime = type.split(";")[0].trim();

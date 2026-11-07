@@ -159,13 +159,16 @@ const probes = new Map();
 const AUDIO = /^(audio\/|application\/ogg|video\/mp2t)/i;
 const PLAYLIST = /mpegurl|vnd\.apple/i;
 
+// On a phone the page can't reach stations directly; the phone fetches for it (see proxyFetch.js).
+const via = (url) => (typeof window !== 'undefined' && window.__tmRadioProxy ? window.__tmRadioProxy(url) : url);
+
 async function reachable(station) {
   const hit = probes.get(station.url);
   if (hit && Date.now() - hit.at < PROBE_KEEP_MS) return hit.ok;
   const { signal, done } = withTimeout(PROBE_TIMEOUT_MS);
   let ok = false;
   try {
-    const res = await fetch(station.url, { signal, headers: { 'User-Agent': 'Mozilla/5.0', 'Icy-MetaData': '0' } });
+    const res = await fetch(via(station.url), { signal, headers: { 'User-Agent': 'Mozilla/5.0', 'Icy-MetaData': '0' } });
     const type = res.headers.get('content-type') || '';
     if (res.ok && PLAYLIST.test(type)) {
       const text = await res.text();
@@ -173,7 +176,7 @@ async function reachable(station) {
       // A master playlist can open while the stream it points to is refused: try that one too.
       const variant = ok && /#EXT-X-STREAM-INF/.test(text) && text.split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#'));
       if (variant) {
-        const sub = await fetch(new URL(variant, res.url).href, { signal, headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const sub = await fetch(via(new URL(variant, station.url).href), { signal, headers: { 'User-Agent': 'Mozilla/5.0' } });
         ok = sub.ok && (await sub.text()).includes('#EXTINF');
       }
     } else ok = res.ok && AUDIO.test(type);
@@ -185,7 +188,13 @@ async function reachable(station) {
   return ok;
 }
 
-async function onlyReachable(list) {
+// The phone won't open plain-http connections, which is right; most stream servers answer on https too,
+// so there the address is upgraded and the check below drops the ones that don't.
+const phone = () => typeof window !== 'undefined' && Boolean(window.__tmRadioProxy);
+const secure = (s) => (phone() && s.url.startsWith('http://') ? { ...s, url: `https://${s.url.slice(7)}` } : s);
+
+async function onlyReachable(all) {
+  const list = all.map(secure);
   const keep = new Array(list.length).fill(false);
   let next = 0;
   await Promise.all(Array.from({ length: PROBE_PARALLEL }, async () => {
