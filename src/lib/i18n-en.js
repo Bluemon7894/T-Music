@@ -191,6 +191,7 @@ export default {
   "대기열에 있음": "In queue",
   "라디오": "Radio",
   "라디오 듣는 중": "Listening to the radio",
+  "지금 함께 듣는 방송": "On air together",
   "앱 열기": "Open the app",
   "무대": "Stage",
   "미니": "Mini",

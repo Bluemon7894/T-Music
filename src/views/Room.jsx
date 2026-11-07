@@ -164,7 +164,7 @@ function InRoom() {
       </section>
 
       <section className="room-card room-now" data-enter>
-        <h3><Radio size={16} />{' '}{tr('지금 함께 듣는 곡')}</h3>
+        <h3><Radio size={16} />{' '}{roomRadio ? tr('지금 함께 듣는 방송') : tr('지금 함께 듣는 곡')}</h3>
         {roomRadio ? (
           <div className="room-track">
             <Thumb src={roomRadio.logo} />
