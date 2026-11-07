@@ -345,15 +345,15 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 
 /* ---------- settings ---------- */
 .settings-grid { gap: 10px; }
-.settings-top, .settings-columns, .settings-col { display: contents; }
-.settings-top > :nth-child(1) { order: 0; }
-.settings-top > :nth-child(2) { order: 1; }
-.settings-col:first-child > :nth-child(1) { order: 2; }
-.settings-col:last-child > :nth-child(1) { order: 3; }
-.settings-col:last-child > :nth-child(2) { order: 4; }
-.settings-col:first-child > :nth-child(2) { order: 5; }
-.settings-col:last-child > :nth-child(3) { order: 6; }
-.settings-col:first-child > :nth-child(3) { order: 7; }
+.settings-columns, .settings-col { display: contents; }
+.settings-col:first-child > :nth-child(1) { order: 0; }
+.settings-col:last-child > :nth-child(1) { order: 1; }
+.settings-col:first-child > :nth-child(2) { order: 2; }
+.settings-col:last-child > :nth-child(2) { order: 3; }
+.settings-col:last-child > :nth-child(3) { order: 4; }
+.settings-col:first-child > :nth-child(3) { order: 5; }
+.settings-col:last-child > :nth-child(4) { order: 6; }
+.settings-col:first-child > :nth-child(4) { order: 7; }
 .set-card { padding: 16px; height: auto; border-radius: 18px; }
 .set-item { padding: 12px 0; }
 .set-stats { gap: 6px; }

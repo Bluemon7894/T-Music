@@ -355,13 +355,9 @@ export default function Settings() {
       <div className="page-title" data-enter><h1>{tr('설정')}</h1></div>
 
       <div className="settings-grid">
-        <div className="settings-top">
-          <AccountCard />
-          <FriendPrivacyCard />
-        </div>
-
         <div className="settings-columns">
         <div className="settings-col">
+          <AccountCard />
 
           <section className="set-card" data-enter>
             <h2><Radio size={18} />{' '}{tr('재생 및 음질 설정')}</h2>
@@ -431,48 +427,6 @@ export default function Settings() {
           <EqualizerCard />
 
           {!IS_ANDROID && <section className="set-card" data-enter>
-            <h2><Keyboard size={18} />{' '}{tr('단축키')}</h2>
-            <QuickShortcutRow />
-            <div className="shortcuts">
-              <span><kbd>Space</kbd>{' '}{tr('재생 / 일시정지')}</span>
-              <span><kbd>↑</kbd> <kbd>↓</kbd>{' '}{tr('음량 조절')}</span>
-              <span><kbd>←</kbd> <kbd>→</kbd>{' '}{tr('10초 탐색 (길게 누르면 고속 탐색)')}</span>
-              <span><kbd>Ctrl</kbd> <kbd>→</kbd>{' '}{tr('다음 곡')}</span>
-              <span><kbd>Ctrl</kbd> <kbd>←</kbd>{' '}{tr('이전 곡')}</span>
-              <span><kbd>Ctrl</kbd> <kbd>K</kbd>{' '}{tr('검색창 열기')}</span>
-              <span><kbd>Alt</kbd> <kbd>←</kbd> <kbd>→</kbd>{' '}{tr('뒤로 / 앞으로 이동')}</span>
-              <span><kbd>Esc</kbd>{' '}{tr('전체 화면 닫기')}</span>
-              <span><kbd>{tr('마우스')}</kbd>{' '}{tr('4/5번 앞뒤 이동')}</span>
-            </div>
-          </section>}
-
-          <section className="set-card about-app" data-enter>
-            <h2><Info size={18} />{' '}{tr('앱 정보 및 업데이트')}</h2>
-            <div className="about-app-body">
-              <img src={logo} alt="T-Music" />
-              <div className="about-app-text">
-                <span className="about-app-title">T-Music {status.data?.version ? `v${status.data.version}` : ''}</span>
-                <p className="muted small">{tr('광고 없는 나만의 음악 플레이어. 개인 학습·사용 목적으로 만들었어요.')}</p>
-              </div>
-            </div>
-            <div className="update-check-row">
-              <button className="btn" onClick={() => checkUpdate(false)} disabled={checkingUpdate}>
-                <RefreshCw size={14} className={checkingUpdate ? 'spin' : ''} /> {checkingUpdate ? tr('확인 중…') : tr('업데이트 확인')}
-              </button>
-              {hasUpdate && (
-                <button className="btn grad update-available-btn" onClick={openModal}>
-                  <Sparkles size={14} />{' '}{tr('v{0} 업데이트 가능', latestVersion)}</button>
-              )}
-              {troubleNotes().length > 0 && (
-                <button className="btn" title={tr('재생이 끊겼을 때 남은 기록이에요. 원인을 찾을 때 쓸 수 있어요.')} onClick={async () => { await api.copyText(JSON.stringify(troubleNotes(), null, 1)); toast(tr('재생 문제 기록을 복사했어요')); }}>
-                  {tr('재생 문제 기록 복사')}
-                </button>
-              )}
-            </div>
-          </section>
-        </div>
-        <div className="settings-col">
-          {!IS_ANDROID && <section className="set-card" data-enter>
             <h2><Monitor size={18} />{' '}{tr('시스템 및 연동')}</h2>
             <p className="muted">{tr('윈도우 시작 및 디스코드 상태 표시 설정을 관리해요.')}</p>
 
@@ -510,6 +464,49 @@ export default function Settings() {
                 </ol>
               </div>
             )}
+          </section>}
+
+          <section className="set-card about-app" data-enter>
+            <h2><Info size={18} />{' '}{tr('앱 정보 및 업데이트')}</h2>
+            <div className="about-app-body">
+              <img src={logo} alt="T-Music" />
+              <div className="about-app-text">
+                <span className="about-app-title">T-Music {status.data?.version ? `v${status.data.version}` : ''}</span>
+                <p className="muted small">{tr('광고 없는 나만의 음악 플레이어. 개인 학습·사용 목적으로 만들었어요.')}</p>
+              </div>
+            </div>
+            <div className="update-check-row">
+              <button className="btn" onClick={() => checkUpdate(false)} disabled={checkingUpdate}>
+                <RefreshCw size={14} className={checkingUpdate ? 'spin' : ''} /> {checkingUpdate ? tr('확인 중…') : tr('업데이트 확인')}
+              </button>
+              {hasUpdate && (
+                <button className="btn grad update-available-btn" onClick={openModal}>
+                  <Sparkles size={14} />{' '}{tr('v{0} 업데이트 가능', latestVersion)}</button>
+              )}
+              {troubleNotes().length > 0 && (
+                <button className="btn" title={tr('재생이 끊겼을 때 남은 기록이에요. 원인을 찾을 때 쓸 수 있어요.')} onClick={async () => { await api.copyText(JSON.stringify(troubleNotes(), null, 1)); toast(tr('재생 문제 기록을 복사했어요')); }}>
+                  {tr('재생 문제 기록 복사')}
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+        <div className="settings-col">
+          <FriendPrivacyCard />
+          {!IS_ANDROID && <section className="set-card" data-enter>
+            <h2><Keyboard size={18} />{' '}{tr('단축키')}</h2>
+            <QuickShortcutRow />
+            <div className="shortcuts">
+              <span><kbd>Space</kbd>{' '}{tr('재생 / 일시정지')}</span>
+              <span><kbd>↑</kbd> <kbd>↓</kbd>{' '}{tr('음량 조절')}</span>
+              <span><kbd>←</kbd> <kbd>→</kbd>{' '}{tr('10초 탐색 (길게 누르면 고속 탐색)')}</span>
+              <span><kbd>Ctrl</kbd> <kbd>→</kbd>{' '}{tr('다음 곡')}</span>
+              <span><kbd>Ctrl</kbd> <kbd>←</kbd>{' '}{tr('이전 곡')}</span>
+              <span><kbd>Ctrl</kbd> <kbd>K</kbd>{' '}{tr('검색창 열기')}</span>
+              <span><kbd>Alt</kbd> <kbd>←</kbd> <kbd>→</kbd>{' '}{tr('뒤로 / 앞으로 이동')}</span>
+              <span><kbd>Esc</kbd>{' '}{tr('전체 화면 닫기')}</span>
+              <span><kbd>{tr('마우스')}</kbd>{' '}{tr('4/5번 앞뒤 이동')}</span>
+            </div>
           </section>}
 
           <section className="set-card" data-enter>

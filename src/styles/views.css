@@ -225,16 +225,17 @@
 
 /* ---------- settings ---------- */
 /* Two stacks, so cards of different heights never leave a hole beside them. The cards share out whatever
-   is left, so both stacks start and end on the same line. */
+   is left, so both stacks start and end on the same line. The account and friend cards head the stacks
+   rather than sharing a row, where the shorter one was left with a blank half. */
 .settings-grid { display: flex; flex-direction: column; gap: 14px; }
-.settings-top { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .settings-columns { display: flex; align-items: stretch; gap: 14px; }
 .settings-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .settings-col .set-card { flex: 1 1 auto; height: auto; }
-.settings-top .set-card { height: auto; }
+/* One column: the account and friend cards still come first. */
 @container main (max-width: 720px) {
-  .settings-top { grid-template-columns: minmax(0, 1fr); }
-  .settings-columns { flex-direction: column; }
+  .settings-columns, .settings-col { display: contents; }
+  .settings-col:first-child > :first-child { order: -2; }
+  .settings-col:last-child > :first-child { order: -1; }
 }
 .set-card { margin: 0 !important; padding: 22px; border-radius: var(--r-lg); background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; align-items: flex-start; height: 100%; box-sizing: border-box; }
 .set-card h2 { display: flex; align-items: center; gap: 8px; font-size: 17px; margin: 0; }
