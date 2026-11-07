@@ -271,5 +271,5 @@ html[data-platform='desktop']:not([data-motion='calm']) .mini { animation: mini-
 /* Music that has no cover to show (the app's placeholder instead) is left out of shelves, quick tiles,
    search and library cards, so what's shown always has a picture. If a cover turns up later it appears.
    The radio is not affected. */
-.card:has(> .card-art .thumb.placeholder),
-.quick-tile:has(.thumb.placeholder) { display: none; }
+.card:not([data-kind="local"]):not([data-kind="liked"]):has(> .card-art .thumb.placeholder),
+.quick-tile:not([data-kind="local"]):not([data-kind="liked"]):not([data-kind="mix"]):has(.thumb.placeholder) { display: none; }

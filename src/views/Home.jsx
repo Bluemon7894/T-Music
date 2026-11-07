@@ -46,7 +46,7 @@ function Greeting() {
 function QuickTile({ item, onPlay }) {
   const go = useNav((s) => s.go);
   return (
-    <div className="quick-tile" data-enter onClick={() => (item.kind === 'mix' ? onPlay() : openItem(item, go))}>
+    <div className="quick-tile" data-kind={item.kind} data-enter onClick={() => (item.kind === 'mix' ? onPlay() : openItem(item, go))}>
       {item.icon ? <div className="quick-art liked-art">{item.icon}</div> : <Thumb src={item.thumb} className="quick-art" videoId={item.kind === 'track' ? item.id : undefined} />}
       <span className="quick-name">{item.title || item.name}</span>
       <PlayButton size={34} className="quick-play" onClick={onPlay} />

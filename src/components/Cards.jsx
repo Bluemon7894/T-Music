@@ -70,6 +70,7 @@ export function Card({ item, size }) {
   return (
     <div
       className={`card ${round ? 'is-artist' : ''}`}
+      data-kind={item.kind}
       data-enter
       onClick={() => {
         // Albums and playlists open with their cover flying into the page (see landFlight).
