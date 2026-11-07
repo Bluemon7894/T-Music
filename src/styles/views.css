@@ -36,10 +36,11 @@
   margin-bottom: -10px;
   overflow-x: auto;
   scrollbar-width: none;
-  /* room for the hover glow, which the scrolling row would otherwise cut off */
-  padding: 20px 18px 30px;
-  margin-left: -18px;
-  margin-right: -18px;
+  /* room for the hover glow, which the scrolling row would otherwise cut off: out to the page's own
+     padding on each side, since the glow reaches further than 18px */
+  padding: 20px 28px 30px;
+  margin-left: -28px;
+  margin-right: -28px;
   margin-top: 8px;
 }
 .mood {
