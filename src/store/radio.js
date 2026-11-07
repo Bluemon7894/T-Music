@@ -207,7 +207,10 @@ async function start(station, { quiet = false, retry = false } = {}) {
   const mine = ++token;
   const prev = useRadio.getState();
   const wasOn = prev.on && prev.phase !== 'ending';
-  if (usePlayer.getState().playing) usePlayer.getState().toggle();
+  // Alone, the radio stops the music itself. In a room, tuning in already stopped the room's music for
+  // everyone (room.setRadio), and toggling here would start it again.
+  const inRoom = useRoom.getState().code && useRoom.getState().attached;
+  if (usePlayer.getState().playing && !inRoom) usePlayer.getState().toggle();
   if (!retry) retries = 0;
   const sounds = !quiet && !wasOn && useDeck.getState().sounds;
   const fromFreq = wasOn && prev.station?.band === station.band ? prev.station.freq : null;
