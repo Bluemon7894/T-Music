@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { create } from 'zustand';
 import { Music, Play, Pause, RotateCw } from 'lucide-react';
 import { useNav } from '../store/nav.js';
 import { api, errorText } from '../lib/api.js';
@@ -54,6 +55,16 @@ function smallerThumb(url) {
   return m[2] in SMALLER_THUMB ? (SMALLER_THUMB[m[2]] && m[1] + SMALLER_THUMB[m[2]]) : `${m[1].replace('vi_webp', 'vi')}hq720.jpg`;
 }
 
+// Pictures known to show nothing (no video picture and no album cover), so lists can leave those items
+// out and take the next ones instead (see withCovers).
+export const useNoCover = create(() => ({ srcs: {} }));
+const noteNoCover = (src) => { if (src && !useNoCover.getState().srcs[src]) useNoCover.setState((s) => ({ srcs: { ...s.srcs, [src]: true } })); };
+const coverOf = (item) => item?.thumb;
+// The first `count` items that have a cover. Items of the `keep` kinds (your own playlists) always stay.
+export function withCovers(items, count, noCover, keep = []) {
+  return (items || []).filter((it) => keep.includes(it?.kind) || (coverOf(it) && !noCover[coverOf(it)])).slice(0, count);
+}
+
 // Album covers found for videos without a picture, shared by every Thumb on screen.
 const arts = new Map();
 const albumArt = (id) => {
@@ -97,9 +108,9 @@ export function Thumb({ src, round, className = '', size, alt = '', videoId }) {
     if (videoId && !url.includes(`/vi/${videoId}/`)) { setUrl(`https://i.ytimg.com/vi/${videoId}/hq720.jpg`); return; }
     // No video picture at all: ask YouTube Music for the album's cover before falling back to ours.
     const id = videoId || /\/vi(?:_webp)?\/([\w-]{11})\//.exec(url)?.[1];
-    if (!id) { setMissing(true); return; }
+    if (!id) { setMissing(true); noteNoCover(src); return; }
     setMissing(true);
-    albumArt(id).then((art) => { if (art) { setUrl(art); setMissing(false); } });
+    albumArt(id).then((art) => { if (art) { setUrl(art); setMissing(false); } else noteNoCover(src); });
   };
   if (!url || failed || missing) {
     return (

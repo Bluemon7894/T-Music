@@ -11,7 +11,7 @@ import { dailyOrder, greeting, fmtBytes } from '../lib/util.js';
 import { artistsOfTheDay, hasTaste, mixSeeds, rankMix, recentlyPlayedIds, tasteProfile } from '../lib/taste.js';
 import { useEnter, animate, stagger, ease, reduced } from '../lib/motion.js';
 import { splitText } from 'animejs';
-import { useAsync, Thumb, PlayButton, SkeletonCards } from '../components/common.jsx';
+import { useAsync, Thumb, PlayButton, SkeletonCards, useNoCover, withCovers } from '../components/common.jsx';
 import { Shelf, CoverFlow, openItem, playItem, subtitleOf } from '../components/Cards.jsx';
 import { tr } from '../lib/i18n.js';
 
@@ -131,7 +131,7 @@ export default function Home() {
     const found = await Promise.allSettled(favoriteArtists.map(async (a) => {
       const { songs } = await api.search(a.name);
       const items = songs.filter((t) => t.artists?.some((x) => x.name === a.name) && !skip.has(t.id));
-      return { name: a.name, items: items.slice(0, SHELF_ITEMS) };
+      return { name: a.name, items };
     }));
     return found.filter((r) => r.status === 'fulfilled' && r.value.items.length >= MIN_FRESH_PICKS).map((r) => r.value);
   }, [artistKey]);
@@ -146,24 +146,26 @@ export default function Home() {
   const ref = useRef(null);
   useEnter(ref, [home.data ? 1 : 0]);
 
-  const shelves = useMemo(() => (home.data?.shelves || []).map((s) => ({ ...s, items: dailyOrder(s.items, s.title).slice(0, SHELF_ITEMS) })), [home.data]);
+  // Items whose picture turned out empty are left out, and the next ones move up to fill the row.
+  const noCover = useNoCover((st) => st.srcs);
+  const shelves = useMemo(() => (home.data?.shelves || []).map((s) => ({ ...s, items: withCovers(dailyOrder(s.items, s.title), SHELF_ITEMS, noCover) })), [home.data, noCover]);
   const featured = useMemo(() => shelves.map((s) => s.items[0]).concat(shelves.map((s) => s.items[1])).filter(Boolean).slice(0, 9), [shelves]);
 
   const quick = useMemo(() => {
     const items = [{ kind: 'liked', title: tr('좋아요 표시한 곡'), icon: <Heart size={20} fill="#fff" /> }];
     if (mix.data?.length) items.push({ kind: 'mix', title: tr('오늘의 믹스'), thumb: mix.data[0].thumb });
     for (const p of lib.playlists.slice(0, 3)) items.push({ kind: 'local', id: p.id, title: p.name, thumb: p.thumb || p.tracks[0]?.thumb, tracks: p.tracks });
-    for (const a of lib.savedAlbums.slice(0, 2)) items.push({ kind: 'album', ...a });
+    for (const a of withCovers(lib.savedAlbums, 2, noCover)) items.push({ kind: 'album', ...a });
     for (const t of lib.recent) {
       if (items.length >= 8) break;
-      items.push({ ...t, kind: 'track' });
+      if (t.thumb && !noCover[t.thumb]) items.push({ ...t, kind: 'track' });
     }
     for (const it of featured) {
       if (items.length >= 8) break;
       if (!items.some((x) => x.id === it.id)) items.push(it);
     }
     return items.slice(0, 8);
-  }, [lib.playlists, lib.savedAlbums, lib.recent, featured, mix.data]);
+  }, [lib.playlists, lib.savedAlbums, lib.recent, featured, mix.data, noCover]);
 
   const playQuick = (it) => {
     if (it.kind === 'mix') return playList(mix.data, 0, { name: tr('오늘의 믹스') });
@@ -212,10 +214,10 @@ export default function Home() {
 
       <StatsRow />
 
-      {lib.recent.length > 0 && <Shelf title={tr('최근 재생한 곡')} items={lib.recent.slice(0, 20).map((t) => ({ ...t, kind: 'track', isRecent: true }))} />}
-      {mix.data?.length > 0 && <Shelf title={tr('오늘의 믹스')} subtitle={tr('자주 듣는 {0} 취향으로 골랐어요', taste.artists.slice(0, 2).map((a) => a.name).filter(Boolean).join(', '))} items={mix.data.map((t) => ({ ...t, kind: 'track' }))} />}
-      {byArtist.data?.map((a) => <Shelf key={a.name} title={tr('자주 듣는 {0}', a.name)} subtitle={tr('아직 안 들어본 곡')} items={a.items.map((t) => ({ ...t, kind: 'track' }))} />)}
-      {!mix.data?.length && forYou.data?.length > 0 && <Shelf title={tr('취향 저격 추천')} subtitle={tr('\'{0}\'를 좋아한다면', seed?.title)} items={forYou.data.map((t) => ({ ...t, kind: 'track' }))} />}
+      {lib.recent.length > 0 && <Shelf title={tr('최근 재생한 곡')} items={withCovers(lib.recent, 20, noCover).map((t) => ({ ...t, kind: 'track', isRecent: true }))} />}
+      {mix.data?.length > 0 && <Shelf title={tr('오늘의 믹스')} subtitle={tr('자주 듣는 {0} 취향으로 골랐어요', taste.artists.slice(0, 2).map((a) => a.name).filter(Boolean).join(', '))} items={withCovers(mix.data, mix.data.length, noCover).map((t) => ({ ...t, kind: 'track' }))} />}
+      {byArtist.data?.map((a) => <Shelf key={a.name} title={tr('자주 듣는 {0}', a.name)} subtitle={tr('아직 안 들어본 곡')} items={withCovers(a.items, SHELF_ITEMS, noCover).map((t) => ({ ...t, kind: 'track' }))} />)}
+      {!mix.data?.length && forYou.data?.length > 0 && <Shelf title={tr('취향 저격 추천')} subtitle={tr('\'{0}\'를 좋아한다면', seed?.title)} items={withCovers(forYou.data, forYou.data.length, noCover).map((t) => ({ ...t, kind: 'track' }))} />}
       {lib.followed.length > 0 && <Shelf title={tr('팔로우한 아티스트')} items={lib.followed.map((a) => ({ ...a, kind: 'artist' }))} />}
 
       {home.loading && !home.data && <><div className="sk-shelf-title sk" /><SkeletonCards /><div className="sk-shelf-title sk" /><SkeletonCards /></>}
