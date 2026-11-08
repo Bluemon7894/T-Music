@@ -27,11 +27,36 @@ export function Splash() {
   );
 }
 
+const CAME_BACK_MS = 4000;
+
+// Someone who returns to the app while it still waits on the browser may have closed it, or lost it
+// behind other apps. After a moment they're offered the same sign-in again.
+function useCameBack(waiting) {
+  const [cameBack, setCameBack] = useState(false);
+  useEffect(() => {
+    setCameBack(false);
+    if (!waiting) return undefined;
+    let timer = null;
+    const back = (e) => {
+      clearTimeout(timer);
+      if (e.detail?.visible !== false) timer = setTimeout(() => setCameBack(true), CAME_BACK_MS);
+    };
+    window.addEventListener('focus', back);
+    window.addEventListener('t-music:visibility', back);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('focus', back);
+      window.removeEventListener('t-music:visibility', back);
+    };
+  }, [waiting]);
+  return cameBack;
+}
+
 export default function Login() {
   const busy = useAccount((s) => s.busy);
   const error = useAccount((s) => s.error);
   const canContinueOffline = useAccount((s) => s.canContinueOffline);
-  const { signInAsGuest, signInWithGoogle, cancelGoogle, continueOffline } = useAccount.getState();
+  const { signInAsGuest, signInWithGoogle, cancelGoogle, reopenGoogle, continueOffline } = useAccount.getState();
   const [googleReady, setGoogleReady] = useState(true);
   const card = useRef(null);
   const mark = useRef(null);
@@ -47,6 +72,7 @@ export default function Login() {
   }, []);
 
   const waitingForBrowser = busy === 'google';
+  const cameBack = useCameBack(waitingForBrowser);
 
   return (
     <div className="login">
@@ -59,9 +85,10 @@ export default function Login() {
 
         <div className="login-actions">
           {waitingForBrowser ? (
-            <div className="login-waiting">
+            <div className={cameBack ? 'login-waiting back' : 'login-waiting'}>
               <RefreshCw size={16} className="spin" />
-              <span>{tr('브라우저에서 로그인을 마쳐 주세요')}</span>
+              <span>{cameBack ? tr('로그인을 마치지 못했나요?') : tr('브라우저에서 로그인을 마쳐 주세요')}</span>
+              {cameBack && <button className="text-btn" onClick={reopenGoogle}>{tr('다시 열기')}</button>}
               <button className="text-btn" onClick={cancelGoogle}>{tr('취소')}</button>
             </div>
           ) : (

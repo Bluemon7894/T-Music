@@ -22,7 +22,7 @@ import { photoToShow, useProfile } from './profile.js';
 import { useRoom } from './room.js';
 import { toast } from './ui.js';
 import { clearUndo, record } from './undo.js';
-import { recordVersion } from '../lib/telemetry.js';
+import { recordVersion, reportSignInTrouble } from '../lib/telemetry.js';
 import { tr } from '../lib/i18n.js';
 
 const AUTH_ERRORS = {
@@ -65,10 +65,8 @@ function deleteAccountByToken(idToken) {
   }).catch(() => {});
 }
 
-async function googleCredential() {
-  const tokens = await api.googleSignIn();
-  return tokens && GoogleAuthProvider.credential(tokens.idToken, tokens.accessToken);
-}
+const toCredential = (tokens) => tokens && GoogleAuthProvider.credential(tokens.idToken, tokens.accessToken);
+const googleCredential = async () => toCredential(await api.googleSignIn());
 
 const SIGN_OUT_STEP_MS = 6000;
 const DELETE_STEP_MS = 20000;
@@ -108,6 +106,7 @@ export const useAccount = create((set, get) => {
       return true;
     } catch (e) {
       set({ error: describe(e), canContinueOffline: isOffline(e) });
+      if (busy === 'google') reportSignInTrouble(e);
       return false;
     } finally {
       set({ busy: null });
@@ -158,8 +157,36 @@ export const useAccount = create((set, get) => {
     stopLibrarySync();
   };
 
+  // A guest keeps their uid and data when they connect Google. If that Google account already
+  // exists, linking is refused and the guest's data moves into the existing account instead.
+  const useGoogle = async (credential) => {
+    if (!credential) return;
+    if (!auth.currentUser?.isAnonymous) {
+      await signInWithCredential(auth, credential);
+      return;
+    }
+    try {
+      await linkWithCredential(auth.currentUser, credential);
+    } catch (e) {
+      if (e?.code !== 'auth/credential-already-in-use') throw e;
+      await mergeGuestInto(GoogleAuthProvider.credentialFromError(e) || credential);
+    }
+  };
+
+  // On a phone the app can be started over while the user is in the browser. The sign-in carries on.
+  let resumeChecked = false;
+  const resumeGoogle = async () => {
+    if (resumeChecked) return;
+    resumeChecked = true;
+    if (!(await api.googleSignInPending().catch(() => false))) return;
+    attempt('google', async () => useGoogle(toCredential(await api.resumeGoogleSignIn())));
+  };
+
   // Registered here so the first state arrives once the saved session has been read from disk.
-  onAuthStateChanged(auth, publish);
+  onAuthStateChanged(auth, () => {
+    publish();
+    resumeGoogle();
+  });
   useProfile.subscribe((next, prev) => { if (next.photo !== prev.photo && auth.currentUser) publish(); });
 
   return {
@@ -172,24 +199,10 @@ export const useAccount = create((set, get) => {
 
     signInAsGuest: () => attempt('guest', () => signInAnonymously(auth)),
 
-    // A guest keeps their uid and data when they connect Google. If that Google account already
-    // exists, linking is refused and the guest's data moves into the existing account instead.
-    signInWithGoogle: () => attempt('google', async () => {
-      const credential = await googleCredential();
-      if (!credential) return;
-      if (!auth.currentUser?.isAnonymous) {
-        await signInWithCredential(auth, credential);
-        return;
-      }
-      try {
-        await linkWithCredential(auth.currentUser, credential);
-      } catch (e) {
-        if (e?.code !== 'auth/credential-already-in-use') throw e;
-        await mergeGuestInto(GoogleAuthProvider.credentialFromError(e) || credential);
-      }
-    }),
+    signInWithGoogle: () => attempt('google', async () => useGoogle(await googleCredential())),
 
     cancelGoogle: () => api.cancelGoogleSignIn(),
+    reopenGoogle: () => api.reopenGoogleSignIn(),
 
     // Empty goes back to the Google name or guest number. Everywhere that shows it follows.
     async setDisplay(patch) {

@@ -254,7 +254,7 @@ function ProfileEditor({ user }) {
 export function AccountCard() {
   const user = useAccount((s) => s.user);
   const busy = useAccount((s) => s.busy);
-  const { cancelGoogle, leaveOffline } = useAccount.getState();
+  const { cancelGoogle, reopenGoogle, leaveOffline } = useAccount.getState();
 
   return (
     <section className="set-card" data-enter>
@@ -271,6 +271,7 @@ export function AccountCard() {
       <div className="row-actions">
         {!user && <button className="btn" onClick={leaveOffline}><LogIn size={15} />{' '}{tr('로그인')}</button>}
         {user?.isGuest && busy !== 'google' && <button className="btn" onClick={connectGoogle}><GoogleMark size={15} />{' '}{tr('Google 계정 연결')}</button>}
+        {busy === 'google' && <button className="btn" onClick={reopenGoogle}>{tr('브라우저 다시 열기')}</button>}
         {busy === 'google' && <button className="btn" onClick={cancelGoogle}>{tr('브라우저 로그인 취소')}</button>}
         {user && <button className="btn" onClick={() => confirmSignOut(user)}><LogOut size={15} />{' '}{tr('로그아웃')}</button>}
         {user && <button className="btn" onClick={() => useNav.getState().go('friend', { uid: user.uid })}><Eye size={15} />{' '}{tr('내 프로필 보기')}</button>}

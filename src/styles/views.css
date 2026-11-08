@@ -1231,7 +1231,12 @@
 .login-btn.google { background: #fff; color: #1f1f1f; box-shadow: 0 12px 28px -14px rgba(255, 255, 255, 0.6); }
 .login-btn.guest { background: rgba(255, 255, 255, 0.08); color: var(--v-50); border: 1px solid var(--line-2); }
 .login-btn.guest:hover:not(:disabled) { background: rgba(139, 92, 246, 0.26); }
-.login-waiting { display: flex; align-items: center; justify-content: center; gap: 10px; height: 50px; border-radius: 14px; background: rgba(139, 92, 246, 0.16); border: 1px solid var(--line-2); color: var(--v-100); font-size: 14px; font-weight: 600; }
+.login-waiting { display: flex; align-items: center; justify-content: center; gap: 10px; height: 50px; padding: 0 10px; border-radius: 14px; background: rgba(139, 92, 246, 0.16); border: 1px solid var(--line-2); color: var(--v-100); font-size: 14px; font-weight: 600; }
+.login-waiting .text-btn { flex: none; white-space: nowrap; }
+.login-waiting > span { word-break: keep-all; text-align: center; }
+/* On a phone the offer to reopen the browser goes on a line of its own rather than squeezing the words. */
+.login-waiting.back { flex-wrap: wrap; gap: 0 10px; height: auto; min-height: 50px; padding: 4px 10px; }
+.login-waiting.back > span { white-space: nowrap; }
 .login-note { margin: 0; color: var(--dim); font-size: 12px; line-height: 1.6; word-break: keep-all; }
 .login-error { margin: 0; width: 100%; padding: 10px 12px; box-sizing: border-box; border-radius: 10px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; font-size: 13px; font-weight: 600; }
 

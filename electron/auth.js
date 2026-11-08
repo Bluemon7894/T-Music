@@ -13,9 +13,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_FILE = path.join(__dirname, 'auth.config.json');
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const WAIT_MS = 5 * 60 * 1000;
+// Signing up for the first time can take a while: a new account, a phone check, the consent screen.
+const WAIT_MS = 30 * 60 * 1000;
+const TOKEN_WAIT_MS = 20000;
 
 let cancelPending = null;
+let openedUrl = null;
 
 function loadConfig() {
   try {
@@ -30,6 +33,11 @@ export const isGoogleConfigured = () => Boolean(loadConfig());
 
 export function cancelGoogleSignIn() {
   cancelPending?.();
+}
+
+// For someone who came back without finishing: the same sign-in, so a late answer still counts.
+export function reopenGoogleSignIn() {
+  if (cancelPending && openedUrl) shell.openExternal(openedUrl).catch(() => {});
 }
 
 const base64url = (buf) => buf.toString('base64url');
@@ -62,6 +70,7 @@ function waitForCode(config, verifier) {
     const finish = (value) => {
       clearTimeout(timer);
       cancelPending = null;
+      openedUrl = null;
       server.close();
       server.closeAllConnections();
       resolve(value);
@@ -80,7 +89,8 @@ function waitForCode(config, verifier) {
       });
       timer = setTimeout(() => finish(null), WAIT_MS);
       cancelPending = () => finish(null);
-      shell.openExternal(`${AUTH_URL}?${params}`).catch((e) => {
+      openedUrl = `${AUTH_URL}?${params}`;
+      shell.openExternal(openedUrl).catch((e) => {
         finish(null);
         reject(e);
       });
@@ -109,6 +119,9 @@ export async function googleSignIn() {
       grant_type: 'authorization_code',
       redirect_uri: result.redirectUri,
     }),
+    signal: AbortSignal.timeout(TOKEN_WAIT_MS),
+  }).catch((e) => {
+    throw new Error(e?.name === 'TimeoutError' ? say('구글이 응답하지 않아요. 다시 시도해 주세요.', "Google isn't responding. Please try again.") : say('인터넷 연결을 확인해 주세요.', 'Check your internet connection.'));
   });
   const tokens = await res.json().catch(() => ({}));
   if (!res.ok || !tokens.id_token) throw new Error('구글 로그인에 실패했습니다');

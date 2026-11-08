@@ -240,6 +240,11 @@ final class NativeBridge {
         auth.cancel();
     }
 
+    @JavascriptInterface
+    public String authTake(String state) {
+        return auth.take(state);
+    }
+
     // ---- links in and out ----
 
     void receiveLink(String link) {

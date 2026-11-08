@@ -12,6 +12,7 @@ const KEEP_DAYS = 30;
 const DAILY_LIMIT = 25;
 const LIMIT_KEY = 't-music-reports';
 const TEXT_MAX = 500;
+const SIGN_IN_KEY = 't-music-sign-in-trouble';
 
 // Asked on first use: on Android this module loads before window.api exists.
 let version = null;
@@ -24,6 +25,31 @@ export async function recordVersion(uid) {
   recordedFor = uid;
   await versionReady();
   setDoc(doc(db, 'users', uid, 'state', 'app'), { version, platform: PLATFORM, seenAt: serverTimestamp() }, { merge: true }).catch(() => { recordedFor = null; });
+  sendSignInTrouble();
+}
+
+// Sign-in trouble mostly happens before there's an account to report it with, so it waits for one.
+const reportSignIn = (t) => reportError('sign-in', t.message, { code: t.code, minutesAgo: Math.round((Date.now() - t.at) / 60000) });
+
+export function reportSignInTrouble(e) {
+  const trouble = { message: clip(e?.message || e), code: String(e?.code || ''), at: Date.now() };
+  if (auth.currentUser) {
+    reportSignIn(trouble);
+    return;
+  }
+  try {
+    const kept = JSON.parse(localStorage.getItem(SIGN_IN_KEY) || '[]').slice(-4);
+    localStorage.setItem(SIGN_IN_KEY, JSON.stringify([...kept, trouble]));
+  } catch { /* not worth more */ }
+}
+
+function sendSignInTrouble() {
+  let kept = [];
+  try {
+    kept = JSON.parse(localStorage.getItem(SIGN_IN_KEY) || '[]');
+    localStorage.removeItem(SIGN_IN_KEY);
+  } catch { /* nothing kept */ }
+  kept.forEach(reportSignIn);
 }
 
 // One report per kind and message per session, and a few dozen a day at most, so a loop of failures

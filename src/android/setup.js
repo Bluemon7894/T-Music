@@ -119,6 +119,9 @@ const api = {
   googleAvailable: () => auth.isGoogleConfigured(),
   googleSignIn: () => auth.googleSignIn(),
   cancelGoogleSignIn: () => auth.cancelGoogleSignIn(),
+  googleSignInPending: () => auth.hasPendingSignIn(),
+  resumeGoogleSignIn: () => auth.resumeGoogleSignIn(),
+  reopenGoogleSignIn: () => auth.reopenGoogleSignIn(),
   copyText: (text) => Native.copyText(String(text)),
   shareText: (text) => Native.share(String(text)),
   saveFile: (name, mime, content) => new Promise((resolve) => {
