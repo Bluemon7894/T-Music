@@ -107,6 +107,18 @@ function StatsRow() {
 const SHELF_ITEMS = 16;
 const RECOMMEND_SEEDS = 10;
 const MIN_FRESH_PICKS = 6;
+const ARTIST_ALBUMS = 3; // albums looked into when an artist's row is short
+// The quick-play grid shows about this many, rounded to whole rows so no row has a gap.
+const QUICK_ITEMS = 8;
+const QUICK_MAX = 12;
+
+// How many of `count` items make whole rows of `cols`: the nearest row count to QUICK_ITEMS, or fewer
+// rows when there aren't enough items for them.
+function wholeRows(count, cols) {
+  if (!cols) return Math.min(count, QUICK_ITEMS);
+  const want = Math.min(count, cols * Math.round(QUICK_ITEMS / cols));
+  return want >= cols ? want - (want % cols) : want;
+}
 
 export default function Home() {
   const lib = useLibrary();
@@ -129,8 +141,29 @@ export default function Home() {
   const byArtist = useAsync(async () => {
     const skip = excluded();
     const found = await Promise.allSettled(favoriteArtists.map(async (a) => {
-      const { songs } = await api.search(a.name);
-      const items = songs.filter((t) => t.artists?.some((x) => x.name === a.name) && !skip.has(t.id));
+      // A search alone finds only a handful of one artist's songs; their own page adds the popular ones,
+      // and when that still leaves the row short (most of them already heard), their albums fill it.
+      const res = await api.search(a.name);
+      const page = (res.artists || []).find((x) => x.id && x.name === a.name);
+      const info = page ? await api.artist(page.id).catch(() => null) : null;
+      const seen = new Set();
+      const items = [];
+      const take = (list) => {
+        for (const t of list || []) {
+          // Search results may spell the name another way ("LEE CHANHYUK"); the artist's id is the same.
+          const theirs = t.artists?.some((x) => x.name === a.name || (page && x.id === page.id));
+          if (!t?.id || seen.has(t.id) || skip.has(t.id) || !theirs) continue;
+          seen.add(t.id);
+          items.push(t);
+        }
+      };
+      take(res.songs);
+      take(info?.songs);
+      if (items.length < SHELF_ITEMS && info) {
+        const albums = (info.sections || []).flatMap((x) => x.items || []).filter((x) => x.kind === 'album').slice(0, ARTIST_ALBUMS);
+        const tracks = await Promise.allSettled(albums.map((x) => api.album(x.id)));
+        for (const r of tracks) if (r.status === 'fulfilled') take(r.value?.tracks);
+      }
       return { name: a.name, items };
     }));
     return found.filter((r) => r.status === 'fulfilled' && r.value.items.length >= MIN_FRESH_PICKS).map((r) => r.value);
@@ -157,15 +190,28 @@ export default function Home() {
     for (const p of lib.playlists.slice(0, 3)) items.push({ kind: 'local', id: p.id, title: p.name, thumb: p.thumb || p.tracks[0]?.thumb, tracks: p.tracks });
     for (const a of withCovers(lib.savedAlbums, 2, noCover)) items.push({ kind: 'album', ...a });
     for (const t of lib.recent) {
-      if (items.length >= 8) break;
-      if (t.thumb && !noCover[t.thumb]) items.push({ ...t, kind: 'track' });
+      if (items.length >= QUICK_MAX) break;
+      if (t.thumb && !noCover[t.thumb] && !items.some((x) => x.id === t.id)) items.push({ ...t, kind: 'track' });
     }
     for (const it of featured) {
-      if (items.length >= 8) break;
+      if (items.length >= QUICK_MAX) break;
       if (!items.some((x) => x.id === it.id)) items.push(it);
     }
-    return items.slice(0, 8);
+    return items;
   }, [lib.playlists, lib.savedAlbums, lib.recent, featured, mix.data, noCover]);
+  // The grid fits as many columns as the window allows; the tiles fill whole rows of them.
+  const quickGrid = useRef(null);
+  const [quickCols, setQuickCols] = useState(0);
+  useLayoutEffect(() => {
+    const el = quickGrid.current;
+    if (!el) return undefined;
+    const read = () => setQuickCols(getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length);
+    read();
+    const watch = new ResizeObserver(read);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
+  const quickShown = quick.slice(0, wholeRows(quick.length, quickCols));
 
   const playQuick = (it) => {
     if (it.kind === 'mix') return playList(mix.data, 0, { name: tr('오늘의 믹스') });
@@ -200,8 +246,8 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="quick-grid">
-        {quick.map((it, i) => <QuickTile key={it.kind + (it.id || i)} item={it} onPlay={() => playQuick(it)} />)}
+      <div className="quick-grid" ref={quickGrid}>
+        {quickShown.map((it, i) => <QuickTile key={it.kind + (it.id || i)} item={it} onPlay={() => playQuick(it)} />)}
       </div>
 
       <div className="moods" data-enter>

@@ -1290,3 +1290,5 @@ if (initialTrack) {
     try { usePlayer.getState()._preloadNext(); } catch {}
   }, 2000);
 }
+
+if (import.meta.env.DEV) window.__tmPlayerAudios = audios; // for testing

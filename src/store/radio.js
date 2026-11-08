@@ -79,9 +79,17 @@ function stopSound() {
 }
 
 // ---- the broadcast ----
-const audio = new Audio();
-audio.preload = 'none';
-if (!IS_ANDROID) audio.crossOrigin = 'anonymous'; // lets the radio set's speaker read the sound (the proxy allows it)
+const newAudio = () => { const el = new Audio(); el.preload = 'none'; return el; };
+// `piped` goes through Web Audio, where the radio set's speaker reads the sound. On a desktop every stream
+// comes through the app's own proxy, so one element does it all. On a phone only HLS can (hls.js puts the
+// pieces together inside the page); a plain stream plays straight from the station, which would come out
+// silent through Web Audio, so it gets an element of its own and the speaker rests.
+const piped = newAudio();
+const direct = IS_ANDROID ? newAudio() : piped;
+const elements = [...new Set([piped, direct])];
+if (!IS_ANDROID) piped.crossOrigin = 'anonymous'; // lets the radio set's speaker read the sound (the proxy allows it)
+let audio = piped; // the one playing now
+export const radioMetered = () => audio === piped;
 let hls = null;
 let fadeTimer = null;
 let retries = 0;
@@ -102,9 +110,11 @@ function release() {
   clearInterval(fadeTimer);
   clearTimeout(stallTimer);
   if (hls) { hls.destroy(); hls = null; }
-  audio.pause();
-  audio.removeAttribute('src');
-  audio.load();
+  for (const el of elements) {
+    el.pause();
+    el.removeAttribute('src');
+    el.load();
+  }
 }
 
 function fadeTo(target, ms, then) {
@@ -129,9 +139,7 @@ class ProxyLoader extends Hls.DefaultConfig.loader {
 
 async function attachStream(station) {
   release();
-  // Not on a phone: a stream played straight from a station can't be read without its permission, and
-  // routed through Web Audio it would come out silent. The speaker just doesn't follow the sound there.
-  if (!IS_ANDROID) attachRadio(audio, () => useRadio.getState().on && !useRadio.getState().paused);
+  attachRadio(piped, () => useRadio.getState().on && !useRadio.getState().paused);
   wakeAudio();
   let url = station.url;
   let useHls = station.hls;
@@ -140,6 +148,7 @@ async function attachStream(station) {
     useHls = true;
   }
   if (!url) throw new Error('no stream');
+  audio = useHls ? piped : direct;
   audio.volume = 0;
   if (useHls) {
     if (!Hls.isSupported()) throw new Error('HLS unsupported');
@@ -177,19 +186,22 @@ function onStreamError(why) {
   toast(tr('이 방송에 연결할 수 없어요. 다른 채널을 골라 보세요.'));
 }
 
-audio.addEventListener('playing', () => {
-  retries = 0;
-  clearTimeout(stallTimer);
-  useRadio.setState({ buffering: false, failed: false });
-});
-audio.addEventListener('waiting', () => {
-  if (useRadio.getState().paused) return;
-  useRadio.setState({ buffering: true });
-  clearTimeout(stallTimer);
-  stallTimer = setTimeout(() => onStreamError('stalled'), STALL_RETRY_MS);
-});
-// Clearing the element for the next channel also raises an error; only a stream we gave it counts.
-audio.addEventListener('error', () => { if (!hls && audio.getAttribute('src')) onStreamError(audio.error?.code || 'error'); });
+for (const el of elements) {
+  el.addEventListener('playing', () => {
+    if (el !== audio) return;
+    retries = 0;
+    clearTimeout(stallTimer);
+    useRadio.setState({ buffering: false, failed: false });
+  });
+  el.addEventListener('waiting', () => {
+    if (el !== audio || useRadio.getState().paused) return;
+    useRadio.setState({ buffering: true });
+    clearTimeout(stallTimer);
+    stallTimer = setTimeout(() => onStreamError('stalled'), STALL_RETRY_MS);
+  });
+  // Clearing the element for the next channel also raises an error; only a stream we gave it counts.
+  el.addEventListener('error', () => { if (el === audio && !hls && el.getAttribute('src')) onStreamError(el.error?.code || 'error'); });
+}
 
 // The radio follows the player's volume.
 usePlayer.subscribe((p, prev) => {
@@ -388,7 +400,7 @@ useRoom.subscribe((r, prev) => {
 });
 
 export const isRadioOn = () => useRadio.getState().on;
-if (import.meta.env.DEV) { window.__tmRadioStore = useRadio; window.__tmRadioAudio = audio; } // for poking at it while testing
+if (import.meta.env.DEV) { window.__tmRadioStore = useRadio; Object.defineProperty(window, '__tmRadioAudio', { get: () => audio, configurable: true }); } // for poking at it while testing
 
 // For the media keys, the tray and the phone's notification, which are wired to the music player.
 globalThis.__tmRadioControl = {

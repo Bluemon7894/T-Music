@@ -8,7 +8,7 @@
 import { useEffect, useRef } from 'react';
 import { getRadioAnalyser } from '../../lib/audio.js';
 import { reduced } from '../../lib/motion.js';
-import { useRadio } from '../../store/radio.js';
+import { useRadio, radioMetered } from '../../store/radio.js';
 import { usePlayer } from '../../store/player.js';
 import { useTilt } from '../../lib/motion.js';
 import { BANDS, useNeedle } from '../RadioDial.jsx';
@@ -64,16 +64,23 @@ export default function RadioDevice() {
   // The speaker follows how loud the low end is, smoothed so it breathes rather than jitters.
   useEffect(() => {
     const el = speaker.current;
-    const analyser = getRadioAnalyser();
+    const analyser = radioMetered() ? getRadioAnalyser() : null; // a phone can't read a plain stream's sound
     if (!el || !live || !analyser || reduced) { el?.style.setProperty('--lvl', '0'); return undefined; }
     const bins = new Uint8Array(analyser.frequencyBinCount);
     let level = 0;
     let raf = 0;
+    // Loud or quiet, at any volume, the speaker moves through its whole (small) range: the level is read
+    // against the recent loudest and quietest moments, which slowly let go so it keeps adjusting.
+    let hi = 0;
+    let lo = 255;
     const step = () => {
       analyser.getByteFrequencyData(bins);
       let sum = 0;
       for (let i = 1; i < 14; i++) sum += bins[i];
-      const now = Math.min(1, sum / 13 / 200);
+      const raw = sum / 13;
+      hi = Math.max(raw, hi - 0.2);
+      lo = Math.min(raw, lo + 0.2);
+      const now = hi - lo > 6 ? (raw - lo) / (hi - lo) : 0;
       level += (now - level) * (now > level ? 0.45 : 0.12);
       el.style.setProperty('--lvl', level.toFixed(3));
       raf = requestAnimationFrame(step);

@@ -60,6 +60,18 @@ function smallerThumb(url) {
 export const useNoCover = create(() => ({ srcs: {} }));
 const noteNoCover = (src) => { if (src && !useNoCover.getState().srcs[src]) useNoCover.setState((s) => ({ srcs: { ...s.srcs, [src]: true } })); };
 const coverOf = (item) => item?.thumb;
+// A picture that keeps failing is dropped like a missing one, unless many are failing at once: then the
+// picture server itself is in trouble, and dropping them all would empty the screen.
+const FAIL_WINDOW_MS = 60 * 1000;
+const FAIL_LIMIT = 8;
+const failures = [];
+function dropFailed(src) {
+  const now = Date.now();
+  while (failures.length && now - failures[0] > FAIL_WINDOW_MS) failures.shift();
+  if (failures.length >= FAIL_LIMIT) return;
+  failures.push(now);
+  noteNoCover(src);
+}
 // The first `count` items that have a cover. Items of the `keep` kinds (your own playlists) always stay.
 export function withCovers(items, count, noCover, keep = []) {
   return (items || []).filter((it) => keep.includes(it?.kind) || (coverOf(it) && !noCover[coverOf(it)])).slice(0, count);
@@ -85,6 +97,9 @@ export function Thumb({ src, round, className = '', size, alt = '', videoId }) {
     if (!failed || !src) return undefined;
     const again = () => { tries.current = 0; setUrl(src); setFailed(false); };
     const timer = tries.current < THUMB_RETRIES ? setTimeout(() => { tries.current += 1; setUrl(src); setFailed(false); }, THUMB_RETRY_MS) : null;
+    // Still failing with the connection up: treat it like a missing picture, so a row takes the next
+    // item in its place instead of showing a blank one. Offline, everything fails, so nothing is dropped.
+    if (!timer && navigator.onLine) dropFailed(src);
     window.addEventListener('online', again);
     return () => { clearTimeout(timer); window.removeEventListener('online', again); };
   }, [failed, src]);
