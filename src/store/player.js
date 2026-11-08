@@ -956,11 +956,16 @@ let retryTimer = null;
 let resumeAt = null;
 let watchTimer = null;
 let watched = { id: null, time: -1, still: 0, reloads: 0 };
+// One broken stream can report more than one error (a failed read, then the decoder choking on what it
+// had): those that land right after the reload it caused are the same failure, not a second one.
+const RELOAD_SETTLE_MS = 3000;
+let lastReload = { id: null, at: 0 };
 
 function reloadStream(from) {
   const a = active();
   const id = a.dataset.id;
   if (!id) return;
+  lastReload = { id, at: performance.now() };
   a.src = `${streamUrl(id)}?retry=${Date.now()}`;
   resumeAt = from > 0 ? from : null;
   attach(a);
@@ -1194,6 +1199,7 @@ audios.forEach((a, i) => {
     goodSince = 0;
     noteTrouble('error', { id, code: a.error?.code, message: a.error?.message, time: a.currentTime, net: a.networkState, offline: navigator.onLine === false });
     if (gaveUp) return; // one of the quiet retries; there will be another
+    if (lastReload.id === id && performance.now() - lastReload.at < RELOAD_SETTLE_MS) return;
     if (navigator.onLine === false) {
       giveUp('offline');
       return;

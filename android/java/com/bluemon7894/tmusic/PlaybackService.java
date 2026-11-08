@@ -121,7 +121,7 @@ public final class PlaybackService extends Service {
             @Override public void onSkipToNext() { press("next"); }
             @Override public void onSkipToPrevious() { press("prev"); }
             @Override public void onStop() { press("pause"); finish(); }
-            @Override public void onSeekTo(long ms) { host.bridge.emit("media", "action", "seek", "seconds", ms / 1000.0); }
+            @Override public void onSeekTo(long ms) { host.wakeBriefly(); host.bridge.emit("media", "action", "seek", "seconds", ms / 1000.0); }
         });
         session.setSessionActivity(openApp());
         session.setActive(true);
@@ -147,6 +147,7 @@ public final class PlaybackService extends Service {
     }
 
     private void press(String action) {
+        host.wakeBriefly();
         host.bridge.emit("media", "action", action);
     }
 

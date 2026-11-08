@@ -14,8 +14,25 @@ import android.webkit.WebView;
 final class AppWebView extends WebView {
     private static final String TAG = "T-Music";
 
+    // WebView freezes a page that is off screen and silent, about a minute after the music stops. A frozen
+    // page's audio can't start again, so play from the lock screen, the earphones or the notification did
+    // nothing after a pause. For a moment around such a press the page is told its window is showing,
+    // which thaws it; once the music sounds it stays awake on its own (see WebHost.wakeBriefly).
+    private boolean keepAwake = false;
+
     AppWebView(Context context) {
         super(context);
+    }
+
+    void setKeepAwake(boolean on) {
+        if (on == keepAwake) return;
+        keepAwake = on;
+        super.onWindowVisibilityChanged(keepAwake ? VISIBLE : getWindowVisibility());
+    }
+
+    @Override
+    protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(keepAwake ? VISIBLE : visibility);
     }
 
     @Override

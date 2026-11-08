@@ -22,7 +22,10 @@ import java.util.regex.Pattern;
 // expiry and client fallback stay invisible to <audio>.
 final class StreamHandler {
     private static final Pattern RANGE = Pattern.compile("bytes=(\\d*)-(\\d*)");
+    private static final Pattern CONTENT_RANGE = Pattern.compile("bytes (\\d+)-(\\d+)/");
     private static final int ATTEMPTS = 3;
+    // Times one response may pick itself up again after its connection drops (see ResumingStream).
+    private static final int RESUMES = 4;
 
     private final WebHost host;
 
@@ -43,7 +46,7 @@ final class StreamHandler {
             JSONObject resolved = host.bridge.resolveStream(id);
             if (resolved == null || resolved.optString("url").isEmpty()) return failure(502, "Bad Gateway");
             try {
-                WebResourceResponse response = open(resolved, upstream);
+                WebResourceResponse response = open(id, resolved, upstream);
                 if (response != null) return response;
             } catch (IOException e) {
                 // a network error is treated like a rejected URL
@@ -54,12 +57,17 @@ final class StreamHandler {
         return failure(502, "Bad Gateway");
     }
 
-    private WebResourceResponse open(JSONObject resolved, String range) throws IOException {
-        HttpURLConnection c = (HttpURLConnection) new URL(resolved.optString("url")).openConnection();
+    private static HttpURLConnection connect(String url, String range) throws IOException {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(15000);
         c.setReadTimeout(30000);
         c.setRequestProperty("Range", range);
         c.setRequestProperty("Accept-Encoding", "identity");
+        return c;
+    }
+
+    private WebResourceResponse open(String id, JSONObject resolved, String range) throws IOException {
+        HttpURLConnection c = connect(resolved.optString("url"), range);
         int status = c.getResponseCode();
         if (status == 200 || status == 206) {
             Map<String, String> headers = baseHeaders();
@@ -68,7 +76,19 @@ final class StreamHandler {
             String type = c.getHeaderField("Content-Type");
             String mime = type == null ? "audio/mp4" : type.split(";")[0].trim();
             headers.put("Content-Type", type == null ? mime : type);
-            InputStream body = new ClosingStream(c.getInputStream(), c);
+            // Where this response's bytes start and end, so a dropped connection can carry on from the
+            // byte it stopped at.
+            long start = 0;
+            long end = -1;
+            String contentRange = c.getHeaderField("Content-Range");
+            Matcher m = CONTENT_RANGE.matcher(contentRange == null ? "" : contentRange);
+            if (status == 206 && m.find()) {
+                start = Long.parseLong(m.group(1));
+                end = Long.parseLong(m.group(2)) + 1;
+            } else if (status == 200 && c.getContentLengthLong() >= 0) {
+                end = c.getContentLengthLong();
+            }
+            InputStream body = new ResumingStream(id, c, start, end);
             return new WebResourceResponse(mime, null, status, status == 206 ? "Partial Content" : "OK", headers, body);
         }
         if (status == 416) {
@@ -146,21 +166,93 @@ final class StreamHandler {
         return new WebResourceResponse("text/plain", "UTF-8", status, reason, baseHeaders(), new ByteArrayInputStream(new byte[0]));
     }
 
-    private static final class ClosingStream extends FilterInputStream {
-        private final HttpURLConnection connection;
+    // The player reads a track as far ahead as it wants and then stops reading for a while. A paused track
+    // can sit like that for minutes, and the server closes the idle connection: the next read fails and
+    // <audio> gives up on the whole track. Instead, a dropped connection is opened again from the byte it
+    // stopped at, with a freshly resolved address if need be, and the player never notices.
+    private final class ResumingStream extends InputStream {
+        private final String id;
+        private HttpURLConnection connection;
+        private InputStream in;
+        private long position;
+        private final long end; // one past the last byte, or -1 when unknown
+        private int resumes = 0;
+        private volatile boolean closed = false;
 
-        ClosingStream(InputStream in, HttpURLConnection connection) {
-            super(in);
+        ResumingStream(String id, HttpURLConnection connection, long start, long end) throws IOException {
+            this.id = id;
             this.connection = connection;
+            this.in = connection.getInputStream();
+            this.position = start;
+            this.end = end;
         }
 
         @Override
-        public void close() throws IOException {
-            try {
-                super.close();
-            } finally {
-                connection.disconnect();
+        public int read() throws IOException {
+            byte[] one = new byte[1];
+            int n = read(one, 0, 1);
+            return n < 0 ? -1 : one[0] & 0xff;
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int count) throws IOException {
+            if (count == 0) return 0;
+            while (true) {
+                if (end >= 0 && position >= end) return -1;
+                IOException failure = null;
+                try {
+                    int n = in.read(buffer, offset, count);
+                    if (n > 0) {
+                        position += n;
+                        return n;
+                    }
+                    if (n < 0 && end < 0) return -1; // no length to check against: take the end as real
+                } catch (IOException e) {
+                    failure = e;
+                }
+                if (closed || !resume()) {
+                    if (failure != null) throw failure;
+                    throw new IOException("stream ended early");
+                }
             }
+        }
+
+        private boolean resume() {
+            disconnect();
+            while (resumes < RESUMES && !closed) {
+                resumes++;
+                JSONObject resolved = host.bridge.resolveStream(id);
+                if (resolved == null || resolved.optString("url").isEmpty()) continue;
+                try {
+                    String range = "bytes=" + position + "-" + (end >= 0 ? String.valueOf(end - 1) : "");
+                    HttpURLConnection c = connect(resolved.optString("url"), range);
+                    if (c.getResponseCode() == 206) {
+                        connection = c;
+                        in = c.getInputStream();
+                        return true;
+                    }
+                    c.disconnect();
+                } catch (IOException e) {
+                    // tried again below with a fresh address
+                }
+                host.bridge.invalidateStream(id, resolved.optString("method"), resolved.optBoolean("fresh"));
+            }
+            return false;
+        }
+
+        private void disconnect() {
+            try {
+                in.close();
+            } catch (IOException ignored) {
+                // already gone
+            }
+            connection.disconnect();
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+            disconnect();
         }
     }
 

@@ -87,6 +87,23 @@ final class WebHost {
         into.requestApplyInsets();
     }
 
+    // A button pressed off screen (lock screen, earphones, notification) has to reach a page that may be
+    // frozen: it's shown as on screen for a few seconds, long enough for the music to start, then left
+    // alone again. Posted before the press itself, so the page is awake when the press arrives.
+    private static final long WAKE_MS = 5000;
+    private final Runnable sleepAgain = () -> {
+        if (web instanceof AppWebView) ((AppWebView) web).setKeepAwake(false);
+    };
+
+    void wakeBriefly() {
+        main.post(() -> {
+            if (!(web instanceof AppWebView)) return;
+            ((AppWebView) web).setKeepAwake(true);
+            main.removeCallbacks(sleepAgain);
+            main.postDelayed(sleepAgain, WAKE_MS);
+        });
+    }
+
     void detach(MainActivity leaving) {
         if (activity != leaving) return;
         activity = null;
