@@ -95,6 +95,19 @@ let fadeTimer = null;
 let retries = 0;
 let stallTimer = null;
 
+// The room hears about a change made here at once, and tells this device back straight away. That echo
+// is this very change, already under way: following it as well started the radio twice, the second time
+// without its sound, so the broadcast cut in over the start sound (or the end sound played twice).
+let tellingRoom = false;
+function tellRoom(station) {
+  tellingRoom = true;
+  try {
+    return useRoom.getState().setRadio(station);
+  } finally {
+    tellingRoom = false;
+  }
+}
+
 const level = () => {
   const p = usePlayer.getState();
   return p.muted ? 0 : p.volume;
@@ -298,7 +311,7 @@ export const useRadio = create((set, get) => ({
     if (!station) return;
     const room = useRoom.getState();
     if (!fromRoom && room.code && room.attached) {
-      if (!room.setRadio(station)) return;
+      if (!tellRoom(station)) return;
     }
     start(station);
   },
@@ -315,7 +328,7 @@ export const useRadio = create((set, get) => ({
     if (!get().on) return;
     const room = useRoom.getState();
     if (!fromRoom && !local && room.code && room.attached && room.radio) {
-      if (!room.setRadio(null)) return;
+      if (!tellRoom(null)) return;
     }
     const mine = ++token;
     const freq = get().station?.freq;
@@ -390,13 +403,13 @@ export const useRadio = create((set, get) => ({
 
 // Following the room: its channel, or back to music when it clears it.
 useRoom.subscribe((r, prev) => {
-  if (!r.attached) return;
+  if (!r.attached || tellingRoom) return;
   const ch = r.radio;
   const was = prev.attached ? prev.radio : null;
   if (ch?.id === was?.id && (r.attached === prev.attached)) return;
   const radio = useRadio.getState();
   if (ch && radio.station?.id !== ch.id) radio.tune({ ...ch }, { fromRoom: true });
-  else if (!ch && radio.on) radio.powerOff({ fromRoom: true });
+  else if (!ch && radio.on && radio.phase !== 'ending') radio.powerOff({ fromRoom: true });
 });
 
 export const isRadioOn = () => useRadio.getState().on;

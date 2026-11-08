@@ -43,6 +43,21 @@ export const useLibrary = create(
       pushRecent(track) {
         set({ recent: [slim(track), ...get().recent.filter((t) => t.id !== track.id)].slice(0, RECENT_LIMIT) });
       },
+      // Older likes and history were saved without a length. Once a track has played, it's known.
+      learnDuration(id, sec) {
+        const duration = Math.round(sec);
+        if (!id || !(duration > 0)) return;
+        const fill = (list) => (list.some((t) => t.id === id && !t.duration) ? list.map((t) => (t.id === id && !t.duration ? { ...t, duration } : t)) : list);
+        const liked = fill(get().liked);
+        const recent = fill(get().recent);
+        const playlists = get().playlists.map((p) => {
+          const tracks = fill(p.tracks);
+          return tracks === p.tracks ? p : { ...p, tracks };
+        });
+        const changedLists = playlists.some((p, i) => p !== get().playlists[i]);
+        if (liked === get().liked && recent === get().recent && !changedLists) return;
+        set({ liked, recent, ...(changedLists ? { playlists } : {}) });
+      },
       removeRecent(id) {
         set({ recent: get().recent.filter((t) => t.id !== id) });
       },

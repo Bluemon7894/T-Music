@@ -638,7 +638,11 @@ export const usePlayer = create((set, get) => ({
     const a = active();
     a.volume = get().volume;
     a.muted = get().muted;
-    set({ time: a.currentTime || 0, duration: track.duration || 0, loading: a.readyState < 3 });
+    // A track saved without its length (older likes and history) still gets one: a preloaded element
+    // already knows it, and won't say so again, since its durationchange came while it was the spare.
+    const known = isFinite(a.duration) && a.duration > 0 ? a.duration : 0;
+    set({ time: a.currentTime || 0, duration: track.duration || known, loading: a.readyState < 3 });
+    if (!track.duration && known) learnLength(track.id, known);
     for (const el of audios) attach(el);
     if (!room) playWithDeck();
     else if (!fromRoom) room.onLoad(track);
@@ -1077,6 +1081,17 @@ window.addEventListener('online', comeBack);
 window.addEventListener('t-music:foreground', comeBack);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) comeBack(); });
 
+// A track that came without its length (an old like, a history entry) gets the one the stream reports,
+// in the queue (so the list stops saying 0:00) and in the library (so it's known next time).
+function learnLength(id, sec) {
+  if (!id || !(sec > 0)) return;
+  const { queue } = usePlayer.getState();
+  if (!room && queue.some((t) => t.id === id && !t.duration)) {
+    usePlayer.setState({ queue: queue.map((t) => (t.id === id && !t.duration ? { ...t, duration: Math.round(sec) } : t)) });
+  }
+  useLibrary.getState().learnDuration(id, sec);
+}
+
 // Wire audio events. Events from the spare element are ignored.
 let lastTimeSave = 0;
 let consecutiveErrors = 0;
@@ -1176,7 +1191,11 @@ audios.forEach((a, i) => {
     resumeAt = null;
   });
   a.addEventListener('seeked', () => { if (isActive()) window.dispatchEvent(new CustomEvent('t-music:seeked')); });
-  a.addEventListener('durationchange', () => isActive() && isFinite(a.duration) && usePlayer.setState({ duration: a.duration }));
+  a.addEventListener('durationchange', () => {
+    if (!isActive() || !isFinite(a.duration) || !(a.duration > 0)) return;
+    usePlayer.setState({ duration: a.duration });
+    learnLength(a.dataset.id, a.duration);
+  });
   a.addEventListener('ended', () => {
     if (!isActive()) return;
     const dur = a.duration || 0;

@@ -47,7 +47,7 @@ function QueueRow({ track, onPlay, current, menu, index, order, onMove, flip }) 
         <div className="q-name">{track.title}</div>
         <ArtistLinks artists={track.artists} className="q-artist" />
       </div>
-      <span className="q-dur">{fmtTime(track.duration)}</span>
+      <span className="q-dur">{track.duration ? fmtTime(track.duration) : ''}</span>
       {IS_ANDROID && <button className="icon-btn q-more" onClick={(e) => openMenu(e, menu)} aria-label={tr('더 보기')}><MoreHorizontal size={18} /></button>}
     </div>
   );
