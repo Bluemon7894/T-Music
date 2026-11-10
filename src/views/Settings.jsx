@@ -13,6 +13,8 @@ import {
   Monitor,
   Languages,
   SlidersHorizontal,
+  ShieldCheck,
+  Check,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { troubleNotes } from '../lib/trouble.js';
@@ -141,6 +143,41 @@ function QuickShortcutRow() {
         </div>
       </div>
     </div>
+  );
+}
+
+const PHONE_PERMISSIONS = [
+  { key: 'battery', title: tr('배터리 최적화 해제'), text: tr('화면을 꺼 둬도 폰이 앱을 재우지 않아서, 음악이 중간에 끊기지 않아요.') },
+  { key: 'notifications', title: tr('알림'), text: tr('잠금 화면과 알림창에서 재생을 조작하고, 친구 요청과 초대를 받아요.') },
+  { key: 'music', title: tr('음악 파일 읽기'), text: tr('다른 앱으로 받은 음악 파일을 다운로드 화면의 "내 기기 음악"에서 들을 수 있어요.') },
+];
+
+// What the phone allows the app, with a way to allow it again for whatever was refused or skipped.
+function PhonePermissionsCard() {
+  const [state, setState] = useState({});
+  useEffect(() => {
+    const read = () => api.permissionState().then((s) => setState(s || {})).catch(() => {});
+    read();
+    const stop = window.api.onPermissions?.(read);
+    window.addEventListener('t-music:foreground', read);
+    return () => { stop?.(); window.removeEventListener('t-music:foreground', read); };
+  }, []);
+  return (
+    <section className="set-card" data-enter>
+      <h2><ShieldCheck size={18} />{' '}{tr('폰 권한')}</h2>
+      <p className="muted">{tr('허용하지 않았거나 놓친 권한은 여기서 다시 받을 수 있어요.')}</p>
+      {PHONE_PERMISSIONS.map(({ key, title, text }) => (
+        <div key={key} className="set-item" style={{ cursor: 'default' }}>
+          <div className="set-item-text">
+            <span className="set-item-title">{title}</span>
+            <span className="muted small">{text}</span>
+          </div>
+          {state[key]
+            ? <span className="perm-on"><Check size={14} />{' '}{tr('허용됨')}</span>
+            : <button className="btn" onClick={() => api.askPermission(key)}>{tr('허용하기')}</button>}
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -492,6 +529,7 @@ export default function Settings() {
           </section>
         </div>
         <div className="settings-col">
+          {IS_ANDROID && <PhonePermissionsCard />}
           <FriendPrivacyCard />
           {!IS_ANDROID && <section className="set-card" data-enter>
             <h2><Keyboard size={18} />{' '}{tr('단축키')}</h2>

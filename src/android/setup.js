@@ -147,6 +147,8 @@ const api = {
     Native.saveDocument(name, mime, content);
   }),
   takeInvite: () => takeInvite(),
+  permissionState: () => { try { return JSON.parse(Native.permissionState()); } catch { return {}; } },
+  askPermission: (kind) => Native.askPermission(String(kind)),
   localMusic: () => localMusicState(),
   refreshLocalMusic: () => localMusicState(),
   enableLocalMusic: (on) => enableLocalMusic(on),
@@ -160,6 +162,7 @@ window.api = {
   onUpdateProgress: (listener) => updater.onUpdateProgress(listener),
   onInvite: (listener) => onNative('invite', listener),
   onMediaControl: (listener) => { mediaListeners.add(listener); return () => mediaListeners.delete(listener); },
+  onPermissions: (listener) => onNative('permissions', listener),
 };
 
 // Warm up in the background so the first tap plays quickly.

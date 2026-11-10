@@ -1497,3 +1497,4 @@ html[data-motion="calm"] .eq i { height: 60% !important; }
 .local-music-folder { min-width: 0; flex: 1 1 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .local-music-search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; margin-bottom: 10px; border-radius: 12px; background: var(--glass-2); border: 1px solid var(--line); color: var(--sub); }
 .local-music-search input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--ink); font-size: 14px; }
+.perm-on { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 12.5px; font-weight: 700; color: var(--v-300); }

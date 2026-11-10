@@ -126,10 +126,63 @@ public class MainActivity extends Activity {
         requestPermissions(new String[] { LocalMusic.permission() }, REQUEST_MUSIC);
     }
 
+    private boolean fromSettings = false;
+
+    // What the settings screen shows: which of the phone's permissions the app has now.
+    String permissionState() {
+        PowerManager power = getSystemService(PowerManager.class);
+        boolean battery = power != null && power.isIgnoringBatteryOptimizations(getPackageName());
+        boolean notifications = Build.VERSION.SDK_INT < 33 ? getSystemService(android.app.NotificationManager.class).areNotificationsEnabled()
+            : checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+        try {
+            return new JSONObject().put("battery", battery).put("notifications", notifications).put("music", LocalMusic.allowed(this)).toString();
+        } catch (org.json.JSONException e) {
+            return "{}";
+        }
+    }
+
+    // Pressed in settings. A permission refused for good can't be asked for again from here, so the phone's
+    // own page for this app opens instead, where it can be turned on.
+    void askPermission(String kind) {
+        fromSettings = true;
+        try {
+            if ("battery".equals(kind)) {
+                startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
+            } else if ("notifications".equals(kind)) {
+                if (Build.VERSION.SDK_INT >= 33 && shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                    requestPermissions(new String[] { Manifest.permission.POST_NOTIFICATIONS }, REQUEST_NOTIFICATIONS);
+                } else if (Build.VERSION.SDK_INT >= 33 && !getPreferences(MODE_PRIVATE).getBoolean("askedNotifications", false)) {
+                    getPreferences(MODE_PRIVATE).edit().putBoolean("askedNotifications", true).apply();
+                    requestPermissions(new String[] { Manifest.permission.POST_NOTIFICATIONS }, REQUEST_NOTIFICATIONS);
+                } else {
+                    startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+                }
+            } else if ("music".equals(kind)) {
+                requestPermissions(new String[] { LocalMusic.permission() }, REQUEST_MUSIC);
+            }
+        } catch (Exception e) {
+            openAppSettings();
+        }
+    }
+
+    private void openAppSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
+        } catch (Exception ignored) {
+            // nothing more to offer
+        }
+    }
+
     @Override
     public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(request, permissions, results);
-        if (request == REQUEST_MUSIC && started) WebHost.get(this).bridge.emit("localMusic", "allowed", LocalMusic.allowed(this));
+        boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+        // Refused without the phone even asking: it was refused for good before.
+        if (fromSettings && !granted && permissions.length > 0 && !shouldShowRequestPermissionRationale(permissions[0])) openAppSettings();
+        fromSettings = false;
+        if (!started) return;
+        if (request == REQUEST_MUSIC) WebHost.get(this).bridge.emit("localMusic", "allowed", LocalMusic.allowed(this));
+        WebHost.get(this).bridge.emit("permissions");
     }
 
     private void askForNotifications() {
@@ -164,6 +217,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (started) WebHost.get(this).bridge.emit("visibility", "visible", true);
+        if (started) WebHost.get(this).bridge.emit("permissions");
         askToKeepRunning();
     }
 

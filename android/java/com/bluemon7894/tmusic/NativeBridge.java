@@ -193,6 +193,22 @@ final class NativeBridge {
         host.main.post(() -> PlaybackService.update(host, json));
     }
 
+    // ---- the phone's permissions, shown and asked for again in settings ----
+
+    @JavascriptInterface
+    public String permissionState() {
+        MainActivity activity = host.activity();
+        return activity == null ? "{}" : activity.permissionState();
+    }
+
+    @JavascriptInterface
+    public void askPermission(String kind) {
+        host.main.post(() -> {
+            MainActivity activity = host.activity();
+            if (activity != null) activity.askPermission(String.valueOf(kind));
+        });
+    }
+
     // ---- music already on the phone ----
 
     @JavascriptInterface
