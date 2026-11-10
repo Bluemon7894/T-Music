@@ -3,10 +3,11 @@ import { useLayoutEffect, useEffect, useRef } from 'react';
 import { animate as animeAnimate, stagger, spring, createAnimatable, createTimeline, utils } from 'animejs';
 import { IS_ANDROID } from './platform.js';
 
-const systemReduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-export let reduced = systemReduced;
+// Only the app's own switch decides. Windows and phones turn animations off for battery or by a maker's
+// default far more often than by choice, and an app that quietly follows that just looks broken.
+export let reduced = false;
 export function setCalmMotion(on) {
-  reduced = systemReduced || on;
+  reduced = on;
   calmMotion = on;
 }
 
