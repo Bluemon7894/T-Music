@@ -244,24 +244,28 @@ async function start(station, { quiet = false, retry = false } = {}) {
   if (!retry) retries = 0;
   const sounds = !quiet && !wasOn && useDeck.getState().sounds;
   const fromFreq = wasOn && prev.station?.band === station.band ? prev.station.freq : null;
-  const ms = QUIET_TUNE_MS;
-  useRadio.setState({ on: true, paused: false, phase: 'tuning', station, buffering: true, failed: false, band: station.band, sweep: { at: performance.now(), ms, from: fromFreq, to: station.freq, kind: 'on' } });
+  useRadio.setState({ on: true, paused: false, phase: 'tuning', station, buffering: true, failed: false, band: station.band, sweep: { at: performance.now(), ms: QUIET_TUNE_MS, from: fromFreq, to: station.freq, kind: 'on' } });
   savePrefs({ last: station, band: station.band });
-  if (sounds) playSound('start').catch(() => {});
+  const soundMs = sounds ? await playSound('start') : 0;
+  if (mine !== token) return;
+  const ms = soundMs || QUIET_TUNE_MS;
+  useRadio.setState({ sweep: { at: performance.now(), ms, from: fromFreq, to: station.freq, kind: 'on' } });
   try {
     await attachStream(station);
   } catch (e) {
-    stopSound();
     if (mine !== token) return;
     useRadio.setState({ buffering: false, failed: true });
     toast(errorText(e) || tr('이 방송에 연결할 수 없어요. 다른 채널을 골라 보세요.'));
     return;
   }
   if (mine !== token) return;
-  stopSound();
-  audio.play().catch(() => onStreamError('play refused'));
-  fadeTo(level(), FADE_IN_MS);
-  useRadio.setState({ phase: 'on' });
+  // The broadcast starts quietly under the end of the sound and comes up as the dial lands.
+  setTimeout(() => {
+    if (mine !== token) return;
+    audio.play().catch(() => onStreamError('play refused'));
+    fadeTo(level(), FADE_IN_MS);
+    useRadio.setState({ phase: 'on' });
+  }, Math.max(0, ms - FADE_IN_MS / 2));
 }
 
 export const useRadio = create((set, get) => ({
