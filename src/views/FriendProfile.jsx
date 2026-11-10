@@ -1,15 +1,17 @@
 // What a friend chose to show: what they play, how much they listen, what they like. Anything they keep
 // private simply isn't in what they published, so it can't be shown here by mistake.
 import { useRef, useState } from 'react';
-import { Clock, Copy, Disc3, Headphones, ListMusic, Lock, Mic2, Music2, Pencil, Play, PlusCircle, Tags, UserMinus, Users } from 'lucide-react';
+import { Clock, Copy, Disc3, Headphones, ListMusic, Lock, Mic2, Music2, Pencil, Play, PlusCircle, Radio, Tags, UserMinus, Users } from 'lucide-react';
 import { Avatar } from '../components/Account.jsx';
 import { ErrorMsg, Thumb, useAsync } from '../components/common.jsx';
 import TrackList from '../components/TrackList.jsx';
+import { BANDS } from '../components/RadioDial.jsx';
 import { useAccount } from '../store/account.js';
 import { useFriends } from '../store/friends.js';
 import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
+import { useRadio } from '../store/radio.js';
 import { loadFriendView } from '../store/profile.js';
 import { useRoom } from '../store/room.js';
 import { toast, useUI } from '../store/ui.js';
@@ -119,6 +121,17 @@ export default function FriendProfile({ uid }) {
             <small><Music2 size={12} />{' '}{friend.playing ? tr('지금 듣는 곡') : tr('일시정지한 곡')}</small>
             <b>{friend.track.title}</b>
             <small>{artistNames(friend.track)}</small>
+          </span>
+        </button>
+      )}
+
+      {!isMe && friend.radio && !friend.track && (
+        <button className="fp-now" data-enter onClick={() => useRadio.getState().tune(friend.radio)} title={tr('이 라디오 듣기')}>
+          <Thumb src={friend.radio.logo} />
+          <span>
+            <small><Radio size={12} />{' '}{friend.playing ? tr('지금 듣는 방송') : tr('일시정지한 방송')}</small>
+            <b>📻 {friend.radio.name}</b>
+            <small>{BANDS[friend.radio.band]?.fmt(friend.radio.freq) || friend.radio.freq} {friend.radio.band}</small>
           </span>
         </button>
       )}

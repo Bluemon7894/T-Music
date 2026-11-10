@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Maximize2, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from 'lucide-react';
 import { usePlayer } from '../../store/player.js';
 import { useRadio } from '../../store/radio.js';
+import { BANDS } from '../RadioDial.jsx';
 import { useUI } from '../../store/ui.js';
 import { api } from '../../lib/api.js';
 import { artistNames, fmtTime } from '../../lib/util.js';
@@ -28,7 +29,7 @@ function RadioMini() {
       <div className="mini-body">
         <div className="mini-text">
           <b title={station?.name}>{station?.name || tr('라디오')}</b>
-          <small>{station ? `${station.band} ${station.freq} · ${tr('실시간')}` : ''}</small>
+          <small>{station ? `${BANDS[station.band]?.fmt(station.freq) || station.freq} ${station.band} · ${tr('실시간')}` : ''}</small>
         </div>
         <div className="mini-controls">
           <button className="icon-btn" onClick={() => step(-1)} aria-label={tr('이전 채널')}><SkipBack size={18} fill="currentColor" /></button>

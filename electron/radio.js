@@ -47,6 +47,42 @@ async function directory(path) {
   throw last || new Error('directory unavailable');
 }
 
+// Well-known stations whose Radio Browser entry lacks the frequency in its name.
+const KNOWN_STATIONS = [
+  // SBS
+  { match: /sbs.*power|파워\s*fm|power\s*fm/i, band: 'FM', freq: 107.7 },
+  { match: /sbs.*love|러브\s*fm|love\s*fm/i, band: 'FM', freq: 103.5 },
+  // MBC
+  { match: /mbc.*(?:fm\s*4u|for\s*you|포유)|fm\s*4u|엠비씨\s*fm/i, band: 'FM', freq: 91.9 },
+  { match: /mbc.*충북.*표준/i, band: 'FM', freq: 107.1 },
+  { match: /mbc.*충북.*fm/i, band: 'FM', freq: 99.7 },
+  { match: /mbc.*표준\s*fm|mbc\s*fm\b|mbc\s*라디오/i, band: 'FM', freq: 95.9 },
+  { match: /mbc.*올댓뮤직/i, band: 'FM', freq: 92.7 },
+  // KBS
+  { match: /kbs.*(?:cool|쿨\s*fm|2fm|제2fm)/i, band: 'FM', freq: 89.1 },
+  { match: /kbs.*(?:classic|클래식\s*fm|1fm|제1fm)/i, band: 'FM', freq: 93.1 },
+  { match: /kbs.*(?:1라디오|제1라디오|1\s*radio)/i, band: 'FM', freq: 97.3 },
+  { match: /kbs.*(?:2라디오|제2라디오|2\s*radio|happy\s*fm|해피\s*fm)/i, band: 'FM', freq: 106.1 },
+  { match: /kbs.*(?:3라디오|제3라디오|3\s*radio|사랑의\s*소리)/i, band: 'FM', freq: 104.9 },
+  // CBS
+  { match: /cbs.*(?:음악\s*fm|music\s*fm)/i, band: 'FM', freq: 93.9 },
+  { match: /cbs.*(?:표준\s*fm|standard)/i, band: 'FM', freq: 98.1 },
+  // TBS
+  { match: /tbs.*(?:efm|이\s*fm)/i, band: 'FM', freq: 101.3 },
+  { match: /tbs.*(?:fm|교통방송)/i, band: 'FM', freq: 95.1 },
+  // EBS
+  { match: /ebs.*(?:fm|라디오)/i, band: 'FM', freq: 104.5 },
+  // Others
+  { match: /ytn.*(?:라디오|fm)/i, band: 'FM', freq: 94.5 },
+  { match: /obs.*(?:라디오|fm)/i, band: 'FM', freq: 99.9 },
+  { match: /국방\s*fm/i, band: 'FM', freq: 96.7 },
+  { match: /bbs.*(?:불교방송|fm)/i, band: 'FM', freq: 101.9 },
+  { match: /cpbc.*(?:평화방송|가톨릭|fm)|평화방송/i, band: 'FM', freq: 105.3 },
+  { match: /tbn.*(?:교통방송|fm)/i, band: 'FM', freq: 105.5 },
+  { match: /arirang.*(?:radio|라디오)/i, band: 'FM', freq: 88.7 },
+  { match: /afn.*(?:eagle|humphreys)/i, band: 'FM', freq: 88.3 },
+];
+
 // "MBC FM4U 91.9", "KBS 1Radio AM 711", "Classic FM 100.9 MHz"
 function statedFrequency(text) {
   const am = /(?:^|\D)(\d{3,4})\s*(?:khz|am)\b/i.exec(text) || /\bam\s*(\d{3,4})(?!\d)/i.exec(text);
@@ -54,10 +90,13 @@ function statedFrequency(text) {
     const f = Number(am[1]);
     if (f >= AM.min && f <= AM.max) return { band: 'AM', freq: f };
   }
-  const fm = /(?:^|[^\d.])(\d{2,3}\.\d)(?![\d.])/.exec(text);
+  const fm = /(?:^|[^\d.])(\d{2,3}(?:\.\d)?)\s*(?:mhz|fm)\b/i.exec(text) || /(?:^|[^\d.])(\d{2,3}\.\d)(?![\d.])/i.exec(text);
   if (fm) {
     const f = Number(fm[1]);
     if (f >= FM.min && f <= FM.max) return { band: 'FM', freq: Math.round(f * 10) / 10 };
+  }
+  for (const k of KNOWN_STATIONS) {
+    if (k.match.test(text)) return { band: k.band, freq: k.freq };
   }
   return null;
 }
@@ -76,8 +115,9 @@ function place(channels) {
   const taken = { FM: new Set(), AM: new Set() };
   const key = (band, f) => (band === 'FM' ? Math.round(f * 10) : f);
   for (const c of channels) if (c.freq) taken[c.band].add(key(c.band, c.freq));
-  for (const c of channels) {
-    if (c.freq) continue;
+  // Stably sort unplaced channels so virtual frequencies are deterministic across devices and refreshes:
+  const unplaced = channels.filter((c) => !c.freq).sort((a, b) => a.id.localeCompare(b.id));
+  for (const c of unplaced) {
     const range = c.band === 'AM' ? AM : FM;
     const slots = c.band === 'AM' ? Math.floor((range.max - range.min) / range.step) + 1 : Math.round((range.max - range.min) / 0.2) + 1;
     let slot = hash(c.id) % slots;

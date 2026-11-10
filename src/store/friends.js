@@ -75,7 +75,23 @@ export const useFriends = create((set, get) => {
     // The radio channel goes in its own field: older versions don't know it and simply show "online".
     if (sharing.track && radio.on && radio.station) {
       const s = radio.station;
-      return { online: true, track: null, playing: !radio.paused, radio: { id: String(s.id).slice(0, 80), name: String(s.name || '').slice(0, 80), band: s.band, freq: s.freq, ...(s.logo ? { logo: s.logo } : {}) }, updatedAt: serverTimestamp() };
+      return {
+        online: true,
+        track: null,
+        playing: !radio.paused,
+        radio: {
+          id: String(s.id || '').slice(0, 80),
+          kind: s.kind === 'youtube' ? 'youtube' : 'station',
+          name: String(s.name || '').slice(0, 80),
+          band: s.band === 'AM' ? 'AM' : 'FM',
+          freq: Number(s.freq) || 0,
+          ...(s.url ? { url: String(s.url).slice(0, 500) } : {}),
+          ...(s.videoId ? { videoId: String(s.videoId).slice(0, 20) } : {}),
+          ...(s.logo ? { logo: safePhoto(s.logo) } : {}),
+          hls: s.hls === true,
+        },
+        updatedAt: serverTimestamp(),
+      };
     }
     const track = sharing.track && !isLocalId(player.current()?.id) ? safeTrack(player.current()) : null;
     return { online: true, track, playing: Boolean(track && player.playing), updatedAt: serverTimestamp() };
@@ -118,7 +134,17 @@ export const useFriends = create((set, get) => {
     const listen = () => {
       stopPresence = onValue(dbRef('presence', uid), (snap) => {
         const p = snap.val();
-        const radio = p?.online && p.radio && typeof p.radio.name === 'string' ? { name: p.radio.name.slice(0, 80), band: p.radio.band === 'AM' ? 'AM' : 'FM', freq: Number(p.radio.freq) || 0, logo: safePhoto(p.radio.logo) } : null;
+        const radio = p?.online && p.radio && typeof p.radio.name === 'string' ? {
+          id: String(p.radio.id || '').slice(0, 80),
+          kind: p.radio.kind === 'youtube' ? 'youtube' : 'station',
+          name: p.radio.name.slice(0, 80),
+          band: p.radio.band === 'AM' ? 'AM' : 'FM',
+          freq: Number(p.radio.freq) || 0,
+          url: typeof p.radio.url === 'string' ? p.radio.url.slice(0, 500) : null,
+          videoId: typeof p.radio.videoId === 'string' ? p.radio.videoId.slice(0, 20) : null,
+          logo: safePhoto(p.radio.logo),
+          hls: p.radio.hls === true,
+        } : null;
         patchFriend(uid, { online: p?.online === true, track: p?.online ? safeTrack(p.track) : null, radio, playing: p?.playing === true });
       }, () => {
         patchFriend(uid, { online: false, track: null, playing: false });

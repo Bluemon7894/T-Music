@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy, Crown, GripVertical, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Share2, UserPlus, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { Empty, ArtistLinks, Thumb } from '../components/common.jsx';
+import { BANDS } from '../components/RadioDial.jsx';
 import LyricsView from '../components/layout/LyricsView.jsx';
 import { safePhoto, safeTrack } from '../lib/safeTrack.js';
 import { useFriends } from '../store/friends.js';
@@ -170,7 +171,7 @@ function InRoom() {
             <Thumb src={roomRadio.logo} />
             <div className="room-track-text">
               <b title={roomRadio.name}>📻 {roomRadio.name}</b>
-              <small>{roomRadio.band} {roomRadio.freq} · {tr('라디오')}</small>
+              <small>{BANDS[roomRadio.band]?.fmt(roomRadio.freq) || roomRadio.freq} {roomRadio.band} · {tr('라디오')}</small>
             </div>
           </div>
         ) : track ? (

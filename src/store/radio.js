@@ -244,28 +244,24 @@ async function start(station, { quiet = false, retry = false } = {}) {
   if (!retry) retries = 0;
   const sounds = !quiet && !wasOn && useDeck.getState().sounds;
   const fromFreq = wasOn && prev.station?.band === station.band ? prev.station.freq : null;
-  useRadio.setState({ on: true, paused: false, phase: 'tuning', station, buffering: true, failed: false, band: station.band, sweep: { at: performance.now(), ms: QUIET_TUNE_MS, from: fromFreq, to: station.freq, kind: 'on' } });
+  const ms = QUIET_TUNE_MS;
+  useRadio.setState({ on: true, paused: false, phase: 'tuning', station, buffering: true, failed: false, band: station.band, sweep: { at: performance.now(), ms, from: fromFreq, to: station.freq, kind: 'on' } });
   savePrefs({ last: station, band: station.band });
-  const soundMs = sounds ? await playSound('start') : 0;
-  if (mine !== token) return;
-  const ms = soundMs || QUIET_TUNE_MS;
-  useRadio.setState({ sweep: { at: performance.now(), ms, from: fromFreq, to: station.freq, kind: 'on' } });
+  if (sounds) playSound('start').catch(() => {});
   try {
     await attachStream(station);
   } catch (e) {
+    stopSound();
     if (mine !== token) return;
     useRadio.setState({ buffering: false, failed: true });
     toast(errorText(e) || tr('이 방송에 연결할 수 없어요. 다른 채널을 골라 보세요.'));
     return;
   }
   if (mine !== token) return;
-  // The broadcast starts quietly under the end of the sound and comes up as the dial lands.
-  setTimeout(() => {
-    if (mine !== token) return;
-    audio.play().catch(() => onStreamError('play refused'));
-    fadeTo(level(), FADE_IN_MS);
-    useRadio.setState({ phase: 'on' });
-  }, Math.max(0, ms - FADE_IN_MS / 2));
+  stopSound();
+  audio.play().catch(() => onStreamError('play refused'));
+  fadeTo(level(), FADE_IN_MS);
+  useRadio.setState({ phase: 'on' });
 }
 
 export const useRadio = create((set, get) => ({
@@ -290,7 +286,28 @@ export const useRadio = create((set, get) => ({
     try {
       const channels = await api.radioChannels(country);
       if (get().country !== country) return;
-      set({ channels: Array.isArray(channels) ? channels : [], updatedAt: Date.now(), loading: false });
+      const list = Array.isArray(channels) ? channels : [];
+      set({ channels: list, updatedAt: Date.now(), loading: false });
+      const cur = get().station;
+      if (cur) {
+        const live = list.find((c) => (cur.id && c.id === cur.id) || (cur.name && c.name === cur.name));
+        if (live && (live.freq !== cur.freq || live.band !== cur.band)) {
+          set({ station: { ...cur, freq: live.freq, band: live.band } });
+        }
+      }
+      const lib = useLibrary.getState();
+      if (lib.savedStations?.length) {
+        let changed = false;
+        const updatedSaved = lib.savedStations.map((s) => {
+          const m = list.find((c) => (s.id && c.id === s.id) || (s.name && c.name === s.name));
+          if (m && (m.freq !== s.freq || m.band !== s.band)) {
+            changed = true;
+            return { ...s, freq: m.freq, band: m.band };
+          }
+          return s;
+        });
+        if (changed) useLibrary.setState({ savedStations: updatedSaved });
+      }
     } catch (e) {
       set({ loading: false, error: errorText(e) || tr('라디오 목록을 불러오지 못했어요') });
     }
@@ -309,11 +326,14 @@ export const useRadio = create((set, get) => ({
   // Tune to a channel, turning the radio on if needed. In a room, the whole room tunes in.
   tune(station, { fromRoom = false } = {}) {
     if (!station) return;
+    const channels = get().channels;
+    const match = channels.find((c) => (station.id && c.id === station.id) || (station.name && c.name === station.name));
+    const target = match ? { ...match, ...station, url: match.url || station.url, videoId: match.videoId || station.videoId, freq: match.freq ?? station.freq, band: match.band ?? station.band } : station;
     const room = useRoom.getState();
     if (!fromRoom && room.code && room.attached) {
-      if (!tellRoom(station)) return;
+      if (!tellRoom(target)) return;
     }
-    start(station);
+    start(target);
   },
 
   powerOn() {

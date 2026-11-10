@@ -2,11 +2,13 @@ import { useRef, useState } from 'react';
 import { Check, Copy, Headphones, MoreHorizontal, UserMinus, UserPlus, UserRound, Users, X } from 'lucide-react';
 import { Avatar } from '../components/Account.jsx';
 import { Empty, Thumb } from '../components/common.jsx';
+import { BANDS } from '../components/RadioDial.jsx';
 import { useAccount } from '../store/account.js';
 import { normalizeFriendCode, useFriends } from '../store/friends.js';
 import { useNav } from '../store/nav.js';
 import { useRoom } from '../store/room.js';
 import { usePlayer } from '../store/player.js';
+import { useRadio } from '../store/radio.js';
 import { toast, useUI } from '../store/ui.js';
 import { api } from '../lib/api.js';
 import { useEnter } from '../lib/motion.js';
@@ -50,13 +52,13 @@ function FriendRow({ uid, friend }) {
         <small>{statusOf(friend)}</small>
       </div>
       {friend.radio && !friend.track && (
-        <div className="friend-track" title={tr('라디오')}>
+        <button className="friend-track" onClick={() => useRadio.getState().tune(friend.radio)} title={tr('이 라디오 듣기')}>
           <Thumb src={friend.radio.logo} />
           <span>
             <b>📻 {friend.radio.name}</b>
-            <small>{friend.radio.band} {friend.radio.freq}</small>
+            <small>{BANDS[friend.radio.band]?.fmt(friend.radio.freq) || friend.radio.freq} {friend.radio.band}</small>
           </span>
-        </div>
+        </button>
       )}
       {friend.track && (
         <button className="friend-track" onClick={() => usePlayer.getState().playList([friend.track], 0, { name: tr('{0}님이 듣는 곡', friend.name) })} title={tr('이 곡 재생')}>
