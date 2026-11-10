@@ -8,6 +8,8 @@ import * as lyrics from './lyrics/index.js';
 import * as updater from './updater.js';
 import { getClient } from './youtube/client.js';
 import * as downloads from './downloads.js';
+import * as localMusic from './localMusic.js';
+import { isLocalId } from './localId.js';
 import * as discord from './discord.js';
 import * as auth from './auth.js';
 import * as lang from './lang.js';
@@ -118,12 +120,21 @@ const api = {
   related: (id) => catalog.related(id),
   artistGenres: (names) => artistGenres(names),
   home: () => catalog.home(),
-  lyrics: (track) => lyrics.getLyrics(track),
+  lyrics: async (track) => {
+    const found = await lyrics.getLyrics(track);
+    // A music file can carry its own lyrics: better than nothing when no database has the song.
+    const inFile = !found?.lines?.length && !found?.plainLyrics && isLocalId(track?.id) ? localMusic.lyricsOf(track.id) : null;
+    return inFile ? { plainLyrics: inFile, syncedLyrics: null, lines: [], source: '파일' } : found;
+  },
   refreshLyrics: (track) => lyrics.refreshLyrics(track),
   lyricsCandidates: (track, query) => lyrics.getCandidates(track, query),
   cleanLyricsQuery: (track) => lyrics.getCleanSearchTerm(track),
   setCustomLyrics: (trackId, lyricsData) => lyrics.setCustom(trackId, lyricsData),
-  prefetch: (id) => { if (!downloads.localFile(id)) stream.prefetch(id); return true; },
+  prefetch: (id) => { if (!downloads.localFile(id) && !isLocalId(id)) stream.prefetch(id); return true; },
+  localMusic: () => localMusic.list(),
+  refreshLocalMusic: () => localMusic.refresh(),
+  enableLocalMusic: (on) => localMusic.enable(on),
+  chooseMusicFolder: () => localMusic.chooseFolder(),
   status: () => ({ methods: stream.status(), version: app.getVersion() }),
   remoteNotice: async () => { await remote.start(); return remote.notice(); },
   quickState: (state) => { quick.relayState(state); return true; },
@@ -427,6 +438,7 @@ if (!app.requestSingleInstanceLock()) {
       return;
     }
     remote.start();
+    localMusic.start();
     const win = createWindow();
     setMainWindow(win);
     createTray(win);

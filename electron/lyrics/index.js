@@ -2,6 +2,7 @@
 // candidates are ranked by title/artist/length, and the top ones are checked for
 // plausible timing and the right language. A confident match ends the search early.
 // Plain text is only used when no timed lyrics exist anywhere.
+import { isLocalId } from '../localId.js';
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -176,12 +177,12 @@ async function search(track) {
 
   // Nothing lines up to the second (typically a music video longer than the song):
   // the video's own captions beat a database entry for a different cut.
-  const captions = await fromCaptions(track, meta);
+  const captions = isLocalId(track.id) ? null : await fromCaptions(track, meta);
   if (captions) return { result: captions, answered: true };
   if (best) return { result: timedResult(best.c, best.e, meta.duration), answered: true };
 
   // No timed lyrics anywhere. Licensed text first, then the best entry we saw.
-  const ytm = remote.lyricsOn('ytmusic') ? await youtubeMusicPlain(track.id) : null;
+  const ytm = remote.lyricsOn('ytmusic') && !isLocalId(track.id) ? await youtubeMusicPlain(track.id) : null;
   if (ytm && isUsableText(ytm.text)) return { result: plainResult(ytm.text, 'YouTube Music', ytm.footer), answered: true };
   if (state.text) {
     const { c, e } = state.text;

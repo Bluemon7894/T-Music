@@ -39,10 +39,12 @@ final class StreamHandler {
 
         File local = Downloads.localFile(host.app, id);
         if (local != null) return serveFile(local, range);
+        if (id.endsWith("Z")) return serveLocalMusic(id, range);
 
         // Pass the Range request straight upstream so the player can seek anywhere in the file.
         String upstream = range == null ? "bytes=0-" : range;
         for (int attempt = 0; attempt < ATTEMPTS; attempt++) {
+            host.wakeBriefly();
             JSONObject resolved = host.bridge.resolveStream(id);
             if (resolved == null || resolved.optString("url").isEmpty()) return failure(502, "Bad Gateway");
             try {
@@ -88,7 +90,7 @@ final class StreamHandler {
             } else if (status == 200 && c.getContentLengthLong() >= 0) {
                 end = c.getContentLengthLong();
             }
-            InputStream body = new ResumingStream(id, c, start, end);
+            InputStream body = new ResumingStream(id, resolved.optString("url"), c, start, end);
             return new WebResourceResponse(mime, null, status, status == 206 ? "Partial Content" : "OK", headers, body);
         }
         if (status == 416) {
@@ -99,6 +101,52 @@ final class StreamHandler {
         }
         c.disconnect();
         return null;
+    }
+
+    // A file from the phone's own music library, read through the system with the same byte ranges.
+    private WebResourceResponse serveLocalMusic(String id, String range) {
+        android.content.res.AssetFileDescriptor afd = LocalMusic.open(host.app, id);
+        if (afd == null) return failure(404, "Not Found");
+        String mime = LocalMusic.mimeOf(host.app, id);
+        long size = afd.getLength();
+        Map<String, String> headers = baseHeaders();
+        headers.put("Content-Type", mime);
+        long start = 0;
+        long end = size - 1;
+        boolean partial = false;
+        if (range != null && size > 0) {
+            Matcher m = RANGE.matcher(range);
+            if (m.find() && !(m.group(1).isEmpty() && m.group(2).isEmpty())) {
+                partial = true;
+                if (m.group(1).isEmpty()) {
+                    start = Math.max(0, size - Long.parseLong(m.group(2)));
+                } else {
+                    start = Long.parseLong(m.group(1));
+                    if (!m.group(2).isEmpty()) end = Math.min(Long.parseLong(m.group(2)), size - 1);
+                }
+            }
+        }
+        try {
+            if (partial && start >= size) {
+                afd.close();
+                headers.put("Content-Range", "bytes */" + size);
+                return new WebResourceResponse(mime, null, 416, "Range Not Satisfiable", headers, new ByteArrayInputStream(new byte[0]));
+            }
+            InputStream in = afd.createInputStream();
+            long skipped = 0;
+            while (skipped < start) {
+                long n = in.skip(start - skipped);
+                if (n <= 0) break;
+                skipped += n;
+            }
+            if (size < 0) return new WebResourceResponse(mime, null, 200, "OK", headers, in);
+            long length = end - start + 1;
+            headers.put("Content-Length", String.valueOf(length));
+            if (partial) headers.put("Content-Range", "bytes " + start + "-" + end + "/" + size);
+            return new WebResourceResponse(mime, null, partial ? 206 : 200, partial ? "Partial Content" : "OK", headers, new LimitedStream(in, length));
+        } catch (IOException e) {
+            return failure(500, "Server Error");
+        }
     }
 
     private WebResourceResponse serveFile(File file, String range) {
@@ -172,6 +220,7 @@ final class StreamHandler {
     // stopped at, with a freshly resolved address if need be, and the player never notices.
     private final class ResumingStream extends InputStream {
         private final String id;
+        private String url;
         private HttpURLConnection connection;
         private InputStream in;
         private long position;
@@ -179,8 +228,9 @@ final class StreamHandler {
         private int resumes = 0;
         private volatile boolean closed = false;
 
-        ResumingStream(String id, HttpURLConnection connection, long start, long end) throws IOException {
+        ResumingStream(String id, String url, HttpURLConnection connection, long start, long end) throws IOException {
             this.id = id;
+            this.url = url;
             this.connection = connection;
             this.in = connection.getInputStream();
             this.position = start;
@@ -219,8 +269,11 @@ final class StreamHandler {
 
         private boolean resume() {
             disconnect();
+            // The address in hand is good for hours and needs nothing from the page, so it goes first.
+            if (url != null && !url.isEmpty() && reopen(url)) return true;
             while (resumes < RESUMES && !closed) {
                 resumes++;
+                host.wakeBriefly();
                 JSONObject resolved = host.bridge.resolveStream(id);
                 if (resolved == null || resolved.optString("url").isEmpty()) continue;
                 try {
@@ -229,6 +282,7 @@ final class StreamHandler {
                     if (c.getResponseCode() == 206) {
                         connection = c;
                         in = c.getInputStream();
+                        url = resolved.optString("url");
                         return true;
                     }
                     c.disconnect();
@@ -236,6 +290,22 @@ final class StreamHandler {
                     // tried again below with a fresh address
                 }
                 host.bridge.invalidateStream(id, resolved.optString("method"), resolved.optBoolean("fresh"));
+            }
+            return false;
+        }
+
+        private boolean reopen(String address) {
+            try {
+                String range = "bytes=" + position + "-" + (end >= 0 ? String.valueOf(end - 1) : "");
+                HttpURLConnection c = connect(address, range);
+                if (c.getResponseCode() == 206) {
+                    connection = c;
+                    in = c.getInputStream();
+                    return true;
+                }
+                c.disconnect();
+            } catch (IOException e) {
+                // the address went stale: ask the page for a new one
             }
             return false;
         }

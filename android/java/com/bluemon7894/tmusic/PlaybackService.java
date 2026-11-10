@@ -44,12 +44,17 @@ public final class PlaybackService extends Service {
     private static final String ACTION_CLOSE = "tmusic.CLOSE";
     private static final String EXTRA_STATE = "state";
     private static final long PAUSED_LIFETIME_MS = 10 * 60 * 1000;
+    // Between two tracks the page reports a pause. Letting go of the locks right then lets a sleeping
+    // phone cut the network just as the next track has to load, so they're kept a while longer.
+    private static final long LOCKS_AFTER_PAUSE_MS = 90 * 1000;
+    static volatile boolean everPlayed;
     private static final int ART_SIZE = 512;
 
     private static PlaybackService instance;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Runnable stopAfterPause = this::finish;
+    private final Runnable releaseLocks = this::releaseLocks;
 
     private WebHost host;
     private MediaSession session;
@@ -151,6 +156,12 @@ public final class PlaybackService extends Service {
         host.bridge.emit("media", "action", action);
     }
 
+    private void releaseLocks() {
+        host.stayAwake(false);
+        if (wakeLock.isHeld()) wakeLock.release();
+        if (wifiLock.isHeld()) wifiLock.release();
+    }
+
     private void apply(JSONObject state) {
         boolean wasPlaying = playing;
         playing = state.optBoolean("playing");
@@ -162,7 +173,10 @@ public final class PlaybackService extends Service {
         position = (long) (state.optDouble("position", 0) * 1000);
 
         main.removeCallbacks(stopAfterPause);
+        main.removeCallbacks(releaseLocks);
         if (playing) {
+            everPlayed = true;
+            host.stayAwake(true);
             wakeLock.acquire();
             wifiLock.acquire();
             if (!noisyRegistered) {
@@ -170,8 +184,8 @@ public final class PlaybackService extends Service {
                 noisyRegistered = true;
             }
         } else {
-            if (wakeLock.isHeld()) wakeLock.release();
-            if (wifiLock.isHeld()) wifiLock.release();
+            if (wasPlaying) main.postDelayed(releaseLocks, LOCKS_AFTER_PAUSE_MS);
+            else releaseLocks();
             if (noisyRegistered) {
                 unregisterReceiver(noisy);
                 noisyRegistered = false;

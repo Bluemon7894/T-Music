@@ -1,5 +1,6 @@
 import { ArrowDownToLine, CircleCheck, X, RotateCw } from 'lucide-react';
 import { useDownloads, download, cancelDownload, retryDownload, removeDownload } from '../store/downloads.js';
+import { isLocalId } from '../../electron/localId.js';
 import { tr } from '../lib/i18n.js';
 
 export function ProgressRing({ value = 0, size = 18, stroke = 2.4 }) {
@@ -17,6 +18,7 @@ export function ProgressRing({ value = 0, size = 18, stroke = 2.4 }) {
 export default function DownloadButton({ track, size = 17, className = '' }) {
   const done = useDownloads((s) => s.done.has(track.id));
   const job = useDownloads((s) => s.active[track.id]);
+  if (isLocalId(track.id)) return null; // already a file on this device
 
   if (done) {
     return (

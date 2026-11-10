@@ -193,6 +193,28 @@ final class NativeBridge {
         host.main.post(() -> PlaybackService.update(host, json));
     }
 
+    // ---- music already on the phone ----
+
+    @JavascriptInterface
+    public boolean localMusicAllowed() {
+        return LocalMusic.allowed(app);
+    }
+
+    @JavascriptInterface
+    public String localMusicList() {
+        return LocalMusic.list(app);
+    }
+
+    // Answered with a "localMusic" event once the person has chosen.
+    @JavascriptInterface
+    public void localMusicAsk() {
+        host.main.post(() -> {
+            MainActivity activity = host.activity();
+            if (activity == null || LocalMusic.allowed(app)) emit("localMusic", "allowed", LocalMusic.allowed(app));
+            else activity.askForMusic();
+        });
+    }
+
     // ---- downloads ----
 
     @JavascriptInterface

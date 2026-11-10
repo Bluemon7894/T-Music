@@ -9,6 +9,7 @@ import { IS_ANDROID } from '../lib/platform.js';
 import { followingCode, lastPlayback } from '../lib/resume.js';
 import { noteTrouble } from '../lib/trouble.js';
 import { tr } from '../lib/i18n.js';
+import { isLocalId } from '../../electron/localId.js';
 
 // Phones set the volume with their own buttons, so the app stays at full level there.
 const DEFAULT_VOLUME = IS_ANDROID ? 1 : 0.8;
@@ -125,6 +126,13 @@ const shuffled = (list) => {
   }
   return a;
 };
+
+// Music files live on one device, so a room, where everyone hears the same thing, can't take them.
+function forRoom(tracks) {
+  const shared = tracks.filter((t) => !isLocalId(t?.id));
+  if (shared.length < tracks.length) toast(tr('내 기기 음악은 같이 듣기 방에서 틀 수 없어요'));
+  return shared;
+}
 
 let extendingPromise = null;
 const PRELOAD_BEFORE_END_S = 45;
@@ -291,6 +299,12 @@ export const usePlayer = create((set, get) => ({
   playList(tracks, start = 0, context = null) {
     if (!tracks?.length) return;
     if (room && !room.allowTrackChange()) return;
+    if (room && tracks.some((t) => isLocalId(t?.id))) {
+      const chosen = tracks[start];
+      tracks = forRoom(tracks);
+      if (!tracks.length) return;
+      start = Math.max(0, tracks.indexOf(chosen));
+    }
     commitListen();
     consecutiveErrors = 0;
     let queue = tracks.slice();
@@ -311,7 +325,7 @@ export const usePlayer = create((set, get) => ({
   },
 
   playNext(track) {
-    if (room) { room.enqueue([track], { next: true }); return; }
+    if (room) { const list = forRoom([track]); if (list.length) room.enqueue(list, { next: true }); return; }
     const { queue, index } = get();
     const cleanTrack = { ...track, isAutoplay: false };
     if (index < 0) return get().playList([cleanTrack]);
@@ -326,7 +340,7 @@ export const usePlayer = create((set, get) => ({
   addToQueue(tracks) {
     const list = (Array.isArray(tracks) ? tracks : [tracks]).map((t) => ({ ...t, isAutoplay: false }));
     if (!list.length) return;
-    if (room) { room.enqueue(list); return; }
+    if (room) { const shared = forRoom(list); if (shared.length) room.enqueue(shared); return; }
     const { queue, index } = get();
     if (index < 0) return get().playList(list);
     const q = queue.slice();
@@ -703,8 +717,8 @@ export const usePlayer = create((set, get) => ({
         const candidates = [];
         const cur = queue[index];
         const last = queue[queue.length - 1];
-        if (cur) candidates.push(cur);
-        if (last && last.id !== cur?.id) candidates.push(last);
+        if (cur && !isLocalId(cur.id)) candidates.push(cur);
+        if (last && last.id !== cur?.id && !isLocalId(last.id)) candidates.push(last);
         for (let i = index - 1; i >= 0 && candidates.length < 5; i--) {
           if (queue[i] && !candidates.some((c) => c.id === queue[i].id)) {
             candidates.push(queue[i]);

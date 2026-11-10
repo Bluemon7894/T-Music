@@ -69,8 +69,8 @@ function FriendRow({ uid, friend }) {
       )}
       <div className="friend-actions">
         {inMyRoom
-          ? <span className="room-badge"><Headphones size={13} />{' '}{tr('같은 방에 있어요')}</span>
-          : <button className="btn" disabled={inviting} onClick={invite}><Headphones size={15} />{' '}{tr('같이 듣기 초대')}</button>}
+          ? <span className="room-badge" title={tr('같은 방에 있어요')}><Headphones size={13} /><span className="friend-action-label">{' '}{tr('같은 방에 있어요')}</span></span>
+          : <button className="btn" disabled={inviting} onClick={invite} title={tr('같이 듣기 초대')} aria-label={tr('같이 듣기 초대')}><Headphones size={15} /><span className="friend-action-label">{' '}{tr('같이 듣기 초대')}</span></button>}
         <button className="icon-btn" aria-label={tr('더 보기')} onClick={(e) => openMenu(e, [{ label: tr('프로필 보기'), icon: UserRound, onClick: open }, { label: tr('친구 삭제'), icon: UserMinus, onClick: confirmRemove }])}><MoreHorizontal size={18} /></button>
       </div>
     </li>

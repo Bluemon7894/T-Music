@@ -46,6 +46,13 @@ final class AppWebClient extends WebViewClient {
         String path = url.getPath() == null ? "/" : url.getPath();
         if (path.startsWith("/stream/")) return streams.serve(path.substring("/stream/".length()), request.getRequestHeaders());
         if (path.startsWith("/__proxy/")) return host.bridge.proxy.serve(path.substring("/__proxy/".length()));
+        if (path.startsWith("/art/")) {
+            byte[] art = LocalMusic.art(host.app, path.substring("/art/".length()));
+            if (art == null) return empty(404, "Not Found");
+            Map<String, String> headers = new HashMap<>();
+            headers.put("Cache-Control", "max-age=86400");
+            return new WebResourceResponse("image/jpeg", null, 200, "OK", headers, new ByteArrayInputStream(art));
+        }
         return asset(path);
     }
 

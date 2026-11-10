@@ -391,6 +391,9 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .friend-track { flex: 1 1 100%; order: 3; }
 .friend-actions { order: 2; margin-left: auto; }
 .friend-actions .btn { height: 34px; padding: 0 12px; font-size: 12.5px; }
+/* A phone row is too narrow for the name and a worded button; the headphones say it. */
+.friend-actions .friend-action-label { display: none; }
+.friend-actions .btn:has(.friend-action-label) { width: 40px; padding: 0; justify-content: center; }
 .friend-actions .icon-btn { width: 36px; height: 44px; }
 .friend-add input { font-size: 15px; }
 .friend-add .btn-primary { flex: none; padding: 0 12px; font-size: 13px; }

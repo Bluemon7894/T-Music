@@ -7,6 +7,7 @@ import fs from 'fs';
 import { Readable } from 'stream';
 import * as stream from './youtube/stream.js';
 import * as downloads from './downloads.js';
+import * as localMusic from './localMusic.js';
 
 export function registerScheme() {
   protocol.registerSchemesAsPrivileged([
@@ -61,13 +62,21 @@ async function handleRadio(req) {
   }
 }
 
+// ytm://art/ID — the picture inside a music file on this computer.
+function handleArt(req) {
+  const file = localMusic.fileOf(new URL(req.url).pathname.slice(1))?.art;
+  if (!file || !fs.existsSync(file)) return new Response(null, { status: 404, headers: CORS });
+  return new Response(Readable.toWeb(fs.createReadStream(file)), { headers: { ...CORS, 'content-type': file.endsWith('.png') ? 'image/png' : 'image/jpeg', 'cache-control': 'max-age=86400' } });
+}
+
 async function handleStream(req) {
   if (new URL(req.url).host === 'radio') return handleRadio(req);
+  if (new URL(req.url).host === 'art') return handleArt(req);
   const id = new URL(req.url).pathname.slice(1);
   if (!/^[\w-]{11}$/.test(id)) return new Response('bad id', { status: 400 });
   const range = req.headers.get('range');
 
-  const local = downloads.localFile(id);
+  const local = downloads.localFile(id) || localMusic.fileOf(id);
   if (local) return serveFile(local, range);
 
   // Pass the browser's Range request directly to upstream (e.g. bytes=0- or bytes=X-)

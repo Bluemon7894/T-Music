@@ -95,6 +95,17 @@ final class WebHost {
         if (web instanceof AppWebView) ((AppWebView) web).setKeepAwake(false);
     };
 
+    // While music plays the page stays awake: a stream that drops has to be reopened and the next track
+    // resolved, and both are asked of the page. A frozen page answers neither, and the music stops.
+    void stayAwake(boolean on) {
+        main.post(() -> {
+            if (!(web instanceof AppWebView)) return;
+            main.removeCallbacks(sleepAgain);
+            if (on) ((AppWebView) web).setKeepAwake(true);
+            else ((AppWebView) web).setKeepAwake(false);
+        });
+    }
+
     void wakeBriefly() {
         main.post(() -> {
             if (!(web instanceof AppWebView)) return;

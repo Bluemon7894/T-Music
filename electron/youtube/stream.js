@@ -6,6 +6,7 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { getClient, getPlayerClient, resetClient } from './client.js';
+import { isLocalId } from '../localId.js';
 import * as remote from '../remoteConfig.js';
 
 const CLIENTS = ['VISIONOS', 'IOS', 'ANDROID_VR'];
@@ -127,6 +128,7 @@ const cache = new Map();
 const inflight = new Map();
 
 export async function resolve(id) {
+  if (isLocalId(id)) throw new UnplayableError('재생할 수 없는 곡입니다: 이 기기에 없는 음악 파일이에요');
   const hit = cache.get(id);
   if (hit && hit.expires > Date.now()) return { ...hit, fresh: false };
   if (inflight.has(id)) return inflight.get(id);

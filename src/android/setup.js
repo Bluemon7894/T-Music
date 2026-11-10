@@ -80,6 +80,24 @@ function takeInvite() {
 
 const noop = () => {};
 
+// ---- music already on the phone (LocalMusic.java) ----
+const LOCAL_MUSIC_KEY = 't-music-local-music';
+const localMusicOn = () => { try { return localStorage.getItem(LOCAL_MUSIC_KEY) === '1'; } catch { return false; } };
+function localMusicState() {
+  const enabled = localMusicOn() && Native.localMusicAllowed();
+  let tracks = [];
+  if (enabled) try { tracks = JSON.parse(Native.localMusicList()); } catch { /* an empty list */ }
+  return { enabled, folder: null, tracks };
+}
+function enableLocalMusic(on) {
+  try { localStorage.setItem(LOCAL_MUSIC_KEY, on ? '1' : '0'); } catch { /* this session only */ }
+  if (!on) return localMusicState();
+  return new Promise((resolve) => {
+    const stop = onNative('localMusic', () => { stop(); resolve(localMusicState()); });
+    Native.localMusicAsk();
+  });
+}
+
 // Everything electron/main.js answers that a phone has a use for. The rest does nothing here.
 const api = {
   search: (q) => catalog.search(q),
@@ -129,6 +147,9 @@ const api = {
     Native.saveDocument(name, mime, content);
   }),
   takeInvite: () => takeInvite(),
+  localMusic: () => localMusicState(),
+  refreshLocalMusic: () => localMusicState(),
+  enableLocalMusic: (on) => enableLocalMusic(on),
 };
 
 const mediaListeners = new Set();

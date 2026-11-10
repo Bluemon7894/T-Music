@@ -6,6 +6,7 @@ import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { useUI, toast } from '../store/ui.js';
 import { useDownloads, download, removeDownload } from '../store/downloads.js';
+import { isLocalId, missingHere, useLocalMusic } from '../store/localMusic.js';
 import { api } from '../lib/api.js';
 import { canEditPlaylist } from '../lib/sharedPlaylists.js';
 import { fmtTime } from '../lib/util.js';
@@ -79,9 +80,9 @@ export function trackMenuItems(track, extra = []) {
       ],
     },
     { label: liked ? tr('좋아요 취소') : tr('좋아요'), icon: Heart, onClick: () => lib.toggleLike(track) },
-    downloaded
+    !isLocalId(track.id) && (downloaded
       ? { label: tr('다운로드 삭제'), icon: Trash2, onClick: () => removeDownload(track.id) }
-      : { label: tr('다운로드'), icon: ArrowDownToLine, onClick: () => download(track) },
+      : { label: tr('다운로드'), icon: ArrowDownToLine, onClick: () => download(track) }),
     lib.recent.some((t) => t.id === track.id) && {
       label: tr('최근 들은 곡에서 삭제'),
       icon: Trash2,
@@ -123,7 +124,9 @@ function QueuedMark({ id }) {
   return <span className="tl-queued" title={tr('대기열에 있음')} aria-label={tr('대기열에 있음')}><ListChecks size={12} /></span>;
 }
 
-export default function TrackList({ tracks, context, showAlbum = true, showThumb = true, numbered = true, onRemove, onReorder, compact, animate = true, playSingle = false }) {
+export default function TrackList({ tracks: given = [], context, showAlbum = true, showThumb = true, numbered = true, onRemove, onReorder, compact, animate = true, playSingle = false }) {
+  useLocalMusic((s) => s.ids); // a file another device saved shows once this device has it
+  const tracks = given.some(missingHere) ? given.filter((t) => !missingHere(t)) : given;
   const currentId = usePlayer((s) => s.queue[s.index]?.id);
   const playing = usePlayer((s) => s.playing);
   const playList = usePlayer((s) => s.playList);

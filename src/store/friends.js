@@ -26,6 +26,7 @@ import { useRoom } from './room.js';
 import { toast, useUI } from './ui.js';
 import { record } from './undo.js';
 import { tr } from '../lib/i18n.js';
+import { isLocalId } from '../../electron/localId.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 8;
@@ -76,7 +77,7 @@ export const useFriends = create((set, get) => {
       const s = radio.station;
       return { online: true, track: null, playing: !radio.paused, radio: { id: String(s.id).slice(0, 80), name: String(s.name || '').slice(0, 80), band: s.band, freq: s.freq, ...(s.logo ? { logo: s.logo } : {}) }, updatedAt: serverTimestamp() };
     }
-    const track = sharing.track ? safeTrack(player.current()) : null;
+    const track = sharing.track && !isLocalId(player.current()?.id) ? safeTrack(player.current()) : null;
     return { online: true, track, playing: Boolean(track && player.playing), updatedAt: serverTimestamp() };
   };
 

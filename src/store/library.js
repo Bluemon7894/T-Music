@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isLocalId } from '../../electron/localId.js';
 import { persist } from 'zustand/middleware';
 import { tr } from '../lib/i18n.js';
 
@@ -40,7 +41,9 @@ export const useLibrary = create(
         set({ liked: liked.some((t) => t.id === track.id) ? liked.filter((t) => t.id !== track.id) : [{ ...slim(track), addedAt: Date.now() }, ...liked] });
       },
 
+      // Music files stay on their device: nothing about them goes into history, which follows the account.
       pushRecent(track) {
+        if (isLocalId(track?.id)) return;
         set({ recent: [slim(track), ...get().recent.filter((t) => t.id !== track.id)].slice(0, RECENT_LIMIT) });
       },
       // Older likes and history were saved without a length. Once a track has played, it's known.
@@ -72,6 +75,7 @@ export const useLibrary = create(
         set({ searches: [] });
       },
       addListen(track, sec) {
+        if (isLocalId(track?.id)) return;
         const s = Math.round(sec || 0);
         if (s <= 0) return;
         const now = Date.now();

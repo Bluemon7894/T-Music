@@ -10,6 +10,7 @@ import { resumeOnLaunch, usePlayer } from './store/player.js';
 import { SIDE, toast, useUI } from './store/ui.js';
 import { openSharedPlaylist } from './lib/sharedPlaylists.js';
 import { initDownloads } from './store/downloads.js';
+import { initLocalMusic } from './store/localMusic.js';
 import { useUpdater } from './store/updater.js';
 import { useAccount } from './store/account.js';
 import { useRoom } from './store/room.js';
@@ -200,10 +201,12 @@ function MainApp() {
 
   useEffect(() => {
     initDownloads();
+    const stopLocalMusic = initLocalMusic();
     useUpdater.getState().init();
     showRemoteNotice();
     startQuickBridge();
-    return watchForeground();
+    const stopWatching = watchForeground();
+    return () => { stopLocalMusic(); stopWatching?.(); };
   }, []);
 
   // Invite links: tmusic://join/CODE, possibly opened before the app was running or signed in.

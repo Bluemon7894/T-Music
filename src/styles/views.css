@@ -1485,3 +1485,15 @@ html[data-motion="calm"] .eq i { height: 60% !important; }
 .key-combo { display: inline-flex; align-items: center; gap: 4px; }
 .key-combo kbd { min-width: 22px; text-align: center; }
 .quick-key .row-btns .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }
+
+/* Music already on this device, below the downloads. */
+.local-music { margin: 8px 0 24px; }
+.local-music h2 { display: flex; align-items: center; gap: 6px; }
+.local-music-off { padding: 18px; border-radius: 18px; background: var(--glass-2); box-shadow: 0 0 0 1px var(--line); }
+.local-music-off p { margin: 0 0 8px; }
+.local-music-off .row-btns { margin-top: 12px; }
+.local-music-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.local-music-bar .row-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.local-music-folder { min-width: 0; flex: 1 1 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.local-music-search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; margin-bottom: 10px; border-radius: 12px; background: var(--glass-2); border: 1px solid var(--line); color: var(--sub); }
+.local-music-search input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--ink); font-size: 14px; }

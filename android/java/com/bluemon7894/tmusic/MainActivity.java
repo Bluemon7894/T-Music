@@ -10,6 +10,8 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -28,6 +30,7 @@ public class MainActivity extends Activity {
     private static final int REQUEST_FILE = 1;
     private static final int REQUEST_SAVE = 2;
     private static final int REQUEST_NOTIFICATIONS = 3;
+    private static final int REQUEST_MUSIC = 4;
     // The page uses browser features from this version on. Phones get WebView updates from the Play Store.
     private static final int MIN_WEBVIEW_VERSION = 105;
 
@@ -119,6 +122,16 @@ public class MainActivity extends Activity {
         return Build.VERSION.SDK_INT >= 30 ? WindowInsets.CONSUMED : insets.consumeSystemWindowInsets();
     }
 
+    void askForMusic() {
+        requestPermissions(new String[] { LocalMusic.permission() }, REQUEST_MUSIC);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        if (request == REQUEST_MUSIC && started) WebHost.get(this).bridge.emit("localMusic", "allowed", LocalMusic.allowed(this));
+    }
+
     private void askForNotifications() {
         if (Build.VERSION.SDK_INT < 33) return;
         if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return;
@@ -151,6 +164,22 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (started) WebHost.get(this).bridge.emit("visibility", "visible", true);
+        askToKeepRunning();
+    }
+
+    // Battery savers stop apps a while after the screen goes off, foreground service or not. Asked once,
+    // after the first time music played, when it's clear why.
+    private void askToKeepRunning() {
+        if (!PlaybackService.everPlayed) return;
+        if (getPreferences(MODE_PRIVATE).getBoolean("askedBattery", false)) return;
+        PowerManager power = getSystemService(PowerManager.class);
+        if (power == null || power.isIgnoringBatteryOptimizations(getPackageName())) return;
+        getPreferences(MODE_PRIVATE).edit().putBoolean("askedBattery", true).apply();
+        try {
+            startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
+        } catch (Exception ignored) {
+            // some phones don't offer it
+        }
     }
 
     @Override
