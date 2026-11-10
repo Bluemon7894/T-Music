@@ -67,7 +67,17 @@ function fetchJson(urlStr) {
 export async function checkUpdate() {
   const currentVersion = app.getVersion();
   try {
-    const release = await fetchJson(`https://api.github.com/repos/${REPO}/releases/latest`);
+    let release = await fetchJson(`https://api.github.com/repos/${REPO}/releases/latest`);
+    // If the latest release is an Android release or lacks an .exe, search recent releases for the newest desktop release
+    if (!release?.assets?.some((a) => a.name && a.name.endsWith('.exe'))) {
+      try {
+        const releases = await fetchJson(`https://api.github.com/repos/${REPO}/releases?per_page=15`);
+        if (Array.isArray(releases)) {
+          const desktop = releases.find((r) => !r.draft && /^v\d/.test(r.tag_name) && r.assets?.some((a) => a.name && a.name.endsWith('.exe')));
+          if (desktop) release = desktop;
+        }
+      } catch {}
+    }
     const tagName = release.tag_name || '';
     const latestVersion = tagName.replace(/^v/, '');
     const hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
