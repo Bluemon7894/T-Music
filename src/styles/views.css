@@ -110,6 +110,8 @@
 .tr-name { font-size: 30px; font-weight: 900; margin: 20px 0 8px; letter-spacing: -0.04em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .tr-sub { display: flex; align-items: center; gap: 10px; color: var(--sub); }
 .tag { background: rgba(10, 7, 18, 0.55); color: var(--v-100); font-weight: 800; font-size: 12px; padding: 4px 11px; border-radius: 10px; }
+/* The title and artist keep clear of the play button's corner. */
+.top-result .tr-name, .top-result .tr-sub { padding-right: 70px; }
 .tr-play { position: absolute; right: 22px; bottom: 22px; opacity: 0; transform: translateY(10px); transition: opacity 0.25s, transform 0.35s var(--spring); }
 .top-result:hover .tr-play { opacity: 1; transform: none; }
 .history .chips { margin-top: 4px; }

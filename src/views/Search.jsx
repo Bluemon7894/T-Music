@@ -8,7 +8,7 @@ import { useUI } from '../store/ui.js';
 import { useAsync, Thumb, PlayButton, ArtistLinks, SkeletonRows, SkeletonCards, ErrorMsg, Empty } from '../components/common.jsx';
 import TrackList from '../components/TrackList.jsx';
 import { Shelf, Grid, openItem, playItem } from '../components/Cards.jsx';
-import { useEnter, useTilt } from '../lib/motion.js';
+import { useEnter } from '../lib/motion.js';
 import { tr } from '../lib/i18n.js';
 
 const BROWSE_CATEGORIES = [
@@ -171,7 +171,7 @@ export const remember = (q) => useLibrary.getState().rememberSearch(q);
 function TopResult({ item }) {
   const go = useNav((s) => s.go);
   const ref = useRef(null);
-  useTilt(ref, { max: 6, scale: 1.01 });
+  // No tilt here: the card leaned as the pointer went for its play button, and the button moved away.
   const label = { artist: tr('아티스트'), album: item.type || tr('앨범'), track: tr('노래'), playlist: tr('플레이리스트') }[item.kind];
   return (
     <div className="top-result" ref={ref} onClick={() => openItem(item, go)}>

@@ -278,6 +278,7 @@ button, a, .card, .tl-row, .q-row { touch-action: manipulation; }
 .tr-sub { grid-column: 2; align-self: start; margin-top: 4px; min-width: 0; font-size: 12px; }
 .tag { flex: none; font-size: 11px; padding: 2px 8px; }
 .tr-sub .artist-links { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-result .tr-name, .top-result .tr-sub { padding-right: 0; }
 .tr-play { position: static; opacity: 1; transform: none; grid-column: 3; grid-row: 1 / 3; width: 44px !important; height: 44px !important; }
 .browse-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 8px; perspective: none; }
 .browse-tile { padding: 12px; font-size: 17px; border-radius: 16px; }
