@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 final class StreamHandler {
     private static final Pattern RANGE = Pattern.compile("bytes=(\\d*)-(\\d*)");
     private static final Pattern CONTENT_RANGE = Pattern.compile("bytes (\\d+)-(\\d+)/");
+    private static final Pattern EXPIRE = Pattern.compile("[?&]expire=(\\d+)");
     private static final int ATTEMPTS = 3;
     // Times one response may pick itself up again after its connection drops (see ResumingStream).
     private static final int RESUMES = 4;
@@ -43,20 +44,74 @@ final class StreamHandler {
 
         // Pass the Range request straight upstream so the player can seek anywhere in the file.
         String upstream = range == null ? "bytes=0-" : range;
+
+        // The player asks again for a track it's already playing whenever it wants more of it, often with the
+        // screen off. The address it had is good for hours, so that needs nothing from the page, which a
+        // sleeping phone may have frozen.
+        Known known = knownAddresses.get(id);
+        if (known != null && known.expires > System.currentTimeMillis()) {
+            try {
+                WebResourceResponse response = open(id, known.address, upstream);
+                if (response != null) return response;
+            } catch (IOException e) {
+                // asked of the page below
+            }
+            knownAddresses.remove(id);
+            report(id, "known address refused");
+        }
+
         for (int attempt = 0; attempt < ATTEMPTS; attempt++) {
             host.wakeBriefly();
             JSONObject resolved = host.bridge.resolveStream(id);
-            if (resolved == null || resolved.optString("url").isEmpty()) return failure(502, "Bad Gateway");
+            if (resolved == null || resolved.optString("url").isEmpty()) {
+                report(id, resolved == null ? "page did not answer" : "no address");
+                return failure(502, "Bad Gateway");
+            }
             try {
                 WebResourceResponse response = open(id, resolved, upstream);
-                if (response != null) return response;
+                if (response != null) {
+                    remember(id, resolved.optString("url"));
+                    return response;
+                }
             } catch (IOException e) {
                 // a network error is treated like a rejected URL
             }
             // A cached URL may simply have expired: drop it and resolve a fresh one.
             host.bridge.invalidateStream(id, resolved.optString("method"), resolved.optBoolean("fresh"));
         }
+        report(id, "every address refused");
         return failure(502, "Bad Gateway");
+    }
+
+    private static final class Known {
+        final JSONObject address;
+        final long expires;
+
+        Known(JSONObject address, long expires) {
+            this.address = address;
+            this.expires = expires;
+        }
+    }
+
+    private static final int KNOWN_LIMIT = 30;
+    private final Map<String, Known> knownAddresses = new java.util.concurrent.ConcurrentHashMap<>();
+
+    // Until ten minutes before the address says it stops working, or an hour if it doesn't say.
+    private void remember(String id, String url) {
+        long expires = System.currentTimeMillis() + 60 * 60 * 1000L;
+        Matcher m = EXPIRE.matcher(url);
+        if (m.find()) expires = Long.parseLong(m.group(1)) * 1000L - 10 * 60 * 1000L;
+        if (knownAddresses.size() > KNOWN_LIMIT) knownAddresses.clear();
+        try {
+            knownAddresses.put(id, new Known(new JSONObject().put("url", url), expires));
+        } catch (org.json.JSONException ignored) {
+            // a plain string always fits
+        }
+    }
+
+    // Why a stream failed goes to the page's trouble notes, which reach the developer.
+    private void report(String id, String why) {
+        host.bridge.emit("streamTrouble", "id", id, "why", why);
     }
 
     private static HttpURLConnection connect(String url, String range) throws IOException {
@@ -261,6 +316,7 @@ final class StreamHandler {
                     failure = e;
                 }
                 if (closed || !resume()) {
+                    if (!closed) report(id, failure != null ? "reopen failed after " + failure.getClass().getSimpleName() : "reopen failed after early end");
                     if (failure != null) throw failure;
                     throw new IOException("stream ended early");
                 }

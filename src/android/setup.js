@@ -42,6 +42,7 @@ window.__tm.resolveStream = async (id, request) => {
   }
 };
 window.__tm.invalidateStream = (id, method, fresh) => stream.invalidate(id, method, fresh);
+onNative('streamTrouble', ({ id, why }) => noteTrouble('stream', { id, why }));
 // Radio streams come through the phone too: the page may only load media from itself.
 window.__tmRadioProxy = radioProxyUrl;
 
