@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { api, streamUrl } from '../lib/api.js';
-import { attach, healSound, setMusicFade, sleepAudioSoon, startAudioOnsetDetection, wakeAudio } from '../lib/audio.js';
+import { reopenOutput, attach, healSound, setMusicFade, sleepAudioSoon, startAudioOnsetDetection, wakeAudio } from '../lib/audio.js';
 import { pressDeckKey, cancelSound, commitEnd, endLead, hasStarted, isEndCommitted, isEnding, isStarting, isWaitingForMusic, playEndSound, playStartSound, setDeckLevel, setStarted, startLength, useDeck } from './deck.js';
 import { useLibrary } from './library.js';
 import { usePrefs } from './prefs.js';
@@ -40,6 +40,13 @@ function checkResume(a, from) {
     if (a !== active() || !usePlayer.getState().playing || isWaitingForMusic() || navigator.onLine === false) return;
     if (a.currentTime > from + 0.3) return;
     noteTrouble('resume stuck', { id: a.dataset.id, time: a.currentTime, net: a.networkState, ready: a.readyState });
+    // Loaded and still not moving: the output, not the track (see reopenOutput). Look again after that.
+    if (a.readyState >= a.HAVE_FUTURE_DATA && !a.dataset.outputTried) {
+      a.dataset.outputTried = '1';
+      reopenOutput().then(() => checkResume(a, from));
+      return;
+    }
+    delete a.dataset.outputTried;
     recover(from);
   }, RESUME_CHECK_MS);
 }
@@ -1054,13 +1061,21 @@ function watchPlayback() {
   }
   if (a.paused) a.play().catch(() => {});
   if (a.currentTime !== watched.time) {
-    if (watched.time >= 0) watched.reloads = 0;
+    if (watched.time >= 0) { watched.reloads = 0; watched.outputTried = false; }
     watched.time = a.currentTime;
     watched.still = 0;
     return;
   }
   if (++watched.still < STUCK_CHECKS) return;
   watched.still = 0;
+  // Everything needed is loaded and it still doesn't move: the sound output stopped, not the stream.
+  // That's tried first, since loading the track again leaves it just as stuck.
+  if (a.readyState >= a.HAVE_FUTURE_DATA && !a.seeking && !watched.outputTried) {
+    watched.outputTried = true;
+    noteTrouble('output stuck', { id: a.dataset.id, time: a.currentTime });
+    reopenOutput();
+    return;
+  }
   if (++watched.reloads > MAX_RELOADS) {
     watched.reloads = 0;
     giveUp('stuck');
@@ -1232,7 +1247,11 @@ audios.forEach((a, i) => {
     goodSince = 0;
     noteTrouble('error', { id, code: a.error?.code, message: a.error?.message, time: a.currentTime, net: a.networkState, offline: navigator.onLine === false });
     if (gaveUp) return; // one of the quiet retries; there will be another
-    if (lastReload.id === id && performance.now() - lastReload.at < RELOAD_SETTLE_MS) return;
+    // Right after a reload the old connection can still report its failure, once. A source that can't be
+    // opened at all is the new one answering, though: a video YouTube won't play fails in under a second,
+    // and ignoring that left the player sitting on it until it gave up, instead of moving to the next.
+    const couldNotOpen = a.error?.code === a.error?.MEDIA_ERR_SRC_NOT_SUPPORTED;
+    if (!couldNotOpen && lastReload.id === id && performance.now() - lastReload.at < RELOAD_SETTLE_MS) return;
     if (navigator.onLine === false) {
       giveUp('offline');
       return;

@@ -248,6 +248,40 @@ export function getAudioSinkId() {
   return currentSinkId;
 }
 
+// The sound device went away under the music (earphones out, Bluetooth dropped, another device made the
+// default) and took the output with it: the track then sits still with all its data loaded, and loading
+// it again doesn't help. Opening the output again does: on the chosen device if it's still there, or the
+// default one. Where a page can't choose its device (phones), pausing the output and starting it again
+// opens it anew too.
+let reopening = null;
+export function reopenOutput() {
+  if (!ctx) return Promise.resolve(false);
+  reopening ??= (async () => {
+    try {
+      if (typeof ctx.setSinkId === 'function') {
+        await ctx.setSinkId({ type: 'none' });
+        try { await ctx.setSinkId(currentSinkId || ''); } catch { await ctx.setSinkId(''); }
+      } else {
+        await ctx.suspend();
+      }
+    } catch { /* the plain resume below is all that's left */ }
+    await ctx.resume().catch(() => {});
+    return true;
+  })().finally(() => { reopening = null; });
+  return reopening;
+}
+
+// The chosen output device unplugged: carry on through the default one rather than into nothing.
+if (typeof navigator !== 'undefined' && navigator.mediaDevices?.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', async () => {
+    if (!ctx || !currentSinkId || typeof ctx.setSinkId !== 'function') return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      if (!devices.some((d) => d.kind === 'audiooutput' && d.deviceId === currentSinkId)) await ctx.setSinkId('');
+    } catch { /* checked again on the next change */ }
+  });
+}
+
 // Automatic audio onset and silence detector for zero-configuration lyrics sync
 let onsetTrackId = null;
 let currentOnsetSec = 0;
