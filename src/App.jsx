@@ -261,7 +261,7 @@ function MainApp() {
 
   // Sync Discord Rich Presence (seeking moves the timer shown on the profile too)
   useEffect(() => {
-    if (!currentTrack) {
+    if (!currentTrack || !playing) {
       api.clearDiscordActivity().catch(() => {});
       return undefined;
     }

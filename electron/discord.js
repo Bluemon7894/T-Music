@@ -1,4 +1,5 @@
 import { Client } from '@xhayper/discord-rpc';
+import { isLocalId } from './localId.js';
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
@@ -180,7 +181,7 @@ function applyActivity(data) {
   }
 
   // Clickable button
-  if (id && /^[\w-]{11}$/.test(id)) {
+  if (id && /^[\w-]{11}$/.test(id) && !isLocalId(id)) {
     activity.buttons = [
       { label: say('YouTube에서 듣기', 'Listen on YouTube'), url: `https://www.youtube.com/watch?v=${id}` },
     ];
@@ -200,6 +201,11 @@ function applyActivity(data) {
 }
 
 export function setActivity(data) {
+  // Paused is not listening: friends on Discord shouldn't see a song that isn't playing.
+  if (!data?.playing) {
+    clearActivity();
+    return;
+  }
   currentActivity = data;
   if (!enabled) return;
   if (!client || !client.user) {
