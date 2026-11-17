@@ -141,6 +141,13 @@ function forRoom(tracks) {
   return shared;
 }
 
+// The most recently played song that isn't already in the queue.
+function earlierFromHistory(queue) {
+  const inQueue = new Set(queue.map((t) => t.id));
+  const found = useLibrary.getState().recent.find((t) => t?.id && !inQueue.has(t.id));
+  return found ? { ...found, isAutoplay: false } : null;
+}
+
 let extendingPromise = null;
 const PRELOAD_BEFORE_END_S = 45;
 const lazyPreload = () => IS_ANDROID || usePrefs.getState().calmMotion;
@@ -543,6 +550,15 @@ export const usePlayer = create((set, get) => ({
     pressDeckKey('prev');
     commitListen();
     const a = active();
+    // Nothing earlier in the queue, as after playing a single song: go back through what was listened to
+    // before it. Each press goes one further, since a song already put back in the queue isn't picked again.
+    const earlier = !room && a.currentTime <= 3 && get().index === 0 ? earlierFromHistory(get().queue) : null;
+    if (earlier) {
+      const { queue, unshuffled } = get();
+      set({ queue: [earlier, ...queue], index: 0, ...(unshuffled ? { unshuffled: [earlier, ...unshuffled] } : {}) });
+      get()._load();
+      return;
+    }
     if (a.currentTime > 3 || get().index <= 0) {
       if (room) room.seek(0);
       else get().seek(0);
