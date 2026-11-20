@@ -58,7 +58,7 @@ function rank(tracks) {
 
 async function webSongs(query, limit = 20) {
   const d = await call('/search', { client: 'WEB', query, params: VIDEOS_ONLY });
-  const vids = P.findAll(d, 'videoRenderer').map((v) => P.parseVideo(v, query)).filter(Boolean);
+  const vids = P.searchVideos(d, query);
   return rank(vids.filter((t) => t.score >= -3)).slice(0, limit);
 }
 
@@ -66,9 +66,8 @@ async function webSongs(query, limit = 20) {
 // so adding it to the query surfaces official studio audio instead of MVs/covers.
 async function officialAudio(query, limit = 20) {
   const d = await call('/search', { client: 'WEB', query: `${query} "Provided to YouTube"`, params: VIDEOS_ONLY });
-  const tracks = P.findAll(d, 'videoRenderer')
-    .map((v) => P.parseVideo(v, query))
-    .filter((t) => t && (t.topic || t.score >= 1))
+  const tracks = P.searchVideos(d, query)
+    .filter((t) => t.topic || t.score >= 1)
     // "Release - Topic" mirrors whole albums with barely any listeners and no artist name.
     .filter((t) => !(t.topic && t.artists[0]?.name === 'Release'))
     // Noisy titles (karaoke, instrumentals) and near-zero view uploads score under 3.

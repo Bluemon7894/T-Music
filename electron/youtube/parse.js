@@ -184,6 +184,8 @@ export function parseViews(str) {
   if (m억) return Math.round(parseFloat(m억[1]) * 100000000);
   const m만 = s.match(/([\d.]+)\s*만/);
   if (m만) return Math.round(parseFloat(m만[1]) * 10000);
+  const m천 = s.match(/([\d.]+)\s*천/);
+  if (m천) return Math.round(parseFloat(m천[1]) * 1000);
   const mB = s.match(/([\d.]+)\s*B(?:illion)?/i);
   if (mB) return Math.round(parseFloat(mB[1]) * 1000000000);
   const mM = s.match(/([\d.]+)\s*M(?:illion)?/i);
@@ -287,37 +289,58 @@ export function parseVideo(v, query = '') {
   return t;
 }
 
-// lockupViewModel (new-style related videos)
+// lockupViewModel: the newer layout for a video, in related lists and, for some sessions, in search
+// results. It carries what videoRenderer does, so a track reads the same from either.
 export function parseLockup(l, query = '') {
   if (l?.contentType !== 'LOCKUP_CONTENT_TYPE_VIDEO') return null;
   const md = l.metadata?.lockupMetadataViewModel;
   const rawTitle = text(md?.title);
   const rows = md?.metadata?.contentMetadataViewModel?.metadataRows || [];
-  const ownerName = text(rows[0]?.metadataParts?.[0]?.text);
+  // In search results the channel's name and badge sit inside its avatar stack.
+  const firstPart = rows[0]?.metadataParts?.[0];
+  const ownerPart = firstPart?.avatarStack?.avatarStackViewModel || firstPart;
+  const ownerName = text(ownerPart?.text);
   const ownerId = find(rows[0], 'browseId') || null;
   const durStr = JSON.stringify(l.contentImage || {}).match(/"(?:text|content)":"(\d+:\d{2}(?::\d{2})?)"/)?.[1];
   const duration = seconds(durStr);
   if (!rawTitle || !duration) return null;
   const topic = / - Topic$/.test(ownerName);
   const artistName = ownerName.replace(/ - Topic$/, '');
-  const viewsText = text(rows[1]?.metadataParts?.[0]?.text) || '';
-  const views = parseViews(viewsText);
+  // The channel's badge: the music note of an official artist channel, or the plain check mark.
+  const icon = firstPart?.icon || ownerPart?.icon;
+  const badge = `${icon?.name || ''} ${JSON.stringify(icon?.ytIcon || '')}`;
+  const verifiedArtist = /AUDIO_BADGE/.test(badge);
+  const verified = verifiedArtist || /VERIFIED/.test(badge);
+  // The view count is labelled in search results; related lists put it first on the second row.
+  const labelled = rows.flatMap((r) => r.metadataParts || []).find((p) => /조회수|\bviews?\b/i.test(p.accessibilityLabel || ''));
+  const views = parseViews(labelled ? labelled.accessibilityLabel : text(rows[1]?.metadataParts?.[0]?.text));
   const t = {
     kind: 'track',
     id: l.contentId,
     title: cleanTitle(rawTitle, artistName),
     rawTitle,
-    artists: [{ id: topic ? ownerId : null, name: artistName }],
+    artists: [{ id: topic || verified ? ownerId : null, name: artistName }],
     album: null,
     duration,
     thumb: videoThumb(l.contentId),
     topic,
-    officialArtist: false,
-    verified: false,
+    officialArtist: verifiedArtist,
+    verified,
     views,
   };
   t.score = musicScore(t, query);
   return t;
+}
+
+// The videos of a YouTube search, in either layout. YouTube gives some sessions lockupViewModel
+// instead of videoRenderer, and keeps giving it to them, so reading only one left those people with
+// no songs at all. Ads come as lockups too, so only those listed among the results count.
+export function searchVideos(d, query = '') {
+  const lockups = findAll(d, 'itemSectionRenderer').flatMap((s) => (s.contents || []).map((c) => c.lockupViewModel).filter(Boolean));
+  return [
+    ...findAll(d, 'videoRenderer').map((v) => parseVideo(v, query)),
+    ...lockups.map((l) => parseLockup(l, query)),
+  ].filter(Boolean);
 }
 
 // playlistVideoRenderer (regular YouTube playlist pages)
