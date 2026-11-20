@@ -187,14 +187,39 @@ function TopResult({ item }) {
   );
 }
 
+// The last few searches, so going back to one shows it at once: same results, same tab, same place.
+const kept = new Map(); // q -> { data, tab, scroll }
+const KEEP = 8;
+const keep = (q, patch) => {
+  const next = { ...kept.get(q), ...patch };
+  kept.delete(q);
+  kept.set(q, next);
+  if (kept.size > KEEP) kept.delete(kept.keys().next().value);
+};
+const scrollerOf = (el) => el?.closest('.main');
+
 function Results({ q }) {
-  const [tab, setTab] = useState('all');
-  const res = useAsync(() => api.search(q).then((r) => { remember(q); return r; }), [q]);
+  const before = kept.get(q);
+  const [tab, setTabState] = useState(before?.tab || 'all');
+  const setTab = (t) => { setTabState(t); keep(q, { tab: t }); };
+  const res = useAsync(() => api.search(q).then((r) => { remember(q); keep(q, { data: r }); return r; }), [q]);
+  const data = res.data || before?.data;
   const ref = useRef(null);
-  useEnter(ref, [res.data ? 1 : 0, tab]);
-  if (res.loading) return <div className="search-loading"><SkeletonRows count={5} /><SkeletonCards /></div>;
-  if (res.error) return <ErrorMsg error={res.error} onRetry={res.retry} />;
-  const { top, songs, artists, albums, playlists } = res.data;
+  useEnter(ref, [data ? 1 : 0, tab]);
+  // Where the page was left. The app scrolls to the top on every page change, so this comes after it.
+  useEffect(() => {
+    const scroller = scrollerOf(ref.current);
+    if (!scroller) return undefined;
+    const top = before?.scroll || 0;
+    const frame = requestAnimationFrame(() => { if (top) scroller.scrollTop = top; });
+    const save = () => keep(q, { scroll: scroller.scrollTop });
+    scroller.addEventListener('scroll', save, { passive: true });
+    return () => { cancelAnimationFrame(frame); scroller.removeEventListener('scroll', save); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, Boolean(data)]);
+  if (!data && res.loading) return <div className="search-loading"><SkeletonRows count={5} /><SkeletonCards /></div>;
+  if (!data && res.error) return <ErrorMsg error={res.error} onRetry={res.retry} />;
+  const { top, songs, artists, albums, playlists } = data;
   const ctx = { name: tr('\'{0}\' 검색 결과', q) };
   const counts = { songs: songs.length, artists: artists.length, albums: albums.length, playlists: playlists.length };
 

@@ -19,6 +19,16 @@ export const useNav = create((set, get) => ({
   },
   back() { set((s) => ({ index: Math.max(0, s.index - 1) })); },
   forward() { set((s) => ({ index: Math.min(s.stack.length - 1, s.index + 1) })); },
+  // The sidebar and the phone's tab bar. Search opens on what was searched last, until it's cleared.
+  openTab(name) {
+    get().go(name, name === 'search' && lastSearch ? { q: lastSearch } : {});
+  },
 }));
+
+let lastSearch = '';
+useNav.subscribe((s) => {
+  const route = s.stack[s.index];
+  if (route.name === 'search') lastSearch = route.params.q || '';
+});
 
 export const useRoute = () => useNav((s) => s.stack[s.index]);

@@ -100,7 +100,6 @@ function RadioMiniBar() {
 
 function TabBar() {
   const route = useRoute();
-  const go = useNav((s) => s.go);
   const requests = useFriends((s) => s.requests.length);
   const listeners = useRoom((s) => Object.values(s.members).filter((m) => m.listening).length);
   const badges = { friends: requests, room: listeners };
@@ -108,7 +107,7 @@ function TabBar() {
   return (
     <nav className="m-tabs">
       {TABS.map((t) => (
-        <button key={t.id} className={`m-tab ${t.id === active ? 'on' : ''}`} onClick={() => go(t.id, {})}>
+        <button key={t.id} className={`m-tab ${t.id === active ? 'on' : ''}`} onClick={() => useNav.getState().openTab(t.id)}>
           <span className="m-tab-icon">
             <t.icon size={21} />
             {badges[t.id] > 0 && <b className="m-tab-badge">{badges[t.id]}</b>}

@@ -39,7 +39,6 @@ function NavItem({ n, on, badge, onClick }) {
 
 function NavList() {
   const route = useRoute();
-  const go = useNav((s) => s.go);
   const jobs = useDownloads((s) => s.jobs.filter((j) => j.status !== 'error').length);
   const friendRequests = useFriends((s) => s.requests.length);
   const listeners = useRoom((s) => Object.values(s.members).filter((m) => m.listening).length);
@@ -63,7 +62,7 @@ function NavList() {
     <nav className="nav" ref={list}>
       <span className="nav-pill" ref={pill} />
       {NAV.map((n, i) => (
-        <NavItem key={n.id} n={n} on={i === active} onClick={() => go(n.id, {})} badge={{ downloads: jobs, room: listeners, friends: friendRequests }[n.id] || 0} />
+        <NavItem key={n.id} n={n} on={i === active} onClick={() => useNav.getState().openTab(n.id)} badge={{ downloads: jobs, room: listeners, friends: friendRequests }[n.id] || 0} />
       ))}
     </nav>
   );
