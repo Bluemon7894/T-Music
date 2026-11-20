@@ -33,7 +33,7 @@ import { tr } from '../lib/i18n.js';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 6;
 const MAX_MEMBERS = 20;
-const START_LEAD_MS = 1500; // everyone gets this long to buffer before a new track starts
+const START_LEAD_MS = 3000; // everyone gets this long to buffer before a new track starts
 const AT_THE_TOP_S = 0.5;
 const SOUND_LEAD_MS = 5500; // and long enough for the deck's start sound to finish first
 const MARK_ENDING_S = 6; // ahead of the end of the last track, members are told nothing follows it
@@ -549,7 +549,9 @@ export const useRoom = create((set, get) => {
           const diff = orderOf(x) - orderOf(y);
           return Number.isNaN(diff) || diff === 0 ? (a < b ? -1 : 1) : diff;
         });
-        set({ queue: sorted.map(([key, item]) => ({ key, ...item, track: safeTrack(item.track) })).filter((item) => item.track) });
+        const queue = sorted.map(([key, item]) => ({ key, ...item, track: safeTrack(item.track) })).filter((item) => item.track);
+        set({ queue });
+        if (queue[0] && get().attached) api.prefetch(queue[0].track.id);
       }),
     ];
   };
