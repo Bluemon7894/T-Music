@@ -343,6 +343,13 @@ export function searchVideos(d, query = '') {
   ].filter(Boolean);
 }
 
+// How many entries a search's results hold, and how many are videos this file can read. Twenty
+// entries with none readable means YouTube used a layout that's new to us.
+export function searchEntries(d) {
+  const contents = findAll(d, 'itemSectionRenderer').flatMap((s) => s.contents || []);
+  return { all: contents.length, readable: contents.filter((c) => c.videoRenderer || c.lockupViewModel).length };
+}
+
 // playlistVideoRenderer (regular YouTube playlist pages)
 export function parsePlaylistVideo(v) {
   if (!v?.videoId || v.isPlayable === false) return null;

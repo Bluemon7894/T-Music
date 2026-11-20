@@ -1,7 +1,7 @@
 // Catalog: search, album/artist/playlist pages, related tracks, home feed.
 // Logged-out YT Music in Korea omits songs, home and radio, so those parts are
 // filled from regular YouTube.
-import { call, setMarket } from './client.js';
+import { call, resetClient, setMarket } from './client.js';
 import * as P from './parse.js';
 import { relevance, trackRelevance, albumRelevance, playlistRelevance, artistRelevance, keepRelevant } from './relevance.js';
 
@@ -56,17 +56,40 @@ function rank(tracks) {
     .map((x) => x.t);
 }
 
+// YouTube gives each session its own layout and keeps it. When a search comes back full of
+// entries and none can be read, this session got a layout that's new to us: the search is asked
+// again on a fresh session, which most likely gets one we know. At most once a minute, so a
+// change that reaches everyone can't make every search take two trips.
+const FRESH_SESSION_GAP_MS = MIN;
+// One search sends two of these at once; the one that finishes second uses the new session too.
+const JUST_RENEWED_MS = 10 * 1000;
+const UNREADABLE_AT = 3;
+let freshSessionAt = 0;
+
+// `asked` is what goes to YouTube; results are scored against what the person typed.
+async function videoSearch(asked, query = asked) {
+  const d = await call('/search', { client: 'WEB', query: asked, params: VIDEOS_ONLY });
+  const { all, readable } = P.searchEntries(d);
+  const since = Date.now() - freshSessionAt;
+  const justRenewed = since < JUST_RENEWED_MS;
+  if (readable || all < UNREADABLE_AT || (!justRenewed && since < FRESH_SESSION_GAP_MS)) return P.searchVideos(d, query);
+  if (!justRenewed) {
+    freshSessionAt = Date.now();
+    console.warn("[search] nothing readable in this session's results, trying a fresh session");
+    resetClient();
+  }
+  return P.searchVideos(await call('/search', { client: 'WEB', query: asked, params: VIDEOS_ONLY }), query);
+}
+
 async function webSongs(query, limit = 20) {
-  const d = await call('/search', { client: 'WEB', query, params: VIDEOS_ONLY });
-  const vids = P.searchVideos(d, query);
+  const vids = await videoSearch(query);
   return rank(vids.filter((t) => t.score >= -3)).slice(0, limit);
 }
 
 // Auto-generated "Artist - Topic" uploads carry this line in their description,
 // so adding it to the query surfaces official studio audio instead of MVs/covers.
 async function officialAudio(query, limit = 20) {
-  const d = await call('/search', { client: 'WEB', query: `${query} "Provided to YouTube"`, params: VIDEOS_ONLY });
-  const tracks = P.searchVideos(d, query)
+  const tracks = (await videoSearch(`${query} "Provided to YouTube"`, query))
     .filter((t) => t.topic || t.score >= 1)
     // "Release - Topic" mirrors whole albums with barely any listeners and no artist name.
     .filter((t) => !(t.topic && t.artists[0]?.name === 'Release'))
