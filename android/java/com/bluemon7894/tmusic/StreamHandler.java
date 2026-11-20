@@ -356,17 +356,19 @@ final class StreamHandler {
 
         private boolean resume() {
             disconnect();
-            // Brief mobile handoffs (Wi-Fi <-> LTE, cell switching) fail once immediately; retry the same URL with short backoff first.
+            // Brief mobile handoffs (Wi-Fi <-> LTE, cell switching) fail once immediately; retry the same URL with backoff.
             if (url != null && !url.isEmpty()) {
-                for (long waitMs : new long[] { 0, 350, 900 }) {
+                for (long waitMs : new long[] { 0, 350, 900, 1800 }) {
                     if (closed) return false;
                     if (waitMs > 0 && !pauseBeforeRetry(waitMs)) return false;
                     if (reopen(url)) return true;
                 }
             }
-            // The address itself was rejected or expired: drop it from caches BEFORE asking the page so we get a fresh URL/client.
+            // Only resolve a new URL mid-stream when at byte 0; stitching bytes from a different URL/format
+            // after an MP4 header breaks FFmpegAudioDecoder. Let the player reload cleanly from the header instead.
             knownAddresses.remove(id);
             host.bridge.invalidateStream(id, method, true);
+            if (position > 0) return false;
             while (resumes < RESUMES && !closed) {
                 resumes++;
                 if (resumes > 1 && !pauseBeforeRetry(Math.min(1500, resumes * 300L))) return false;

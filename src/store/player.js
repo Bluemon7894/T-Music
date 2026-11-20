@@ -1007,10 +1007,11 @@ function reloadStream(from, { fresh = false } = {}) {
   const id = a.dataset.id;
   if (!id) return;
   lastReload = { id, at: performance.now() };
-  a.src = `${streamUrl(id)}?retry=${Date.now()}${fresh ? '&fresh=1' : ''}`;
   resumeAt = from > 0 ? from : null;
+  a.src = `${streamUrl(id)}?retry=${Date.now()}${fresh ? '&fresh=1' : ''}`;
   attach(a);
-  a.play().catch(() => {});
+  if (resumeAt != null) a.load();
+  else a.play().catch(() => {});
 }
 
 // A reload that hasn't answered yet knows nothing of where the track was, so that's kept apart from it.
@@ -1099,7 +1100,9 @@ function watchPlayback() {
   }
   console.warn('[player] stuck, reloading', a.dataset.id);
   noteTrouble('stuck', { id: a.dataset.id, time: a.currentTime, reloads: watched.reloads, seeking: a.seeking, net: a.networkState, ready: a.readyState });
-  reloadStream(whereItWas(a), { fresh: true });
+  const basePos = whereItWas(a);
+  const nextPos = a.seeking && a.networkState === a.NETWORK_IDLE && basePos > 0 ? basePos + 1 : basePos;
+  reloadStream(nextPos, { fresh: true });
 }
 
 function watchWhilePlaying(on) {
@@ -1234,6 +1237,7 @@ audios.forEach((a, i) => {
     if (!isActive() || resumeAt == null) return;
     a.currentTime = resumeAt;
     resumeAt = null;
+    if (a.paused && usePlayer.getState().playing) a.play().catch(() => {});
   });
   a.addEventListener('seeked', () => { if (isActive()) window.dispatchEvent(new CustomEvent('t-music:seeked')); });
   a.addEventListener('durationchange', () => {
