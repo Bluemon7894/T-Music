@@ -26,15 +26,20 @@ final class StreamHandler {
     private static final Pattern EXPIRE = Pattern.compile("[?&]expire=(\\d+)");
     private static final int ATTEMPTS = 3;
     // Times one response may pick itself up again after its connection drops (see ResumingStream).
-    private static final int RESUMES = 4;
+    private static final int RESUMES = 8;
 
     private final WebHost host;
+    private final Map<String, String> lastFreshRetry = new java.util.concurrent.ConcurrentHashMap<>();
 
     StreamHandler(WebHost host) {
         this.host = host;
     }
 
     WebResourceResponse serve(String id, Map<String, String> requestHeaders) {
+        return serve(id, requestHeaders, false, null);
+    }
+
+    WebResourceResponse serve(String id, Map<String, String> requestHeaders, boolean fresh, String retry) {
         if (!id.matches("[\\w-]{11}")) return failure(400, "Bad Request");
         String range = headerOf(requestHeaders, "Range");
 
@@ -45,18 +50,29 @@ final class StreamHandler {
         // Pass the Range request straight upstream so the player can seek anywhere in the file.
         String upstream = range == null ? "bytes=0-" : range;
 
+        // Only invalidate once per retry token so subsequent Range seeks during the same retry reuse the fresh URL.
+        if (fresh) {
+            String key = retry != null ? retry : "fresh";
+            String prev = lastFreshRetry.put(id, key);
+            if (!key.equals(prev)) {
+                Known dropped = knownAddresses.remove(id);
+                host.bridge.invalidateStream(id, dropped != null ? dropped.method : "", true);
+            }
+        }
+
         // The player asks again for a track it's already playing whenever it wants more of it, often with the
         // screen off. The address it had is good for hours, so that needs nothing from the page, which a
         // sleeping phone may have frozen.
         Known known = knownAddresses.get(id);
         if (known != null && known.expires > System.currentTimeMillis()) {
             try {
-                WebResourceResponse response = open(id, known.address, upstream);
+                WebResourceResponse response = open(id, known.address, known.method, upstream);
                 if (response != null) return response;
             } catch (IOException e) {
                 // asked of the page below
             }
             knownAddresses.remove(id);
+            host.bridge.invalidateStream(id, known.method, true);
             report(id, "known address refused");
         }
 
@@ -67,17 +83,18 @@ final class StreamHandler {
                 report(id, resolved == null ? "page did not answer" : "no address");
                 return failure(502, "Bad Gateway");
             }
+            String method = resolved.optString("method");
             try {
-                WebResourceResponse response = open(id, resolved, upstream);
+                WebResourceResponse response = open(id, resolved, method, upstream);
                 if (response != null) {
-                    remember(id, resolved.optString("url"));
+                    remember(id, resolved.optString("url"), method);
                     return response;
                 }
             } catch (IOException e) {
                 // a network error is treated like a rejected URL
             }
             // A cached URL may simply have expired: drop it and resolve a fresh one.
-            host.bridge.invalidateStream(id, resolved.optString("method"), resolved.optBoolean("fresh"));
+            host.bridge.invalidateStream(id, method, resolved.optBoolean("fresh"));
         }
         report(id, "every address refused");
         return failure(502, "Bad Gateway");
@@ -85,10 +102,12 @@ final class StreamHandler {
 
     private static final class Known {
         final JSONObject address;
+        final String method;
         final long expires;
 
-        Known(JSONObject address, long expires) {
+        Known(JSONObject address, String method, long expires) {
             this.address = address;
+            this.method = method;
             this.expires = expires;
         }
     }
@@ -97,13 +116,13 @@ final class StreamHandler {
     private final Map<String, Known> knownAddresses = new java.util.concurrent.ConcurrentHashMap<>();
 
     // Until ten minutes before the address says it stops working, or an hour if it doesn't say.
-    private void remember(String id, String url) {
+    private void remember(String id, String url, String method) {
         long expires = System.currentTimeMillis() + 60 * 60 * 1000L;
         Matcher m = EXPIRE.matcher(url);
         if (m.find()) expires = Long.parseLong(m.group(1)) * 1000L - 10 * 60 * 1000L;
         if (knownAddresses.size() > KNOWN_LIMIT) knownAddresses.clear();
         try {
-            knownAddresses.put(id, new Known(new JSONObject().put("url", url), expires));
+            knownAddresses.put(id, new Known(new JSONObject().put("url", url), method, expires));
         } catch (org.json.JSONException ignored) {
             // a plain string always fits
         }
@@ -116,14 +135,14 @@ final class StreamHandler {
 
     private static HttpURLConnection connect(String url, String range) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(30000);
+        c.setConnectTimeout(12000);
+        c.setReadTimeout(20000);
         c.setRequestProperty("Range", range);
         c.setRequestProperty("Accept-Encoding", "identity");
         return c;
     }
 
-    private WebResourceResponse open(String id, JSONObject resolved, String range) throws IOException {
+    private WebResourceResponse open(String id, JSONObject resolved, String method, String range) throws IOException {
         HttpURLConnection c = connect(resolved.optString("url"), range);
         int status = c.getResponseCode();
         if (status == 200 || status == 206) {
@@ -145,7 +164,7 @@ final class StreamHandler {
             } else if (status == 200 && c.getContentLengthLong() >= 0) {
                 end = c.getContentLengthLong();
             }
-            InputStream body = new ResumingStream(id, resolved.optString("url"), c, start, end);
+            InputStream body = new ResumingStream(id, resolved.optString("url"), method, c, start, end);
             return new WebResourceResponse(mime, null, status, status == 206 ? "Partial Content" : "OK", headers, body);
         }
         if (status == 416) {
@@ -276,6 +295,7 @@ final class StreamHandler {
     private final class ResumingStream extends InputStream {
         private final String id;
         private String url;
+        private String method;
         private HttpURLConnection connection;
         private InputStream in;
         private long position;
@@ -283,9 +303,10 @@ final class StreamHandler {
         private int resumes = 0;
         private volatile boolean closed = false;
 
-        ResumingStream(String id, String url, HttpURLConnection connection, long start, long end) throws IOException {
+        ResumingStream(String id, String url, String method, HttpURLConnection connection, long start, long end) throws IOException {
             this.id = id;
             this.url = url;
+            this.method = method == null ? "" : method;
             this.connection = connection;
             this.in = connection.getInputStream();
             this.position = start;
@@ -323,29 +344,44 @@ final class StreamHandler {
             }
         }
 
+        private boolean pauseBeforeRetry(long ms) {
+            try {
+                Thread.sleep(ms);
+                return !closed;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+
         private boolean resume() {
             disconnect();
-            // The address in hand is good for hours and needs nothing from the page, so it goes first.
-            if (url != null && !url.isEmpty() && reopen(url)) return true;
+            // Brief mobile handoffs (Wi-Fi <-> LTE, cell switching) fail once immediately; retry the same URL with short backoff first.
+            if (url != null && !url.isEmpty()) {
+                for (long waitMs : new long[] { 0, 350, 900 }) {
+                    if (closed) return false;
+                    if (waitMs > 0 && !pauseBeforeRetry(waitMs)) return false;
+                    if (reopen(url)) return true;
+                }
+            }
+            // The address itself was rejected or expired: drop it from caches BEFORE asking the page so we get a fresh URL/client.
+            knownAddresses.remove(id);
+            host.bridge.invalidateStream(id, method, true);
             while (resumes < RESUMES && !closed) {
                 resumes++;
+                if (resumes > 1 && !pauseBeforeRetry(Math.min(1500, resumes * 300L))) return false;
                 host.wakeBriefly();
                 JSONObject resolved = host.bridge.resolveStream(id);
                 if (resolved == null || resolved.optString("url").isEmpty()) continue;
-                try {
-                    String range = "bytes=" + position + "-" + (end >= 0 ? String.valueOf(end - 1) : "");
-                    HttpURLConnection c = connect(resolved.optString("url"), range);
-                    if (c.getResponseCode() == 206) {
-                        connection = c;
-                        in = c.getInputStream();
-                        url = resolved.optString("url");
-                        return true;
-                    }
-                    c.disconnect();
-                } catch (IOException e) {
-                    // tried again below with a fresh address
+                String nextUrl = resolved.optString("url");
+                String nextMethod = resolved.optString("method");
+                if (reopen(nextUrl)) {
+                    url = nextUrl;
+                    method = nextMethod;
+                    remember(id, nextUrl, nextMethod);
+                    return true;
                 }
-                host.bridge.invalidateStream(id, resolved.optString("method"), resolved.optBoolean("fresh"));
+                host.bridge.invalidateStream(id, nextMethod, resolved.optBoolean("fresh"));
             }
             return false;
         }
@@ -354,14 +390,15 @@ final class StreamHandler {
             try {
                 String range = "bytes=" + position + "-" + (end >= 0 ? String.valueOf(end - 1) : "");
                 HttpURLConnection c = connect(address, range);
-                if (c.getResponseCode() == 206) {
+                int status = c.getResponseCode();
+                if (status == 206 || (position == 0 && status == 200)) {
                     connection = c;
                     in = c.getInputStream();
                     return true;
                 }
                 c.disconnect();
             } catch (IOException e) {
-                // the address went stale: ask the page for a new one
+                // transient failure or stale address
             }
             return false;
         }

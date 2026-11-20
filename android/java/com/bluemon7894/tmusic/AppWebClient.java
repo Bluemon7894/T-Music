@@ -44,7 +44,11 @@ final class AppWebClient extends WebViewClient {
         Uri url = request.getUrl();
         if (!WebHost.ORIGIN_HOST.equals(url.getHost())) return null;
         String path = url.getPath() == null ? "/" : url.getPath();
-        if (path.startsWith("/stream/")) return streams.serve(path.substring("/stream/".length()), request.getRequestHeaders());
+        if (path.startsWith("/stream/")) {
+            boolean fresh = "1".equals(url.getQueryParameter("fresh"));
+            String retry = url.getQueryParameter("retry");
+            return streams.serve(path.substring("/stream/".length()), request.getRequestHeaders(), fresh, retry);
+        }
         if (path.startsWith("/__proxy/")) return host.bridge.proxy.serve(path.substring("/__proxy/".length()));
         if (path.startsWith("/art/")) {
             byte[] art = LocalMusic.art(host.app, path.substring("/art/".length()));

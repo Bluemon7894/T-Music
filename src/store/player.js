@@ -153,7 +153,7 @@ const PRELOAD_BEFORE_END_S = 45;
 const lazyPreload = () => IS_ANDROID || usePrefs.getState().calmMotion;
 const nearTrackEnd = (a) => isFinite(a.duration) && a.duration > 0 && a.duration - a.currentTime <= PRELOAD_BEFORE_END_S;
 const usedRadioSeeds = new Set();
-let retried = new Set();
+let retried = new Map();
 
 // Set while in a listen-together room. Playback commands then go through the room, and the room
 // starts, stops and moves playback for everyone through roomPlayer. See store/room.js.
@@ -1002,12 +1002,12 @@ let watched = { id: null, time: -1, still: 0, reloads: 0 };
 const RELOAD_SETTLE_MS = 3000;
 let lastReload = { id: null, at: 0 };
 
-function reloadStream(from) {
+function reloadStream(from, { fresh = false } = {}) {
   const a = active();
   const id = a.dataset.id;
   if (!id) return;
   lastReload = { id, at: performance.now() };
-  a.src = `${streamUrl(id)}?retry=${Date.now()}`;
+  a.src = `${streamUrl(id)}?retry=${Date.now()}${fresh ? '&fresh=1' : ''}`;
   resumeAt = from > 0 ? from : null;
   attach(a);
   a.play().catch(() => {});
@@ -1034,7 +1034,7 @@ function recover(from) {
   watched.reloads = 0;
   retried.delete(a.dataset.id);
   usePlayer.setState({ playing: true, loading: true });
-  reloadStream(from);
+  reloadStream(from, { fresh: true });
 }
 
 // Whatever is wrong is wrong for the next track too, so stay on this one and keep trying it quietly.
@@ -1099,7 +1099,7 @@ function watchPlayback() {
   }
   console.warn('[player] stuck, reloading', a.dataset.id);
   noteTrouble('stuck', { id: a.dataset.id, time: a.currentTime, reloads: watched.reloads, seeking: a.seeking, net: a.networkState, ready: a.readyState });
-  reloadStream(whereItWas(a));
+  reloadStream(whereItWas(a), { fresh: true });
 }
 
 function watchWhilePlaying(on) {
@@ -1272,10 +1272,14 @@ audios.forEach((a, i) => {
       giveUp('offline');
       return;
     }
-    if (!retried.has(id)) {
-      // One retry: the main process fetches a fresh URL if the first one died.
-      retried.add(id);
-      reloadStream(whereItWas(a));
+    const attempts = retried.get(id) || 0;
+    if (attempts < 2) {
+      // Force a fresh stream URL (and nudge past a broken audio frame on decode errors).
+      retried.set(id, attempts + 1);
+      const from = whereItWas(a);
+      const isDecodeError = a.error?.code === a.error?.MEDIA_ERR_DECODE;
+      const resumePoint = isDecodeError && from > 0 ? from + 0.6 : from;
+      reloadStream(resumePoint, { fresh: true });
       return;
     }
     consecutiveErrors++;

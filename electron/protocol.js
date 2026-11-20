@@ -69,15 +69,26 @@ function handleArt(req) {
   return new Response(Readable.toWeb(fs.createReadStream(file)), { headers: { ...CORS, 'content-type': file.endsWith('.png') ? 'image/png' : 'image/jpeg', 'cache-control': 'max-age=86400' } });
 }
 
+const lastFreshRetry = new Map();
+
 async function handleStream(req) {
-  if (new URL(req.url).host === 'radio') return handleRadio(req);
-  if (new URL(req.url).host === 'art') return handleArt(req);
-  const id = new URL(req.url).pathname.slice(1);
+  const parsedUrl = new URL(req.url);
+  if (parsedUrl.host === 'radio') return handleRadio(req);
+  if (parsedUrl.host === 'art') return handleArt(req);
+  const id = parsedUrl.pathname.slice(1);
   if (!/^[\w-]{11}$/.test(id)) return new Response('bad id', { status: 400 });
   const range = req.headers.get('range');
 
   const local = downloads.localFile(id) || localMusic.fileOf(id);
   if (local) return serveFile(local, range);
+
+  if (parsedUrl.searchParams.get('fresh') === '1') {
+    const retry = parsedUrl.searchParams.get('retry') || 'fresh';
+    if (lastFreshRetry.get(id) !== retry) {
+      lastFreshRetry.set(id, retry);
+      stream.invalidate(id);
+    }
+  }
 
   // Pass the browser's Range request directly to upstream (e.g. bytes=0- or bytes=X-)
   // so the audio element receives a continuous stream and can seek to any position
