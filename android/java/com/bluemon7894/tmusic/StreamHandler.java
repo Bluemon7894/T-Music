@@ -1,5 +1,6 @@
 package com.bluemon7894.tmusic;
 
+import android.util.Log;
 import android.webkit.WebResourceResponse;
 
 import org.json.JSONObject;
@@ -44,20 +45,28 @@ final class StreamHandler {
         String range = headerOf(requestHeaders, "Range");
 
         File local = Downloads.localFile(host.app, id);
-        if (local != null) return serveFile(local, range);
+        if (local != null) {
+            log(id + " from the downloaded file, " + range);
+            return serveFile(local, range);
+        }
         if (id.endsWith("Z")) return serveLocalMusic(id, range);
 
         // Pass the Range request straight upstream so the player can seek anywhere in the file.
         String upstream = range == null ? "bytes=0-" : range;
+        // The player asking again means it has let go of what it asked before. Those still waiting for the
+        // network hold one of the few threads the page reads with: enough of them and the new request never
+        // even starts. One that's flowing is left alone; it may be another player (repeat one preloads the
+        // same song), and one that isn't wanted any more is closed by the page anyway.
+        for (ResumingStream old : LIVE) if (old.id.equals(id) && old.waiting) old.abandon();
+        log(id + " asked " + upstream + (fresh ? " fresh" : ""));
 
-        // Only invalidate once per retry token so subsequent Range seeks during the same retry reuse the fresh URL.
+        // A reload asking for a fresh address still gets the one it has when that works: it was fine minutes
+        // ago, and getting another means asking the page, which a phone with its screen off has frozen. Only
+        // once per retry token, so the seeks of one reload don't each start over.
+        boolean wantFresh = false;
         if (fresh) {
             String key = retry != null ? retry : "fresh";
-            String prev = lastFreshRetry.put(id, key);
-            if (!key.equals(prev)) {
-                Known dropped = knownAddresses.remove(id);
-                host.bridge.invalidateStream(id, dropped != null ? dropped.method : "", true);
-            }
+            wantFresh = !key.equals(lastFreshRetry.put(id, key));
         }
 
         // The player asks again for a track it's already playing whenever it wants more of it, often with the
@@ -65,6 +74,11 @@ final class StreamHandler {
         // sleeping phone may have frozen.
         Known known = knownAddresses.get(id);
         if (known != null && known.expires > System.currentTimeMillis()) {
+            // Answered at once from what the address says about the file, the connection made when the bytes
+            // are read, as patiently as a dropped one (see ResumingStream). With the network away the player
+            // just waits, rather than taking a failed answer for a song that won't play and skipping it.
+            WebResourceResponse answer = answerFromKnown(id, known, upstream);
+            if (answer != null) return answer;
             try {
                 WebResourceResponse response = open(id, known.address, known.method, upstream);
                 if (response != null) return response;
@@ -74,6 +88,9 @@ final class StreamHandler {
             knownAddresses.remove(id);
             host.bridge.invalidateStream(id, known.method, true);
             report(id, "known address refused");
+        } else if (wantFresh) {
+            knownAddresses.remove(id);
+            host.bridge.invalidateStream(id, "", true);
         }
 
         for (int attempt = 0; attempt < ATTEMPTS; attempt++) {
@@ -130,10 +147,75 @@ final class StreamHandler {
 
     // Why a stream failed goes to the page's trouble notes, which reach the developer.
     private void report(String id, String why) {
+        log(id + " trouble: " + why);
         host.bridge.emit("streamTrouble", "id", id, "why", why);
     }
 
+    private static final Pattern URL_PARAM_CLEN = Pattern.compile("[?&]clen=(\\d+)");
+    private static final Pattern URL_PARAM_MIME = Pattern.compile("[?&]mime=([^&]+)");
+
+    // A googlevideo address carries the file's length and type, so the player's request can be answered
+    // without the network. Null when it doesn't, or for a range that isn't a plain "from here on".
+    static volatile boolean answerAtOnce = true; // test builds can turn it off to compare
+
+    private WebResourceResponse answerFromKnown(String id, Known known, String range) {
+        if (!answerAtOnce) return null;
+        String url = known.address.optString("url");
+        Matcher len = URL_PARAM_CLEN.matcher(url);
+        Matcher mime = URL_PARAM_MIME.matcher(url);
+        Matcher want = RANGE.matcher(range);
+        if (!len.find() || !mime.find() || !want.find() || want.group(1).isEmpty()) return null;
+        long size = Long.parseLong(len.group(1));
+        long start = Long.parseLong(want.group(1));
+        long last = want.group(2).isEmpty() ? size - 1 : Math.min(Long.parseLong(want.group(2)), size - 1);
+        if (start >= size || last < start) return null;
+        String type;
+        try {
+            type = java.net.URLDecoder.decode(mime.group(1), "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            return null;
+        }
+        Map<String, String> headers = baseHeaders();
+        headers.put("Content-Type", type);
+        headers.put("Content-Length", String.valueOf(last - start + 1));
+        headers.put("Content-Range", "bytes " + start + "-" + last + "/" + size);
+        log(id + " answered from the known address, " + start + "-" + last + "/" + size);
+        return new WebResourceResponse(type, null, 206, "Partial Content", headers, new ResumingStream(id, url, known.method, start, last + 1));
+    }
+
+    private static final int OPENED = 1;
+    private static final int UNREACHABLE = 0;
+    private static final int REFUSED = -1;
+
+    // Streams being read right now, so a test build can cut their connections and watch them recover.
+    private static final java.util.Set<ResumingStream> LIVE = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    static int dropConnectionsForTest() {
+        for (ResumingStream s : LIVE) if (s.connection != null) s.connection.disconnect();
+        return LIVE.size();
+    }
+
+    // Each step of a stream in the phone's own log: it's written even while the page is frozen.
+    private static void log(String message) {
+        Log.i("TMusicStream", message);
+    }
+
+    // The network can go away for a while under music playing with the screen off: a tunnel, a lift,
+    // Wi-Fi handing over to mobile data. A dropped connection keeps being opened again, further apart
+    // each time, and the music waits and carries on instead of stopping. Only an address YouTube refuses
+    // ends that early.
+    private static final long OUTAGE_PATIENCE_MS = 10 * 60 * 1000L;
+    private static final long[] BACKOFF_MS = { 0, 350, 900, 1800, 3000, 5000, 8000 };
+    private static final long BACKOFF_MAX_MS = 10000;
+    // Test builds only: every connection fails until then, as with no network.
+    private static volatile long outageUntil = 0;
+
+    static void outageForTest(int seconds) {
+        outageUntil = System.currentTimeMillis() + seconds * 1000L;
+    }
+
     private static HttpURLConnection connect(String url, String range) throws IOException {
+        if (System.currentTimeMillis() < outageUntil) throw new IOException("simulated outage");
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(12000);
         c.setReadTimeout(20000);
@@ -206,13 +288,7 @@ final class StreamHandler {
                 headers.put("Content-Range", "bytes */" + size);
                 return new WebResourceResponse(mime, null, 416, "Range Not Satisfiable", headers, new ByteArrayInputStream(new byte[0]));
             }
-            InputStream in = afd.createInputStream();
-            long skipped = 0;
-            while (skipped < start) {
-                long n = in.skip(start - skipped);
-                if (n <= 0) break;
-                skipped += n;
-            }
+            InputStream in = afd.createInputStream(); // from the start, as with downloads (see serveFile)
             if (size < 0) return new WebResourceResponse(mime, null, 200, "OK", headers, in);
             long length = end - start + 1;
             headers.put("Content-Length", String.valueOf(length));
@@ -251,13 +327,9 @@ final class StreamHandler {
         headers.put("Content-Length", String.valueOf(length));
         if (partial) headers.put("Content-Range", "bytes " + start + "-" + end + "/" + size);
         try {
+            // From the file's start: WebView skips to the range it asked for by itself. Skipped here as well,
+            // it saw too little left to skip and gave up on the answer, and a jump past what was loaded stalled.
             FileInputStream in = new FileInputStream(file);
-            long skipped = 0;
-            while (skipped < start) {
-                long n = in.skip(start - skipped);
-                if (n <= 0) break;
-                skipped += n;
-            }
             return new WebResourceResponse(mime, null, partial ? 206 : 200, partial ? "Partial Content" : "OK", headers, new LimitedStream(in, length));
         } catch (IOException e) {
             return failure(500, "Server Error");
@@ -302,6 +374,18 @@ final class StreamHandler {
         private final long end; // one past the last byte, or -1 when unknown
         private int resumes = 0;
         private volatile boolean closed = false;
+        private volatile boolean waiting = false; // reconnecting, for as long as the network is away
+        private final Object gate = new Object();
+
+        // Not connected yet: the first read opens it, with the patience of a dropped connection.
+        ResumingStream(String id, String url, String method, long start, long end) {
+            this.id = id;
+            this.url = url;
+            this.method = method == null ? "" : method;
+            this.position = start;
+            this.end = end;
+            LIVE.add(this);
+        }
 
         ResumingStream(String id, String url, String method, HttpURLConnection connection, long start, long end) throws IOException {
             this.id = id;
@@ -311,6 +395,7 @@ final class StreamHandler {
             this.in = connection.getInputStream();
             this.position = start;
             this.end = end;
+            LIVE.add(this);
         }
 
         @Override
@@ -320,12 +405,25 @@ final class StreamHandler {
             return n < 0 ? -1 : one[0] & 0xff;
         }
 
+        // WebView skips to the start of the range it asked for by itself, but this stream already starts
+        // there (the server was asked for that range). Skipping again would hand the player bytes from twice
+        // as far in, which it can't decode: a jump, or a reload that resumes mid-song, then stalls for good.
+        @Override
+        public long skip(long n) {
+            log(id + " skip " + n + " ignored, already at " + position);
+            return n;
+        }
+
         @Override
         public int read(byte[] buffer, int offset, int count) throws IOException {
             if (count == 0) return 0;
             while (true) {
                 if (end >= 0 && position >= end) return -1;
                 IOException failure = null;
+                if (in == null) {
+                    if (closed || !resume()) throw new IOException("could not connect");
+                    continue;
+                }
                 try {
                     int n = in.read(buffer, offset, count);
                     if (n > 0) {
@@ -336,6 +434,7 @@ final class StreamHandler {
                 } catch (IOException e) {
                     failure = e;
                 }
+                if (!closed) log(id + " dropped at " + position + "/" + end + ": " + (failure != null ? failure.getClass().getSimpleName() + " " + failure.getMessage() : "ended early"));
                 if (closed || !resume()) {
                     if (!closed) report(id, failure != null ? "reopen failed after " + failure.getClass().getSimpleName() : "reopen failed after early end");
                     if (failure != null) throw failure;
@@ -345,24 +444,56 @@ final class StreamHandler {
         }
 
         private boolean pauseBeforeRetry(long ms) {
-            try {
-                Thread.sleep(ms);
+            synchronized (gate) {
+                if (closed) return false;
+                try {
+                    gate.wait(ms);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
                 return !closed;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return false;
             }
         }
 
+        // No longer wanted: stop waiting and free the thread reading it.
+        void abandon() {
+            if (closed) return;
+            log(id + " let go from " + position);
+            closed = true;
+            LIVE.remove(this);
+            synchronized (gate) {
+                gate.notifyAll();
+            }
+            HttpURLConnection c = connection;
+            if (c != null) c.disconnect();
+        }
+
         private boolean resume() {
+            waiting = true;
+            try {
+                return reconnect();
+            } finally {
+                waiting = false;
+            }
+        }
+
+        private boolean reconnect() {
             disconnect();
-            // Brief mobile handoffs (Wi-Fi <-> LTE, cell switching) fail once immediately; retry the same URL with backoff.
+            // The same address, for as long as the network is away (see OUTAGE_PATIENCE_MS).
             if (url != null && !url.isEmpty()) {
-                for (long waitMs : new long[] { 0, 350, 900, 1800 }) {
-                    if (closed) return false;
+                long started = System.currentTimeMillis();
+                for (int attempt = 0; !closed; attempt++) {
+                    long waitMs = attempt < BACKOFF_MS.length ? BACKOFF_MS[attempt] : BACKOFF_MAX_MS;
                     if (waitMs > 0 && !pauseBeforeRetry(waitMs)) return false;
-                    if (reopen(url)) return true;
+                    int outcome = reopen(url);
+                    if (outcome == OPENED) {
+                        if (attempt > 0) log(id + " back after " + (System.currentTimeMillis() - started) / 1000 + "s, " + (attempt + 1) + " tries");
+                        return true;
+                    }
+                    if (outcome == REFUSED || System.currentTimeMillis() - started > OUTAGE_PATIENCE_MS) break;
                 }
+                if (closed) return false;
             }
             // Only resolve a new URL mid-stream when at byte 0; stitching bytes from a different URL/format
             // after an MP4 header breaks FFmpegAudioDecoder. Let the player reload cleanly from the header instead.
@@ -377,7 +508,7 @@ final class StreamHandler {
                 if (resolved == null || resolved.optString("url").isEmpty()) continue;
                 String nextUrl = resolved.optString("url");
                 String nextMethod = resolved.optString("method");
-                if (reopen(nextUrl)) {
+                if (reopen(nextUrl) == OPENED) {
                     url = nextUrl;
                     method = nextMethod;
                     remember(id, nextUrl, nextMethod);
@@ -388,35 +519,41 @@ final class StreamHandler {
             return false;
         }
 
-        private boolean reopen(String address) {
+        // OPENED, UNREACHABLE (no answer: the network) or REFUSED (YouTube answered no).
+        private int reopen(String address) {
             try {
                 String range = "bytes=" + position + "-" + (end >= 0 ? String.valueOf(end - 1) : "");
                 HttpURLConnection c = connect(address, range);
                 int status = c.getResponseCode();
+                log(id + " reopen from " + position + " -> " + status);
                 if (status == 206 || (position == 0 && status == 200)) {
                     connection = c;
                     in = c.getInputStream();
-                    return true;
+                    return OPENED;
                 }
                 c.disconnect();
+                return REFUSED;
             } catch (IOException e) {
-                // transient failure or stale address
+                log(id + " reopen from " + position + " failed: " + e.getClass().getSimpleName() + " " + e.getMessage());
+                return UNREACHABLE;
             }
-            return false;
         }
 
         private void disconnect() {
             try {
-                in.close();
+                if (in != null) in.close();
             } catch (IOException ignored) {
                 // already gone
             }
-            connection.disconnect();
+            if (connection != null) connection.disconnect();
+            in = null;
+            connection = null;
         }
 
         @Override
         public void close() {
             closed = true;
+            LIVE.remove(this);
             disconnect();
         }
     }

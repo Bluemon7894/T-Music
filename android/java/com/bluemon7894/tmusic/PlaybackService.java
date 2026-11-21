@@ -165,6 +165,9 @@ public final class PlaybackService extends Service {
     private void apply(JSONObject state) {
         boolean wasPlaying = playing;
         playing = state.optBoolean("playing");
+        // Stopped for want of a connection and trying again: held awake like playing, so the retry happens
+        // with the screen off and the music comes back by itself.
+        boolean holding = playing || state.optBoolean("retrying");
         title = state.optString("title");
         artist = state.optString("artist");
         album = state.optString("album");
@@ -174,7 +177,7 @@ public final class PlaybackService extends Service {
 
         main.removeCallbacks(stopAfterPause);
         main.removeCallbacks(releaseLocks);
-        if (playing) {
+        if (holding) {
             everPlayed = true;
             host.stayAwake(true);
             wakeLock.acquire();

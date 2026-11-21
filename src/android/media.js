@@ -33,6 +33,7 @@ function publish() {
   rememberPlayback(track ? { id: track.id, track: safeTrack(track), time: p.getPreciseTime(), playing: p.playing, at: Date.now() } : null);
   Native.playbackState(JSON.stringify(track ? {
     playing: p.playing,
+    retrying: p.retrying,
     title: track.title,
     artist: artistNames(track),
     album: track.album?.name || '',
@@ -45,8 +46,8 @@ function publish() {
 let last = {};
 usePlayer.subscribe((p) => {
   const trackId = p.queue[p.index]?.id;
-  if (p.playing === last.playing && trackId === last.trackId && p.duration === last.duration) return;
-  last = { playing: p.playing, trackId, duration: p.duration };
+  if (p.playing === last.playing && p.retrying === last.retrying && trackId === last.trackId && p.duration === last.duration) return;
+  last = { playing: p.playing, retrying: p.retrying, trackId, duration: p.duration };
   publish();
 });
 window.addEventListener('t-music:seeked', publish);

@@ -278,6 +278,29 @@ final class NativeBridge {
         auth.cancel();
     }
 
+    // Test builds only: answers from a known address at once, or not.
+    @JavascriptInterface
+    public int debugAnswerAtOnce(int on) {
+        if ((app.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) return -1;
+        StreamHandler.answerAtOnce = on != 0;
+        return on;
+    }
+
+    // Test builds only: no connection gets through for this many seconds, as with no network.
+    @JavascriptInterface
+    public int debugOutage(int seconds) {
+        if ((app.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) return -1;
+        StreamHandler.outageForTest(seconds);
+        return seconds;
+    }
+
+    // Test builds only: cuts the connections of the streams being played, as a network drop would.
+    @JavascriptInterface
+    public int debugDropStreams() {
+        if ((app.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) return -1;
+        return StreamHandler.dropConnectionsForTest();
+    }
+
     @JavascriptInterface
     public String authTake(String state) {
         return auth.take(state);

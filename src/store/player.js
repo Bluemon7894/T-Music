@@ -292,6 +292,7 @@ export const usePlayer = create((set, get) => ({
   playing: false,
   loading: false,
   time: initialTime,
+  retrying: false, // stopped for want of a connection, and trying again by itself
   duration: initialDuration,
   buffered: 0,
   volume: saved.volume ?? DEFAULT_VOLUME,
@@ -1024,6 +1025,7 @@ function stopRetrying() {
   gaveUp = false;
   clearInterval(retryTimer);
   retryTimer = null;
+  if (usePlayer.getState().retrying) usePlayer.setState({ retrying: false });
 }
 
 // Someone pressed something, or the connection came back: start clean from where it was.
@@ -1050,11 +1052,16 @@ function giveUp(why) {
   stopRetrying();
   gaveUp = true;
   if (room) return;
+  // A phone keeps itself and the page awake meanwhile (see media.js): with the screen off a sleeping page
+  // never gets to its next try, and the music stays stopped after the connection is back. Set after
+  // stopRetrying above, which clears it.
+  usePlayer.setState({ retrying: true });
   let retries = 0;
   retryTimer = setInterval(() => {
     if (++retries > MAX_RETRIES) {
       clearInterval(retryTimer);
       retryTimer = null;
+      usePlayer.setState({ retrying: false });
     }
     if (navigator.onLine !== false) reloadStream(whereItWas(active()));
   }, RETRY_EVERY_MS);
@@ -1237,7 +1244,9 @@ audios.forEach((a, i) => {
     if (!isActive() || resumeAt == null) return;
     a.currentTime = resumeAt;
     resumeAt = null;
-    if (a.paused && usePlayer.getState().playing) a.play().catch(() => {});
+    // A retry after giving up comes back playing too: that's what "carries on when the connection
+    // returns" promised, and giving up had set the player to stopped.
+    if (a.paused && (usePlayer.getState().playing || gaveUp)) a.play().catch(() => {});
   });
   a.addEventListener('seeked', () => { if (isActive()) window.dispatchEvent(new CustomEvent('t-music:seeked')); });
   a.addEventListener('durationchange', () => {
