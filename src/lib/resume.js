@@ -35,6 +35,22 @@ export function lastPlayback() {
   }
 }
 
+// The room this phone itself joined. Being in a room belongs to the account, so another device joining one
+// would otherwise pull this phone into it the next time the app starts, mid-way through listening alone.
+const HERE_KEY = 't-music-room-here';
+
+export function rememberRoomHere(code) {
+  try { localStorage.setItem(HERE_KEY, code); } catch { /* it just won't come back by itself */ }
+}
+
+export function forgetRoomHere() {
+  try { localStorage.removeItem(HERE_KEY); } catch { /* nothing to forget */ }
+}
+
+export function roomHere() {
+  try { return localStorage.getItem(HERE_KEY); } catch { return null; }
+}
+
 export function followingCode() {
   try {
     const saved = JSON.parse(store().getItem(KEY));

@@ -18,6 +18,7 @@ import { tr } from '../lib/i18n.js';
 
 function Lobby() {
   const busy = useRoom((s) => s.busy);
+  const elsewhere = useRoom((s) => s.elsewhere);
   const error = useRoom((s) => s.error);
   const { create, join } = useRoom.getState();
   const [name, setName] = useState('');
@@ -26,6 +27,11 @@ function Lobby() {
 
   return (
     <>
+      {elsewhere && (
+        <p className="room-note" data-enter>
+          {elsewhere.listening ? tr('다른 기기에서 \'{0}\'에서 듣고 있어요.', elsewhere.name) : tr('다른 기기에서 \'{0}\'에 참여 중이에요.', elsewhere.name)}
+        </p>
+      )}
       {waiting > 0 && <p className="room-note" data-enter>{tr('방을 만들거나 들어가면 {0}곡을 대기열에 넣을게요', waiting)}</p>}
       <div className="room-lobby">
         <form className="room-card" data-enter onSubmit={(e) => { e.preventDefault(); create(name); }}>
@@ -209,8 +215,8 @@ function InRoom() {
               {safePhoto(m.photo)
                 ? <img className="avatar" src={safePhoto(m.photo)} alt="" referrerPolicy="no-referrer" draggable={false} />
                 : <span className="avatar fallback"><Users size={15} /></span>}
-              <i className={`room-dot ${m.listening ? 'on' : ''}`} title={m.listening ? tr('듣는 중') : tr('자리 비움')} />
-              <span className={`room-member-name ${friends[memberUid] ? 'room-member-open' : ''}`} onClick={friends[memberUid] ? () => useNav.getState().go('friend', { uid: memberUid }) : undefined}>{m.name}{memberUid === uid && <small>{' '}{tr('(나)')}</small>}</span>
+              <i className={`room-dot ${m.listening ? 'on' : ''}`} title={m.listening ? (memberUid === uid && !attached ? tr('다른 기기에서 듣는 중') : tr('듣는 중')) : tr('자리 비움')} />
+              <span className={`room-member-name ${friends[memberUid] ? 'room-member-open' : ''}`} onClick={friends[memberUid] ? () => useNav.getState().go('friend', { uid: memberUid }) : undefined}>{m.name}{memberUid === uid && <small>{' '}{m.listening && !attached ? tr('(나 · 다른 기기에서 듣는 중)') : tr('(나)')}</small>}</span>
               <span className="room-member-actions">
                 {memberUid !== uid && !friends[memberUid] && (
                   sentRequests[memberUid]
