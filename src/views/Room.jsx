@@ -18,7 +18,6 @@ import { tr } from '../lib/i18n.js';
 
 function Lobby() {
   const busy = useRoom((s) => s.busy);
-  const elsewhere = useRoom((s) => s.elsewhere);
   const error = useRoom((s) => s.error);
   const { create, join } = useRoom.getState();
   const [name, setName] = useState('');
@@ -27,11 +26,6 @@ function Lobby() {
 
   return (
     <>
-      {elsewhere && (
-        <p className="room-note" data-enter>
-          {elsewhere.listening ? tr('다른 기기에서 \'{0}\'에서 듣고 있어요.', elsewhere.name) : tr('다른 기기에서 \'{0}\'에 참여 중이에요.', elsewhere.name)}
-        </p>
-      )}
       {waiting > 0 && <p className="room-note" data-enter>{tr('방을 만들거나 들어가면 {0}곡을 대기열에 넣을게요', waiting)}</p>}
       <div className="room-lobby">
         <form className="room-card" data-enter onSubmit={(e) => { e.preventDefault(); create(name); }}>
@@ -166,7 +160,9 @@ function InRoom() {
           <button className="btn" onClick={() => copy(inviteLink(code), tr('초대 링크를 복사했습니다'))}><Link2 size={15} />{' '}{tr('링크 복사')}</button>
           {IS_ANDROID && <button className="btn" onClick={() => api.shareText(tr('T-Music 같이 듣기에 초대합니다. {0}', inviteLink(code)))}><Share2 size={15} />{' '}{tr('보내기')}</button>}
         </div>
-        {!attached && <p className="room-note">{tr('이 방에 계속 들어와 있어요. 시작을 누르면 지금 방의 곡을 같이 들어요.')}</p>}
+        {!attached && (members[uid]?.listening
+          ? <p className="room-note">{tr('다른 기기에서 같은 계정으로 같이듣기를 하고 있어요.')}</p>
+          : <p className="room-note">{tr('이 방에 계속 들어와 있어요. 시작을 누르면 지금 방의 곡을 같이 들어요.')}</p>)}
         {attached && !hostListening && listening > 1 && <p className="room-note">{tr('방장이 자리를 비웠어요. 30초 안에 돌아오지 않으면 가장 오래 있던 멤버가 대신 방장이 돼요.')}</p>}
       </section>
 
@@ -215,8 +211,8 @@ function InRoom() {
               {safePhoto(m.photo)
                 ? <img className="avatar" src={safePhoto(m.photo)} alt="" referrerPolicy="no-referrer" draggable={false} />
                 : <span className="avatar fallback"><Users size={15} /></span>}
-              <i className={`room-dot ${m.listening ? 'on' : ''}`} title={m.listening ? (memberUid === uid && !attached ? tr('다른 기기에서 듣는 중') : tr('듣는 중')) : tr('자리 비움')} />
-              <span className={`room-member-name ${friends[memberUid] ? 'room-member-open' : ''}`} onClick={friends[memberUid] ? () => useNav.getState().go('friend', { uid: memberUid }) : undefined}>{m.name}{memberUid === uid && <small>{' '}{m.listening && !attached ? tr('(나 · 다른 기기에서 듣는 중)') : tr('(나)')}</small>}</span>
+              <i className={`room-dot ${m.listening ? 'on' : ''}`} title={m.listening ? tr('듣는 중') : tr('자리 비움')} />
+              <span className={`room-member-name ${friends[memberUid] ? 'room-member-open' : ''}`} onClick={friends[memberUid] ? () => useNav.getState().go('friend', { uid: memberUid }) : undefined}>{m.name}{memberUid === uid && <small>{' '}{tr('(나)')}</small>}</span>
               <span className="room-member-actions">
                 {memberUid !== uid && !friends[memberUid] && (
                   sentRequests[memberUid]

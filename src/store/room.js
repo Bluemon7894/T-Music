@@ -15,7 +15,7 @@ import {
   set as dbSet,
   update,
 } from 'firebase/database';
-import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db, rtdb } from '../lib/firebase.js';
 import { OFFLINE_MESSAGE, waitForConnection } from '../lib/online.js';
 import { safeTrack } from '../lib/safeTrack.js';
@@ -26,8 +26,7 @@ import { saveAlignment } from './lyricAlignments.js';
 import { bindRoom, roomPlayer, usePlayer } from './player.js';
 import { toast } from './ui.js';
 import { record } from './undo.js';
-import { followingCode, forgetFollowing, forgetRoomHere, rememberFollowing, rememberRoomHere, roomHere } from '../lib/resume.js';
-import { IS_ANDROID } from '../lib/platform.js';
+import { deviceId, followingCode, forgetFollowing, rememberFollowing } from '../lib/resume.js';
 import { LINK_HOST } from '../lib/links.js';
 import { tr } from '../lib/i18n.js';
 
@@ -281,7 +280,7 @@ export const useRoom = create((set, get) => {
         setTimeout(() => {
           if (get().code !== code || get().members[myUid()]) return;
           stopRoom();
-          (forgetRoomHere(), deleteDoc(myRoomDoc()).catch(() => {}));
+          deleteDoc(myRoomDoc()).catch(() => {});
         }, LEFT_ELSEWHERE_MS);
       }
       return;
@@ -450,6 +449,8 @@ export const useRoom = create((set, get) => {
   const stopFollowing = () => {
     stopListeningPresence?.();
     stopListeningPresence = null;
+    stopWatchingDevice?.();
+    stopWatchingDevice = null;
     clearInterval(tick);
     clearTimeout(startTimer);
     clearTimeout(hostTimer);
@@ -496,7 +497,7 @@ export const useRoom = create((set, get) => {
         if (!snap.exists()) {
           toast(tr('같이듣기 방이 닫혔습니다'));
           stopRoom();
-          (forgetRoomHere(), deleteDoc(myRoomDoc()).catch(() => {}));
+          deleteDoc(myRoomDoc()).catch(() => {});
           return;
         }
         set({ meta: snap.val() });
@@ -525,7 +526,7 @@ export const useRoom = create((set, get) => {
         onDisconnect(dbRef(code, 'members', myUid())).cancel().catch(() => {});
         toast(tr('방장이 이 방에서 내보냈어요'));
         stopRoom();
-        (forgetRoomHere(), deleteDoc(myRoomDoc()).catch(() => {}));
+        deleteDoc(myRoomDoc()).catch(() => {});
       }),
       onValue(dbRef(code, 'lyrics'), (snap) => {
         const announce = lyricsLoaded;
@@ -557,6 +558,30 @@ export const useRoom = create((set, get) => {
     ];
   };
 
+  // One device of an account listens along at a time: starting on one switches the others to listening
+  // alone. Which one it is lives with the account's room (users/{uid}/state/room), which every device
+  // of the account can read and write. A device switched off this way forgets it was following, so it
+  // stays alone after a restart too, until listening along is chosen on it again.
+  let stopWatchingDevice = null;
+  const claimListening = (code) => {
+    const me = deviceId();
+    setDoc(myRoomDoc(), { code, listeningOn: me }, { merge: true }).catch(() => {});
+    stopWatchingDevice?.();
+    stopWatchingDevice = onSnapshot(myRoomDoc(), (snap) => {
+      const room = snap.data();
+      if (!get().attached || get().code !== code || room?.code !== code || !room.listeningOn || room.listeningOn === me) return;
+      handOff(code);
+    }, () => {});
+  };
+
+  // Another device of this account started listening along: this one listens alone, leaving the account's
+  // place in the room (listening, by the other device) as it is.
+  const handOff = (code) => {
+    stopFollowing();
+    onDisconnect(dbRef(code, 'members', myUid())).cancel().catch(() => {});
+    toast(tr('다른 기기에서 같이듣기를 시작해서 이 기기는 혼자 듣기로 바뀌었어요.'));
+  };
+
   const follow = async () => {
     const code = get().code;
     if (!code || get().attached) return;
@@ -578,6 +603,7 @@ export const useRoom = create((set, get) => {
     set({ meta: freshMeta.val(), members: realMembers(freshMembers.val()), playback: freshPlayback.val(), modes: freshModes.val(), attached: true });
     bindRoom(hooks);
     rememberFollowing(code);
+    claimListening(code);
     roomPlayer.setModes(freshModes.val());
     startPresence(code);
     tick = setInterval(followTick, SYNC_TICK_MS);
@@ -594,15 +620,10 @@ export const useRoom = create((set, get) => {
     if (get().playback) applyPlayback(get().playback);
   };
 
-  const rememberRoom = (code) => {
-    rememberRoomHere(code);
-    set({ elsewhere: null });
-    return setDoc(myRoomDoc(), { code }).catch(() => {});
-  };
+  const rememberRoom = (code) => setDoc(myRoomDoc(), { code }, { merge: true }).catch(() => {});
 
   return {
     code: null,
-    elsewhere: null, // { name, listening }: the room this account is in on another device, only shown
     meta: null,
     members: {},
     playback: null,
@@ -703,17 +724,9 @@ export const useRoom = create((set, get) => {
         const member = await dbGet(dbRef(code, 'members', myUid()));
         if (!member.val()?.name) {
           forgetFollowing();
-          await (forgetRoomHere(), deleteDoc(myRoomDoc()).catch(() => {}));
+          await deleteDoc(myRoomDoc()).catch(() => {});
           return;
         }
-        // On a phone, only a room joined on this phone opens by itself. One joined on another device is
-        // only mentioned: the phone may be playing something of its own.
-        if (IS_ANDROID && roomHere() !== code && followingCode() !== code) {
-          const name = (await dbGet(dbRef(code, 'meta', 'name'))).val();
-          if (!get().code) set({ elsewhere: { name: name || code, listening: member.val().listening === true } });
-          return;
-        }
-        rememberRoomHere(code);
         watchRoom(code);
         // The app was killed, not closed on purpose: pick the room back up.
         if (followingCode() === code) await follow();
@@ -779,7 +792,6 @@ export const useRoom = create((set, get) => {
         const res = await fetch(`${base}.json?auth=${oldToken}`, { method: 'PATCH', body: JSON.stringify(handover) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         await setDoc(myRoomDoc(), { code });
-        rememberRoomHere(code);
         if (get().code !== code) {
           await get().disconnect();
           watchRoom(code);
@@ -830,7 +842,7 @@ export const useRoom = create((set, get) => {
         }
         await remove(memberRef);
         if (!others.length) await remove(dbRef(code));
-        await (forgetRoomHere(), deleteDoc(myRoomDoc()).catch(() => {}));
+        await deleteDoc(myRoomDoc()).catch(() => {});
       } catch (e) {
         console.warn('[room]', e);
       }
