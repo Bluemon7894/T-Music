@@ -1284,6 +1284,9 @@
 .room-note { color: #facc15 !important; }
 .room-track { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .room-track .thumb { width: 72px; height: 72px; flex: none; border-radius: 12px; }
+/* YouTube's 4:3 video pictures carry black bars above and below the 16:9 frame. Those are cut away and the
+   picture fills the square, losing its sides rather than showing a letterbox. */
+.room-track .thumb[src*="/hqdefault"], .room-track .thumb[src*="/sddefault"], .room-track .thumb[src*="/default.jpg"], .room-track .thumb[src*="/0.jpg"] { object-fit: cover; object-view-box: inset(12.5% 0); }
 .room-track-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; color: var(--sub); font-size: 13px; }
 .room-track-text b { color: var(--ink); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .room-track-text small { color: var(--dim); font-size: 12px; }
