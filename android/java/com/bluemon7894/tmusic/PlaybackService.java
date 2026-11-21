@@ -42,6 +42,8 @@ public final class PlaybackService extends Service {
     private static final String ACTION_NEXT = "tmusic.NEXT";
     private static final String ACTION_PREV = "tmusic.PREV";
     private static final String ACTION_CLOSE = "tmusic.CLOSE";
+    private static final String ACTION_REPEAT = "tmusic.REPEAT";
+    private static final String ACTION_LIKE = "tmusic.LIKE";
     private static final String EXTRA_STATE = "state";
     private static final long PAUSED_LIFETIME_MS = 10 * 60 * 1000;
     // Between two tracks the page reports a pause. Letting go of the locks right then lets a sleeping
@@ -72,6 +74,9 @@ public final class PlaybackService extends Service {
     private long position;
     private Bitmap art;
     private String artUrl = "";
+    // Shown when the player is expanded. Absent for the radio, which has neither.
+    private String repeat = null; // off | all | one
+    private Boolean liked = null;
 
     private final BroadcastReceiver noisy = new BroadcastReceiver() {
         @Override
@@ -127,6 +132,10 @@ public final class PlaybackService extends Service {
             @Override public void onSkipToPrevious() { press("prev"); }
             @Override public void onStop() { press("pause"); finish(); }
             @Override public void onSeekTo(long ms) { host.wakeBriefly(); host.bridge.emit("media", "action", "seek", "seconds", ms / 1000.0); }
+            @Override public void onCustomAction(String action, android.os.Bundle extras) {
+                if (ACTION_REPEAT.equals(action)) press("repeat");
+                else if (ACTION_LIKE.equals(action)) press("like");
+            }
         });
         session.setSessionActivity(openApp());
         session.setActive(true);
@@ -141,6 +150,8 @@ public final class PlaybackService extends Service {
         else if (ACTION_NEXT.equals(action)) press("next");
         else if (ACTION_PREV.equals(action)) press("prev");
         else if (ACTION_CLOSE.equals(action)) { press("pause"); finish(); }
+        else if (ACTION_REPEAT.equals(action)) press("repeat");
+        else if (ACTION_LIKE.equals(action)) press("like");
         else if (intent != null && intent.hasExtra(EXTRA_STATE)) {
             try {
                 apply(new JSONObject(intent.getStringExtra(EXTRA_STATE)));
@@ -174,6 +185,8 @@ public final class PlaybackService extends Service {
         thumb = state.optString("thumb");
         duration = (long) (state.optDouble("duration", 0) * 1000);
         position = (long) (state.optDouble("position", 0) * 1000);
+        repeat = state.has("repeat") ? state.optString("repeat", "off") : null;
+        liked = state.has("liked") ? state.optBoolean("liked") : null;
 
         main.removeCallbacks(stopAfterPause);
         main.removeCallbacks(releaseLocks);
@@ -196,14 +209,33 @@ public final class PlaybackService extends Service {
             main.postDelayed(stopAfterPause, PAUSED_LIFETIME_MS);
         }
 
-        session.setPlaybackState(new PlaybackState.Builder()
+        PlaybackState.Builder playback = new PlaybackState.Builder()
             .setState(playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED, position, playing ? 1f : 0f, SystemClock.elapsedRealtime())
             .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE | PlaybackState.ACTION_SKIP_TO_NEXT
-                | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_SEEK_TO | PlaybackState.ACTION_STOP)
-            .build());
+                | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_SEEK_TO | PlaybackState.ACTION_STOP);
+        // The two extra buttons of the expanded player (Android 13 on draws them from here).
+        if (repeat != null) playback.addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_REPEAT, repeatLabel(), repeatIcon()).build());
+        if (liked != null) playback.addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_LIKE, likeLabel(), likeIcon()).build());
+        session.setPlaybackState(playback.build());
         publishMetadata();
         if (!thumb.equals(artUrl)) loadArt(thumb);
         goForeground();
+    }
+
+    private int repeatIcon() {
+        return "one".equals(repeat) ? R.drawable.ic_repeat_one : "all".equals(repeat) ? R.drawable.ic_repeat : R.drawable.ic_repeat_off;
+    }
+
+    private String repeatLabel() {
+        return "one".equals(repeat) ? Lang.say("한 곡 반복", "Repeat one") : "all".equals(repeat) ? Lang.say("전체 반복", "Repeat all") : Lang.say("반복 안 함", "Repeat off");
+    }
+
+    private int likeIcon() {
+        return Boolean.TRUE.equals(liked) ? R.drawable.ic_heart : R.drawable.ic_heart_outline;
+    }
+
+    private String likeLabel() {
+        return Boolean.TRUE.equals(liked) ? Lang.say("좋아요 취소", "Unlike") : Lang.say("좋아요", "Like");
     }
 
     private void publishMetadata() {
@@ -242,6 +274,7 @@ public final class PlaybackService extends Service {
             try (InputStream in = c.getInputStream()) {
                 Bitmap image = BitmapFactory.decodeStream(in);
                 if (image == null) return null;
+                image = trimBars(image);
                 int side = Math.min(image.getWidth(), image.getHeight());
                 Bitmap square = Bitmap.createBitmap(image, (image.getWidth() - side) / 2, (image.getHeight() - side) / 2, side, side);
                 return side > ART_SIZE ? Bitmap.createScaledBitmap(square, ART_SIZE, ART_SIZE, true) : square;
@@ -251,6 +284,40 @@ public final class PlaybackService extends Service {
         } finally {
             if (c != null) c.disconnect();
         }
+    }
+
+    // YouTube's 4:3 video pictures carry black bars above and below the picture (and tall videos beside
+    // it). They're cut off before the square is taken, so the cover is the picture itself, larger.
+    private static final int BAR_DARK = 28;
+
+    private static Bitmap trimBars(Bitmap image) {
+        int w = image.getWidth();
+        int h = image.getHeight();
+        int top = 0;
+        int bottom = h - 1;
+        int left = 0;
+        int right = w - 1;
+        while (top < h / 3 && darkLine(image, top, true)) top++;
+        while (bottom > h * 2 / 3 && darkLine(image, bottom, true)) bottom--;
+        while (left < w / 3 && darkLine(image, left, false)) left++;
+        while (right > w * 2 / 3 && darkLine(image, right, false)) right--;
+        if (top == 0 && bottom == h - 1 && left == 0 && right == w - 1) return image;
+        return Bitmap.createBitmap(image, left, top, right - left + 1, bottom - top + 1);
+    }
+
+    // Every sampled pixel along the row (or column) is close to black.
+    private static boolean darkLine(Bitmap image, int at, boolean row) {
+        int length = row ? image.getWidth() : image.getHeight();
+        int samples = Math.min(48, length);
+        for (int i = 0; i < samples; i++) {
+            int along = (int) ((i + 0.5) * length / samples);
+            int color = row ? image.getPixel(along, at) : image.getPixel(at, along);
+            int r = (color >> 16) & 0xff;
+            int g = (color >> 8) & 0xff;
+            int b = color & 0xff;
+            if (Math.max(r, Math.max(g, b)) > BAR_DARK) return false;
+        }
+        return true;
     }
 
     private PendingIntent openApp() {
@@ -276,8 +343,12 @@ public final class PlaybackService extends Service {
             .addAction(action(R.drawable.ic_prev, Lang.say("이전 곡", "Previous"), ACTION_PREV))
             .addAction(action(playing ? R.drawable.ic_pause : R.drawable.ic_play, playing ? Lang.say("일시정지", "Pause") : Lang.say("재생", "Play"), ACTION_TOGGLE))
             .addAction(action(R.drawable.ic_next, Lang.say("다음 곡", "Next"), ACTION_NEXT))
-            .addAction(action(R.drawable.ic_close, Lang.say("닫기", "Close"), ACTION_CLOSE))
             .setStyle(new Notification.MediaStyle().setMediaSession(session.getSessionToken()).setShowActionsInCompactView(0, 1, 2));
+        // Older phones draw the expanded player from these buttons, five at most: repeat and like there,
+        // and close when there's room for it (the radio).
+        if (repeat != null) builder.addAction(action(repeatIcon(), repeatLabel(), ACTION_REPEAT));
+        if (liked != null) builder.addAction(action(likeIcon(), likeLabel(), ACTION_LIKE));
+        if (repeat == null || liked == null) builder.addAction(action(R.drawable.ic_close, Lang.say("닫기", "Close"), ACTION_CLOSE));
         if (art != null) builder.setLargeIcon(art);
         Notification notification = builder.build();
         try {

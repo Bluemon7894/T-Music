@@ -2,6 +2,7 @@
 // what's pressed there, on a headset or by the system comes back here.
 import { Native, onNative } from './native.js';
 import { usePlayer } from '../store/player.js';
+import { useLibrary } from '../store/library.js';
 import { useRadio } from '../store/radio.js';
 import { tr } from '../lib/i18n.js';
 import { useRoom } from '../store/room.js';
@@ -34,6 +35,8 @@ function publish() {
   Native.playbackState(JSON.stringify(track ? {
     playing: p.playing,
     retrying: p.retrying,
+    repeat: p.repeat,
+    liked: useLibrary.getState().isLiked(track.id),
     title: track.title,
     artist: artistNames(track),
     album: track.album?.name || '',
@@ -46,10 +49,12 @@ function publish() {
 let last = {};
 usePlayer.subscribe((p) => {
   const trackId = p.queue[p.index]?.id;
-  if (p.playing === last.playing && p.retrying === last.retrying && trackId === last.trackId && p.duration === last.duration) return;
-  last = { playing: p.playing, retrying: p.retrying, trackId, duration: p.duration };
+  if (p.playing === last.playing && p.retrying === last.retrying && p.repeat === last.repeat && trackId === last.trackId && p.duration === last.duration) return;
+  last = { playing: p.playing, retrying: p.retrying, repeat: p.repeat, trackId, duration: p.duration };
   publish();
 });
+// The heart in the notification follows a like made anywhere.
+useLibrary.subscribe((s, prev) => { if (s.liked !== prev.liked && usePlayer.getState().current()) publish(); });
 window.addEventListener('t-music:seeked', publish);
 setInterval(() => { if (usePlayer.getState().playing) publish(); }, POSITION_EVERY_MS);
 
@@ -84,6 +89,11 @@ onNative('media', ({ action, seconds }) => {
   else if (action === 'next') p.next();
   else if (action === 'prev') p.prev();
   else if (action === 'seek') p.seek(seconds);
+  else if (action === 'repeat') p.cycleRepeat();
+  else if (action === 'like') {
+    const track = p.current();
+    if (track) useLibrary.getState().toggleLike(track);
+  }
 });
 
 // ---- the back button closes what's on top, then goes back, then leaves the app running ----
