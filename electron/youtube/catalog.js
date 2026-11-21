@@ -22,6 +22,7 @@ let homeShelves = null;
 const HOME_SHELF_MAX = 16;
 const MAX_PLAYLIST_PAGES = 5;
 const INSTRUMENTAL = /\binst\b|instrumental|\bMR\b|반주/i;
+const MINOR_VIEWS = 50;
 
 function uniqueBy(list, key = (x) => x.id) {
   const seen = new Set();
@@ -45,6 +46,74 @@ function uniqueRecordings(tracks) {
     if (!twin) kept.push(t);
     return !twin;
   });
+}
+
+// ---- whose song it is ----
+// Signed out in Korea, YouTube Music won't say which upload is the official song, so it's worked out
+// from the uploads themselves. Lyric videos, broadcasts and MV uploads name the artist ("이찬혁 -
+// 멸종위기사랑", "[성시경 노래] …", "성시경 _ …"), and official channels name themselves. A cover
+// singer is seldom named by anyone else's upload. Weighted by how many people watched, the name that
+// keeps coming up is the song's owner.
+const NOT_A_NAME = /방송|버전|ver(sion)?\b|cover|커버|가사|lyrics?|노래방|karaoke|\bmr\b|inst|audio|m\/?v\b|teaser|직캠|fancam|\bost\b|full|live|라이브|playlist|모음|reaction|리액션|official|공식|topic|채널|channel/i;
+
+// "이찬혁 (LEE CHANHYUK)" → 이찬혁, leechanhyuk. "이지금 [IU Official]" → 이지금, iu.
+function nameVariants(name) {
+  return String(name || '')
+    .replace(/\b(official|topic|channel)\b|공식|채널/gi, ' ')
+    .split(/[()[\]{}/&,·|]|\s+x\s+|\bfeat\.?|\bft\./i)
+    .flatMap((piece) => piece.match(/[\p{Script=Hangul}\d][\p{Script=Hangul}\d\s]*|[\p{Script=Latin}\d][\p{Script=Latin}\d\s.'-]*/gu) || [])
+    .map(squash)
+    .filter((v) => v.length >= 2 && !NOT_A_NAME.test(v));
+}
+
+// The artist names a title gives besides the song's own name.
+function namesInTitle(raw, query) {
+  const title = squash(query);
+  const s = String(raw || '').replace(/【([^】]*)】/g, '$1 - ').replace(/\s\|\s.*$/, '');
+  const out = [];
+  const tagged = s.match(/\[([^\]]+?)\s*(?:의\s*)?노래\]/);
+  if (tagged) out.push(tagged[1]);
+  const parts = s.replace(/\[[^\]]*\]/g, ' ').split(/\s+[-–—_]\s*|\s*[-–—_]\s+|\s*[–—]\s*/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    for (const part of parts.slice(0, 2)) {
+      const p = squash(part);
+      if (p && part.length <= 40 && !p.includes(title) && !title.includes(p)) out.push(part);
+    }
+  }
+  return out;
+}
+
+// The owner's group of names, and each track's own groups. Names said together ("이찬혁 (LEE
+// CHANHYUK)", an official channel and the artist its title names) are one artist.
+function songOwner(tracks, query) {
+  const parent = new Map();
+  const root = (v) => { while (parent.get(v) !== v) v = parent.get(v); return v; };
+  const join = (vs) => {
+    vs.forEach((v) => { if (!parent.has(v)) parent.set(v, v); });
+    for (let i = 1; i < vs.length; i++) parent.set(root(vs[i]), root(vs[0]));
+  };
+  const namesOf = tracks.map((t) => {
+    const own = t.topic || t.officialArtist ? [t.artists?.[0]?.name] : [];
+    const said = namesInTitle(t.rawTitle || t.title, query);
+    const groups = [...own, ...said].map(nameVariants).filter((g) => g.length);
+    groups.forEach(join);
+    if (own.length && groups.length > 1) join(groups.flat()); // an official channel and the artist it names
+    return groups.flat();
+  });
+  const weight = new Map();
+  tracks.forEach((t, i) => {
+    for (const r of new Set(namesOf[i].map(root))) weight.set(r, (weight.get(r) || 0) + Math.log10((t.views || 0) + 10));
+  });
+  // An artist named in the search itself is the one meant ("멜로망스 취중고백").
+  const asked = squash(query);
+  // Only part of it, though: a channel that is just the song's name ("Supernova") names nobody.
+  const named = new Set([...parent.keys()].filter((v) => v.length >= 2 && asked.includes(v) && asked.replace(v, '').length >= 2).map(root));
+  let owner = null;
+  for (const r of weight.keys()) {
+    const ahead = !owner || Number(named.has(r)) - Number(named.has(owner)) || weight.get(r) - weight.get(owner);
+    if (ahead === true || ahead > 0) owner = r;
+  }
+  return { owns: (i) => owner != null && namesOf[i].some((v) => root(v) === owner) };
 }
 
 // Sort into score bands, keeping YouTube's relevance order within a band.
@@ -98,7 +167,8 @@ async function officialAudio(query, limit = 20) {
     .slice(0, limit);
   // YouTube's first artist upload is its best guess, and it sees past typos and translated
   // titles ("10CM 그라데이션" finds "Gradation"), which comparing text can't.
-  const [first, second] = tracks.filter((t) => t.officialArtist && t.score >= 3 && !INSTRUMENTAL.test(t.title) && !P.isLiveTitle(t.title));
+  // An artist's own release often sits on its auto-generated Topic channel, which carries no badge.
+  const [first, second] = tracks.filter((t) => (t.officialArtist || t.topic) && t.score >= 3 && !INSTRUMENTAL.test(t.title) && !P.isLiveTitle(t.title));
   // A much better known second result wins ("좋은날" has an obscure song of that exact name too).
   const pick = second && second.score >= first.score + 3 ? second : first;
   if (pick) pick.ytPick = true;
@@ -151,18 +221,40 @@ export function search(query) {
     const literal = scored.filter((x) => x.r >= 0.95 && (x.t.score ?? 0) >= 0);
     // YouTube's pick only outranks results that literally match when one of them confirms it's
     // the same song under another name ("Gradation" inside "10CM _ Gradation(그라데이션)").
-    const trustPick = (t) => !literal.length || literal.some((x) => squash(x.t.rawTitle || x.t.title).includes(squash(t.title)));
-    const rated = scored
-      .map(({ t, r }) => {
-        if (t.ytPick && !trustPick(t)) t = { ...t, ytPick: false };
-        return { t, r: t.ytPick && r >= 0.5 ? Math.max(r, 0.95) : r };
-      })
+    const confirmedAlias = (t) => squash(t.title).length >= 3 && literal.some((x) => squash(x.t.rawTitle || x.t.title).includes(squash(t.title)));
+    const trustPick = (t) => !literal.length || confirmedAlias(t);
+    // A pick whose title shares no words with the search still fits when a literal match names it too:
+    // "멸종위기사랑" is officially "Endangered Love", and "LEE CHANHYUK - 멸종위기사랑 (Endangered Love)" says so.
+    const fitted = scored.map(({ t, r }) => {
+      if (t.ytPick && !trustPick(t)) t = { ...t, ytPick: false };
+      return { t, r: t.ytPick && (r >= 0.5 || confirmedAlias(t)) ? Math.max(r, 0.95) : r };
+    });
+    // Among versions that fit equally well, one with a fiftieth of the best known one's views is a cover
+    // or a re-upload, however official its channel looks ("좋은날" by a small singer over IU's).
+    // The song's own artist goes first: their release, then the rest of theirs, then covers and other
+    // songs that share the name.
+    const matching = fitted.filter((x) => fitBand(x.r) === 3 && (x.t.score ?? 0) >= 0);
+    const { owns } = songOwner(matching.map((x) => x.t), query);
+    const owned = new Set(matching.filter((_, i) => owns(i)));
+    // Someone else's version with a fiftieth of the best known one's views is a cover or a re-upload,
+    // however official its channel looks ("좋은날" by a small singer over IU's). The owner's own release
+    // is never that, though a lyric video of it may well have more views.
+    const bestViews = {};
+    for (const x of fitted) if ((x.t.score ?? 0) >= 0) bestViews[fitBand(x.r)] = Math.max(bestViews[fitBand(x.r)] || 0, x.t.views || 0);
+    const minor = (x) => !owned.has(x) && (x.t.views || 0) > 0 && x.t.views * MINOR_VIEWS < (bestViews[fitBand(x.r)] || 0);
+    // Then the song as released: not an instrumental or a live take unless asked for, from an official
+    // channel, the studio recording before its video.
+    const officialChannel = (t) => t.topic || t.officialArtist;
+    const rated = fitted
       .sort((a, b) => flag((b.t.score ?? 0) >= 0) - flag((a.t.score ?? 0) >= 0)
         || fitBand(b.r) - fitBand(a.r)
-        || flag(b.t.ytPick) - flag(a.t.ytPick)
+        || flag(owned.has(b)) - flag(owned.has(a))
+        || flag(!minor(b)) - flag(!minor(a))
         || flag(!INSTRUMENTAL.test(b.t.title) || wantsInstrumental) - flag(!INSTRUMENTAL.test(a.t.title) || wantsInstrumental)
         || flag(!P.isLiveTitle(b.t.title) || wantsLive) - flag(!P.isLiveTitle(a.t.title) || wantsLive)
+        || flag(officialChannel(b.t)) - flag(officialChannel(a.t))
         || flag(b.t.studioAudio) - flag(a.t.studioAudio)
+        || flag(b.t.ytPick) - flag(a.t.ytPick)
         || (b.t.score ?? 0) - (a.t.score ?? 0)
         || (b.t.views ?? 0) - (a.t.views ?? 0));
     // Hour-long compilations aren't songs unless that's what was asked for.
