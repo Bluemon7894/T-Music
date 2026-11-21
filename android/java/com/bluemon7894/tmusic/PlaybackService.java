@@ -49,6 +49,10 @@ public final class PlaybackService extends Service {
     // Between two tracks the page reports a pause. Letting go of the locks right then lets a sleeping
     // phone cut the network just as the next track has to load, so they're kept a while longer.
     private static final long LOCKS_AFTER_PAUSE_MS = 90 * 1000;
+    // Android won't let a media notification be swiped away while its service runs in the foreground. Once the
+    // music has stayed paused this long, the service steps out of the foreground and the player can be swiped
+    // off (which closes it). Not at once: between two tracks the page reports a short pause too.
+    private static final long PAUSE_SETTLE_MS = 4000;
     static volatile boolean everPlayed;
     private static final int ART_SIZE = 512;
 
@@ -57,6 +61,12 @@ public final class PlaybackService extends Service {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Runnable stopAfterPause = this::finish;
     private final Runnable releaseLocks = this::releaseLocks;
+    private final Runnable settlePause = () -> {
+        pauseSettled = true;
+        goForeground();
+    };
+    private boolean pauseSettled; // paused for a while: the notification can be swiped off
+    private boolean holdingNow;
 
     private WebHost host;
     private MediaSession session;
@@ -190,6 +200,14 @@ public final class PlaybackService extends Service {
 
         main.removeCallbacks(stopAfterPause);
         main.removeCallbacks(releaseLocks);
+        if (holding) {
+            main.removeCallbacks(settlePause);
+            pauseSettled = false;
+        } else if (holdingNow || !foreground) {
+            main.removeCallbacks(settlePause);
+            main.postDelayed(settlePause, PAUSE_SETTLE_MS);
+        }
+        holdingNow = holding;
         if (holding) {
             everPlayed = true;
             host.stayAwake(true);
@@ -325,10 +343,13 @@ public final class PlaybackService extends Service {
         return PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    private Notification.Action action(int icon, String label, String name) {
+    private PendingIntent serviceIntent(String name) {
         Intent intent = new Intent(this, PlaybackService.class).setAction(name);
-        PendingIntent pending = PendingIntent.getService(this, name.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        return new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(this, icon), label, pending).build();
+        return PendingIntent.getService(this, name.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private Notification.Action action(int icon, String label, String name) {
+        return new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(this, icon), label, serviceIntent(name)).build();
     }
 
     private void goForeground() {
@@ -340,6 +361,7 @@ public final class PlaybackService extends Service {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
             .setOngoing(playing)
+            .setDeleteIntent(serviceIntent(ACTION_CLOSE))
             .addAction(action(R.drawable.ic_prev, Lang.say("이전 곡", "Previous"), ACTION_PREV))
             .addAction(action(playing ? R.drawable.ic_pause : R.drawable.ic_play, playing ? Lang.say("일시정지", "Pause") : Lang.say("재생", "Play"), ACTION_TOGGLE))
             .addAction(action(R.drawable.ic_next, Lang.say("다음 곡", "Next"), ACTION_NEXT))
@@ -351,17 +373,26 @@ public final class PlaybackService extends Service {
         if (repeat == null || liked == null) builder.addAction(action(R.drawable.ic_close, Lang.say("닫기", "Close"), ACTION_CLOSE));
         if (art != null) builder.setLargeIcon(art);
         Notification notification = builder.build();
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (pauseSettled) {
+            // Left paused: kept on show, but out of the foreground so it can be swiped off.
+            if (foreground) stopForeground(STOP_FOREGROUND_DETACH);
+            foreground = false;
+            manager.notify(NOTIFICATION_ID, notification);
+            return;
+        }
         try {
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
             else startForeground(NOTIFICATION_ID, notification);
             foreground = true;
         } catch (RuntimeException e) {
-            ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(NOTIFICATION_ID, notification);
+            manager.notify(NOTIFICATION_ID, notification);
         }
     }
 
     private void finish() {
         main.removeCallbacks(stopAfterPause);
+        main.removeCallbacks(settlePause);
         if (foreground) stopForeground(STOP_FOREGROUND_REMOVE);
         foreground = false;
         stopSelf();
