@@ -6,6 +6,7 @@ import { Disc3, Heart, Bookmark, BookmarkCheck, ListMusic, Pause, Play, PictureI
 import { api } from '../lib/api.js';
 import { tr } from '../lib/i18n.js';
 import logo from '../assets/logo-mark.png';
+import { barFree } from '../lib/cover.js';
 
 const send = (command, arg) => api.quickCommand(command, arg).catch(() => {});
 const fmt = (sec) => {
@@ -113,7 +114,7 @@ export default function QuickMenu() {
         <div className="qm-brand"><img src={logo} alt="" draggable={false} /><b>T-Music</b><kbd>Esc</kbd></div>
 
         <section className="qm-now">
-          <div className="qm-now-bg" style={{ backgroundImage: art ? `url("${art}")` : undefined }} />
+          <div className="qm-now-bg" style={{ backgroundImage: art ? `url("${barFree(art)}")` : undefined }} />
           <button className="qm-now-main" onClick={() => send('openApp')} data-nav title={tr('앱 열기')}>
             <Art src={art} />
             <span className="qm-now-text">

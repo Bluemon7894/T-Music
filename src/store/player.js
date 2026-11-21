@@ -10,6 +10,7 @@ import { followingCode, lastPlayback } from '../lib/resume.js';
 import { noteTrouble } from '../lib/trouble.js';
 import { tr } from '../lib/i18n.js';
 import { isLocalId } from '../../electron/localId.js';
+import { barFree } from '../lib/cover.js';
 
 // Phones set the volume with their own buttons, so the app stays at full level there.
 const DEFAULT_VOLUME = IS_ANDROID ? 1 : 0.8;
@@ -1326,7 +1327,7 @@ function updateMediaSession(track) {
     title: track.title,
     artist: (track.artists || []).map((a) => a.name).join(', '),
     album: track.album?.name || '',
-    artwork: track.thumb ? [{ src: track.thumb, sizes: '544x544' }] : [],
+    artwork: track.thumb ? [{ src: barFree(track.thumb), sizes: '544x544' }] : [],
   });
 }
 

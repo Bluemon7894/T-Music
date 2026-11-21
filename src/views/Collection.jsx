@@ -11,6 +11,7 @@ import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { useUI, toast } from '../store/ui.js';
 import { totalTime, colorFor } from '../lib/util.js';
+import { barFree } from '../lib/cover.js';
 import { flyToQueue, landFlight, launchFlight, useEnter, useTilt } from '../lib/motion.js';
 import { IS_ANDROID } from '../lib/platform.js';
 import { dropOnLiked, dropOnPlaylist, useDrop } from '../lib/drag.js';
@@ -31,7 +32,7 @@ function Header({ kind, title, thumb, art, color, meta, description }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="page-header" style={{ '--hdr': color }}>
-      {thumb && <div className="ph-backdrop" style={{ backgroundImage: `url("${thumb}")` }} />}
+      {thumb && <div className="ph-backdrop" style={{ backgroundImage: `url("${barFree(thumb)}")` }} />}
       <div className="ph-art-wrap" ref={artRef} data-enter>
         {art || <Thumb src={thumb} className="ph-art" />}
         <span className="glare" />

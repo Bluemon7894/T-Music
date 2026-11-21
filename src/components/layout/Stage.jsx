@@ -17,6 +17,7 @@ import Deck from './Deck.jsx';
 import { fmtTime } from '../../lib/util.js';
 import { animate, burst, createTimeline, ease, stagger } from '../../lib/motion.js';
 import { tr } from '../../lib/i18n.js';
+import { barFree } from '../../lib/cover.js';
 
 const VOLUME_WHEEL_STEP = 0.05;
 
@@ -187,7 +188,7 @@ function StageView({ track }) {
 
   return (
     <div className="stage" ref={root}>
-      <div className="stage-bg" style={{ backgroundImage: track.thumb ? `url("${track.thumb}")` : undefined }} />
+      <div className="stage-bg" style={{ backgroundImage: track.thumb ? `url("${barFree(track.thumb)}")` : undefined }} />
       <div className="stage-shade" />
       <div className="stage-top-gradient" />
       <div className="stage-top-drag" />

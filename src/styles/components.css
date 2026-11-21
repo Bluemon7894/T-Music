@@ -63,6 +63,9 @@
 /* ---------- thumbs & misc ---------- */
 .thumb { display: block; object-fit: cover; background: var(--glass-2); border-radius: 10px; }
 .thumb.round { border-radius: 50%; }
+/* YouTube's 4:3 video pictures carry black bars above and below the 16:9 frame. Every cover cuts them away
+   and fills its box, losing its sides rather than showing a letterbox. Backgrounds use src/lib/cover.js. */
+img[src*="ytimg.com/vi"]:is([src*="/hqdefault"], [src*="/sddefault"], [src*="/default."], [src*="/0."], [src*="/1."], [src*="/2."], [src*="/3."], [src*="/hq1."], [src*="/hq2."], [src*="/hq3."], [src*="/sd1."], [src*="/sd2."], [src*="/sd3."]) { object-fit: cover; object-view-box: inset(12.5% 0); }
 .thumb.placeholder { display: flex; align-items: center; justify-content: center; color: var(--dim); background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(46, 16, 101, 0.4)); }
 .glare { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(circle at var(--gx, 50%) var(--gy, 0%), rgba(255, 255, 255, 0.28), transparent 55%); opacity: 0; transition: opacity 0.3s; mix-blend-mode: overlay; }
 :hover > .glare, .card:hover .glare { opacity: 1; }

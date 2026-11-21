@@ -167,7 +167,9 @@ function applyActivity(data) {
 
   // Large thumbnail image
   if (thumb && /^https?:\/\//.test(thumb)) {
-    activity.largeImageKey = thumb;
+    // YouTube's 4:3 pictures put the frame between black bars; mqdefault is the same frame without them
+    // (as src/lib/cover.js does for the app).
+    activity.largeImageKey = thumb.replace(/^(https:\/\/i\.ytimg\.com\/vi)(?:_webp)?(\/[\w-]+\/)(?:hqdefault|sddefault|default|hq[1-3]|sd[1-3]|[0-3])(?:_live)?\.(?:jpg|webp)(?:\?.*)?$/, '$1$2mqdefault.jpg');
     activity.largeImageText = (title || 'T-Music').slice(0, 128);
   }
 

@@ -18,6 +18,7 @@ import Deck from '../layout/Deck.jsx';
 import { QueueList, AutoplayToggle } from '../layout/NowPanel.jsx';
 import { NextTrack, StageProgress } from '../layout/Stage.jsx';
 import { tr } from '../../lib/i18n.js';
+import { barFree } from '../../lib/cover.js';
 
 const TABS = [
   { id: 'now', label: tr('지금 재생'), icon: Music2 },
@@ -75,7 +76,7 @@ function StageView({ track }) {
 
   return (
     <div className="stage m-stage" ref={root}>
-      <div className="stage-bg" style={{ backgroundImage: track.thumb ? `url("${track.thumb}")` : undefined }} />
+      <div className="stage-bg" style={{ backgroundImage: track.thumb ? `url("${barFree(track.thumb)}")` : undefined }} />
       <div className="stage-shade" />
 
       <header className="m-stage-top">

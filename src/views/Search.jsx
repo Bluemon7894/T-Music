@@ -6,6 +6,7 @@ import { useLibrary } from '../store/library.js';
 import { usePlayer } from '../store/player.js';
 import { useUI } from '../store/ui.js';
 import { useAsync, Thumb, PlayButton, ArtistLinks, SkeletonRows, SkeletonCards, ErrorMsg, Empty } from '../components/common.jsx';
+import { barFree } from '../lib/cover.js';
 import TrackList from '../components/TrackList.jsx';
 import { Shelf, Grid, openItem, playItem } from '../components/Cards.jsx';
 import { useEnter } from '../lib/motion.js';
@@ -327,7 +328,7 @@ function BrowseTile({ item }) {
       {showArt && thumbUrl && imgLoaded && (
         <div
           className="browse-tile-bg"
-          style={{ backgroundImage: `url(${thumbUrl})` }}
+          style={{ backgroundImage: `url(${barFree(thumbUrl)})` }}
         />
       )}
 
