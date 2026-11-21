@@ -69,20 +69,55 @@ export async function getPlayerClient() {
   return playerClient;
 }
 
+// YouTube leaves some requests hanging for 5 to 10 seconds and then refuses them, while the same
+// request sent again answers in half a second. A healthy answer takes well under a second, so one
+// that hasn't come by HEDGE_MS is sent again, and whichever copy answers first is used.
+const HEDGE_MS = 1500;
+const COPIES = 3;
+
+function hedged(send) {
+  return new Promise((resolve, reject) => {
+    let sent = 0;
+    let failed = 0;
+    let settled = false;
+    let timer = null;
+    const next = () => {
+      clearTimeout(timer);
+      sent += 1;
+      send().then(
+        (value) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (e) => {
+          failed += 1;
+          if (settled) return;
+          // A refusal is sent again straight away; the last one to fail ends it.
+          if (sent < COPIES) next();
+          else if (failed === sent) {
+            settled = true;
+            reject(e);
+          }
+        },
+      );
+      if (sent < COPIES) timer = setTimeout(next, HEDGE_MS);
+    };
+    next();
+  });
+}
+
+const execute = (yt, endpoint, payload) => yt.actions.execute(endpoint, { ...payload, parse: false }).then((r) => r.data);
+
 export async function call(endpoint, payload) {
   const yt = await getClient();
   try {
-    return (await yt.actions.execute(endpoint, { ...payload, parse: false })).data;
+    return await hedged(() => execute(yt, endpoint, payload));
   } catch {
-    // Most failures are transient; retry on the same session first.
-    await new Promise((r) => setTimeout(r, 300));
-  }
-  try {
-    return (await yt.actions.execute(endpoint, { ...payload, parse: false })).data;
-  } catch {
-    // Still failing: the session itself (visitor data, client version) may be stale.
+    // Every copy failed: the session itself (visitor data, client version) may be stale.
     if (client === yt) resetClient();
-    const fresh = await getClient();
-    return (await fresh.actions.execute(endpoint, { ...payload, parse: false })).data;
   }
+  const fresh = await getClient();
+  return hedged(() => execute(fresh, endpoint, payload));
 }
