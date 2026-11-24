@@ -4,7 +4,7 @@ import { Avatar } from '../components/Account.jsx';
 import { Empty, Thumb } from '../components/common.jsx';
 import { BANDS } from '../components/RadioDial.jsx';
 import { useAccount } from '../store/account.js';
-import { normalizeFriendCode, useFriends } from '../store/friends.js';
+import { lastSeenText, normalizeFriendCode, useFriends } from '../store/friends.js';
 import { useNav } from '../store/nav.js';
 import { useRoom } from '../store/room.js';
 import { usePlayer } from '../store/player.js';
@@ -16,7 +16,7 @@ import { artistNames } from '../lib/util.js';
 import { tr } from '../lib/i18n.js';
 
 function statusOf(friend) {
-  if (!friend.online) return tr('오프라인');
+  if (!friend.online) return lastSeenText(friend);
   if (friend.radio) return friend.playing ? tr('라디오 듣는 중') : tr('일시정지');
   if (!friend.track) return tr('온라인');
   return friend.playing ? tr('듣는 중') : tr('일시정지');

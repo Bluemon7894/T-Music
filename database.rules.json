@@ -249,6 +249,9 @@
           },
           "$other": {
             ".validate": false
+          },
+          "lastSeen": {
+            ".validate": "newData.isBoolean()"
           }
         },
         "$other": {
@@ -314,7 +317,7 @@
         ".read": "auth != null && auth.uid === $to",
         ".write": "auth != null && auth.uid === $to && !newData.exists()",
         "$id": {
-          ".write": "auth != null && ((newData.exists() && root.child('friends').child($to).child(auth.uid).exists()) || (!newData.exists() && (auth.uid === $to || data.child('from').val() === auth.uid)))",
+          ".write": "auth != null && ((newData.exists() && newData.child('code').isString() && root.child('rooms').child(newData.child('code').val()).child('members').child(auth.uid).exists() && root.child('rooms').child(newData.child('code').val()).child('members').child($to).exists()) || (newData.exists() && root.child('friends').child($to).child(auth.uid).exists()) || (!newData.exists() && (auth.uid === $to || data.child('from').val() === auth.uid)))",
           ".validate": "newData.hasChildren(['from', 'code', 'at'])",
           "from": {
             ".validate": "newData.val() === auth.uid"

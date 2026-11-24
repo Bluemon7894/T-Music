@@ -135,6 +135,13 @@ export function FriendPrivacyCard() {
         </div>
         <div className={`switch ${sharing.online ? 'on' : ''}`} />
       </div>
+      <div className={`set-item ${sharing.online ? '' : 'disabled'}`} onClick={() => sharing.online && setSharing({ lastSeen: !sharing.lastSeen })}>
+        <div className="set-item-text">
+          <span className="set-item-title">{tr('마지막 접속 시간 표시')}</span>
+          <span className="muted small">{tr('앱을 끄면 친구 목록에 "3시간 전 접속"처럼 보여요. 끄면 그냥 오프라인으로 보여요.')}</span>
+        </div>
+        <div className={`switch ${sharing.online && sharing.lastSeen ? 'on' : ''}`} />
+      </div>
       <div className={`set-item ${sharing.online ? '' : 'disabled'}`} onClick={() => sharing.online && setSharing({ track: !sharing.track })}>
         <div className="set-item-text">
           <span className="set-item-title">{tr('듣고 있는 곡 표시')}</span>

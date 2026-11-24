@@ -7,7 +7,7 @@ import { ErrorMsg, Thumb, useAsync } from '../components/common.jsx';
 import TrackList from '../components/TrackList.jsx';
 import { BANDS } from '../components/RadioDial.jsx';
 import { useAccount } from '../store/account.js';
-import { useFriends } from '../store/friends.js';
+import { lastSeenText, useFriends } from '../store/friends.js';
 import { useLibrary } from '../store/library.js';
 import { useNav } from '../store/nav.js';
 import { usePlayer } from '../store/player.js';
@@ -76,7 +76,7 @@ export default function FriendProfile({ uid }) {
   const time = view.time;
   const hidden = listOf(view.hidden);
   const name = person.name || '...';
-  const status = isMe ? null : !friend.online ? tr('오프라인') : friend.radio ? (friend.playing ? tr('라디오 듣는 중') : tr('일시정지')) : friend.track ? (friend.playing ? tr('듣는 중') : tr('일시정지')) : tr('온라인');
+  const status = isMe ? null : !friend.online ? lastSeenText(friend) : friend.radio ? (friend.playing ? tr('라디오 듣는 중') : tr('일시정지')) : friend.track ? (friend.playing ? tr('듣는 중') : tr('일시정지')) : tr('온라인');
 
   const confirmRemove = () => useUI.getState().prompt({
     title: tr('{0}님을 친구에서 삭제할까요?', name),

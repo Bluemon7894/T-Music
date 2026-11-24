@@ -35,7 +35,7 @@ const INVITE_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const PRESENCE_DELAY_MS = 800;
 // Listening details stay private until someone chooses to show them: nobody agreed to this when they signed up.
 // Shown until someone turns it off.
-const DEFAULT_SHARING = { online: true, track: true, playlists: true, topTracks: true, time: true, artists: true, genres: true };
+const DEFAULT_SHARING = { online: true, track: true, lastSeen: true, playlists: true, topTracks: true, time: true, artists: true, genres: true };
 const OFFLINE_CLEANUP_MS = 4000;
 const PRESENCE_RETRY_MS = 5000;
 
@@ -56,6 +56,21 @@ function myProfile() {
     name: (user.displayName || google?.displayName || tr('게스트 {0}', user.uid.slice(0, 4).toUpperCase())).slice(0, 40),
     photo: photoToShow(user),
   };
+}
+
+// "3시간 전 접속" for a friend who's away and shares when they were last here.
+export function lastSeenText(friend) {
+  const at = Number(friend?.lastSeen);
+  if (friend?.online || !Number.isFinite(at) || at <= 0) return tr('오프라인');
+  const minutes = Math.max(0, Math.round((Date.now() - at) / 60000));
+  if (minutes < 1) return tr('방금 전 접속');
+  if (minutes < 60) return tr('{0}분 전 접속', minutes);
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return tr('{0}시간 전 접속', hours);
+  const days = Math.round(hours / 24);
+  if (days < 30) return tr('{0}일 전 접속', days);
+  if (days < 365) return tr('{0}달 전 접속', Math.round(days / 30));
+  return tr('{0}년 전 접속', Math.round(days / 365));
 }
 
 export const useFriends = create((set, get) => {
@@ -98,6 +113,9 @@ export const useFriends = create((set, get) => {
     return { online: true, track, playing: Boolean(track && player.playing), updatedAt: serverTimestamp() };
   };
 
+  // What friends see once this account leaves: when it was last here, unless that's kept private.
+  const goneValue = () => (get().sharing.lastSeen ? { online: false, lastSeen: serverTimestamp() } : { online: false });
+
   const publishPresence = async () => {
     clearTimeout(presenceTimer);
     presenceTimer = null;
@@ -105,7 +123,7 @@ export const useFriends = create((set, get) => {
     const value = presenceValue();
     try {
       if (value) {
-        await onDisconnect(presenceRef()).set({ online: false, lastSeen: serverTimestamp() });
+        await onDisconnect(presenceRef()).set(goneValue());
         await dbSet(presenceRef(), value);
       } else {
         await onDisconnect(presenceRef()).cancel();
@@ -146,7 +164,7 @@ export const useFriends = create((set, get) => {
           logo: safePhoto(p.radio.logo),
           hls: p.radio.hls === true,
         } : null;
-        patchFriend(uid, { online: p?.online === true, track: p?.online ? safeTrack(p.track) : null, radio, playing: p?.playing === true });
+        patchFriend(uid, { online: p?.online === true, track: p?.online ? safeTrack(p.track) : null, radio, playing: p?.playing === true, lastSeen: !p?.online && Number.isFinite(p?.lastSeen) ? p.lastSeen : null });
       }, () => {
         patchFriend(uid, { online: false, track: null, playing: false });
         if (!stopped) retry = setTimeout(listen, PRESENCE_RETRY_MS);
@@ -209,7 +227,7 @@ export const useFriends = create((set, get) => {
     const now = Date.now();
     const invites = [];
     for (const [id, invite] of Object.entries(snap.val() || {})) {
-      if (now - (invite.at || 0) > INVITE_LIFETIME_MS || invite.code === useRoom.getState().code) {
+      if (now - (invite.at || 0) > INVITE_LIFETIME_MS || (invite.code === useRoom.getState().code && useRoom.getState().attached)) {
         remove(dbRef('invites', myUid(), id)).catch(() => {});
         continue;
       }
@@ -288,12 +306,14 @@ export const useFriends = create((set, get) => {
     // Signing out: look offline right away instead of waiting for the connection to drop.
     async goOffline() {
       const uid = myUid();
+      const sharingLastSeen = get().sharing.lastSeen && get().sharing.online;
       get().stop();
       if (!uid) return;
       await within(closeWakeBox(uid), OFFLINE_CLEANUP_MS).catch(() => {});
       const presence = dbRef('presence', uid);
       await within(onDisconnect(presence).cancel(), OFFLINE_CLEANUP_MS).catch(() => {});
-      await within(remove(presence), OFFLINE_CLEANUP_MS).catch(() => {});
+      // Signing out is leaving: friends see when, if that's shared.
+      await within(sharingLastSeen ? dbSet(presence, { online: false, lastSeen: serverTimestamp() }) : remove(presence), OFFLINE_CLEANUP_MS).catch(() => {});
     },
 
     // A guest connecting Google gets a real name and photo without changing accounts.
@@ -409,7 +429,7 @@ export const useFriends = create((set, get) => {
         } else {
           // Not in the app right now: the invite waits for them, and their phone is woken if it can be.
           const reached = await wakeFriend(uid, { from: myUid(), fromName: name, code, roomName });
-          toast(reached ? tr('{0}님을 깨웠어요. 폰에 알림이 가요 (조금 걸릴 수 있어요)', friendName) : tr('{0}님에게 초대를 남겼어요. 앱을 켜면 바로 보여요', friendName));
+          toast(tr('{0}님에게 초대를 보냈어요. 폰에 알림이 가고, 앱을 켜면 바로 보여요', friendName));
         }
       } catch (e) {
         console.warn('[friends]', e);

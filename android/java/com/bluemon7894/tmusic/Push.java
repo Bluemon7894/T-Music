@@ -64,6 +64,8 @@ public final class Push extends BroadcastReceiver {
             WakeCheck.showInvite(context, "push:" + id, from == null ? "" : from, intent.getStringExtra("roomName"), code);
         } else if ("friendRequest".equals(type)) {
             WakeCheck.showFriendRequest(context, "request:" + id, from == null ? "" : from);
+        } else if ("chat".equals(type)) {
+            WakeCheck.showChat(context, intent.getStringExtra("code"), from == null ? "" : from, intent.getStringExtra("text"));
         }
     }
 }

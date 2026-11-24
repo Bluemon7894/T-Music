@@ -69,9 +69,7 @@ function FriendInvites({ members }) {
             <li key={uid}>
               <i className={`room-dot ${f.online ? 'on' : ''}`} />
               <span className="room-member-name room-member-open" onClick={() => useNav.getState().go('friend', { uid })}>{f.name || '...'}</span>
-              {f.online
-                ? <button className="text-btn" onClick={() => inviteFriend(uid)}>{tr('초대')}</button>
-                : <button className="text-btn room-wake" onClick={() => inviteFriend(uid)} title={tr('앱을 켜지 않은 친구에게 같이 듣자고 알림을 보내요')}><BellRing size={13} />{' '}{tr('깨우기')}</button>}
+              <button className="text-btn" onClick={() => inviteFriend(uid)}>{tr('초대')}</button>
             </li>
           ))}
         </ul>
@@ -280,6 +278,9 @@ function InRoom() {
                         <UserPlus size={13} /> {friendRequests.some((r) => r.uid === memberUid) ? tr('요청 수락') : tr('친구 추가')}
                       </button>
                     )
+                )}
+                {memberUid !== uid && !m.listening && (
+                  <button className="text-btn room-wake" onClick={() => useRoom.getState().wakeMember(memberUid)} title={tr('같이 듣자고 알림을 보내요')}><BellRing size={13} />{' '}{tr('깨우기')}</button>
                 )}
                 {memberUid === ownerUid
                   ? <span className="room-badge"><Crown size={12} />{' '}{tr('방장')}</span>

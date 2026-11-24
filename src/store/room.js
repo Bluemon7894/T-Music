@@ -29,6 +29,7 @@ import { useDeck } from './deck.js';
 import { photoToShow } from './profile.js';
 import { saveAlignment } from './lyricAlignments.js';
 import { bindRoom, roomPlayer, usePlayer } from './player.js';
+import { useNav } from './nav.js';
 import { toast } from './ui.js';
 import { record } from './undo.js';
 import { deviceId, followingCode, forgetFollowing, rememberFollowing } from '../lib/resume.js';
@@ -57,6 +58,8 @@ const SOURCE_STALL = 0.8;
 const GENTLE_RATE_CHANGE = 0.03;
 const FAST_RATE_CHANGE = 0.06;
 
+const WAKE_AGAIN_MS = 60 * 1000;
+const lastWake = new Map();
 const CHAT_KEEP_MS = 24 * 60 * 60 * 1000;
 const CHAT_SHOWN = 100;
 const CHAT_MAX = 300;
@@ -495,7 +498,30 @@ export const useRoom = create((set, get) => {
     }
   };
 
+  // A message from someone else, while this person isn't looking at the room: a notification on the
+  // computer or phone, or a toast when the app is in front on another page. Closed apps get a push instead
+  // (functions/index.js).
+  let chatLoaded = false;
+  const announceChat = (m) => {
+    const nav = useNav.getState();
+    const onRoomPage = nav.stack[nav.index]?.name === 'room';
+    const looking = document.hasFocus() && !document.hidden;
+    if (looking && onRoomPage) return;
+    if (looking) {
+      toast(tr('{0}: {1}', m.name || tr('멤버'), String(m.text).slice(0, 80)));
+      return;
+    }
+    try {
+      const n = new Notification(m.name || tr('같이 듣기'), { body: String(m.text).slice(0, 120) });
+      n.onclick = () => {
+        api.showWindow().catch(() => {});
+        useNav.getState().go('room', {});
+      };
+    } catch { /* seen when the room is opened */ }
+  };
+
   const watchRoom = (code) => {
+    chatLoaded = false;
     set({ code });
     // Nothing older than a day stays in the database, even in a room nobody opens the page of.
     setTimeout(() => get().clearOldChat(), 3000);
@@ -552,7 +578,11 @@ export const useRoom = create((set, get) => {
       onValue(query(dbRef(code, 'chat'), orderByChild('at'), startAt(Date.now() - CHAT_KEEP_MS), limitToLast(CHAT_SHOWN)), (snap) => {
         const chat = [];
         snap.forEach((child) => { const m = child.val(); if (m && typeof m.text === 'string') chat.push({ id: child.key, ...m }); });
+        const before = new Set(get().chat.map((m) => m.id));
+        const firstLoad = !chatLoaded;
+        chatLoaded = true;
         set({ chat });
+        if (!firstLoad) for (const m of chat) if (!before.has(m.id) && m.uid !== myUid()) announceChat(m);
       }, () => set({ chat: [] })),
       onValue(dbRef(code, 'playback'), (snap) => {
         const playback = snap.val();
@@ -645,6 +675,26 @@ export const useRoom = create((set, get) => {
     playback: null,
     queue: [],
     chat: [],
+
+    // Someone in the room who isn't listening along: their phone gets a push, or the app shows the invite,
+    // and accepting it starts listening along here (join() on the room they're in follows it).
+    async wakeMember(uid) {
+      const { code, meta, members } = get();
+      if (!code || !members[uid] || uid === myUid()) return;
+      if (Date.now() - (lastWake.get(uid) || 0) < WAKE_AGAIN_MS) {
+        toast(tr('조금 전에 깨웠어요. 잠시 뒤에 다시 해 주세요'));
+        return;
+      }
+      lastWake.set(uid, Date.now());
+      try {
+        await dbSet(push(ref(rtdb, `invites/${uid}`)), { from: myUid(), fromName: myProfile().name, code, roomName: String(meta?.name || '').slice(0, 40), at: serverTimestamp() });
+        toast(tr('{0}님을 깨웠어요', members[uid].name || tr('멤버')));
+      } catch (e) {
+        console.warn('[room]', e);
+        lastWake.delete(uid);
+        toast(tr('깨우지 못했어요'));
+      }
+    },
 
     async sendChat(text) {
       const { code } = get();

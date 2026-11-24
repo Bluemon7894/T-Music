@@ -117,6 +117,14 @@ public final class WakeCheck extends JobService {
             room == null || room.isEmpty() ? Lang.say("눌러서 같이 듣기 방에 들어가요", "Tap to join the room") : Lang.say("'" + room + "' 방에서 기다리고 있어요", "Waiting in '" + room + "'"));
     }
 
+    // One notification per room, replaced by each new message, so a talkative room doesn't pile them up.
+    static void showChat(Context context, String code, String from, String text) {
+        if (code == null || !code.matches("[A-Za-z0-9]{6}")) return;
+        Intent open = new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        Lang.load(context);
+        post(context, "chat:" + code, open, from == null || from.isEmpty() ? Lang.say("같이 듣기", "Listen together") : from, text == null ? "" : text);
+    }
+
     static void showFriendRequest(Context context, String key, String from) {
         Intent open = new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         Lang.load(context);

@@ -258,7 +258,7 @@
 .eq-band { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 0 8px; transition: opacity 0.25s; }
 .eq-band.off { opacity: 0.45; }
 .eq-db { font-size: 11.5px; font-weight: 800; color: var(--v-200); font-variant-numeric: tabular-nums; min-height: 15px; }
-.eq-slider { position: relative; width: 28px; height: 132px; display: flex; justify-content: center; cursor: pointer; touch-action: none; outline: none; }
+.eq-slider { position: relative; width: 36px; height: 160px; display: flex; justify-content: center; cursor: pointer; touch-action: none; outline: none; }
 .eq-track { position: relative; width: 4px; height: 100%; border-radius: 4px; background: rgba(255, 255, 255, 0.12); transition: width 0.2s var(--out); }
 .eq-slider:hover .eq-track, .eq-slider.dragging .eq-track, .eq-slider:focus-visible .eq-track { width: 6px; }
 .eq-zero { position: absolute; left: -5px; right: -5px; top: 50%; height: 1px; background: rgba(255, 255, 255, 0.22); }

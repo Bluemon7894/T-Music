@@ -461,7 +461,6 @@ export default function Settings() {
             )}
           </section>
 
-          <EqualizerCard />
 
           {!IS_ANDROID && <section className="set-card" data-enter>
             <h2><Monitor size={18} />{' '}{tr('시스템 및 연동')}</h2>
@@ -590,6 +589,8 @@ export default function Settings() {
           </section>
         </div>
         </div>
+        {/* Full width: five sliders need the room. */}
+        <EqualizerCard />
       </div>
     </div>
   );

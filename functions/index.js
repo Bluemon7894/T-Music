@@ -41,3 +41,20 @@ export const pushFriendRequest = onValueCreated({ ...where, ref: '/friendRequest
   const request = event.data.val() || {};
   await pushTo(event.params.to, { type: 'friendRequest', id: event.params.from, fromName: clip(request.name, 40) });
 });
+
+// A message in a room reaches the phones of the others in it who have the app closed.
+export const pushChat = onValueCreated({ ...where, ref: '/rooms/{code}/chat/{id}' }, async (event) => {
+  const message = event.data.val() || {};
+  const db = getDatabase();
+  const room = (await db.ref(`rooms/${event.params.code}`).get()).val() || {};
+  const others = Object.keys(room.members || {}).filter((uid) => uid !== message.uid);
+  await Promise.all(others.map((uid) => pushTo(uid, {
+    type: 'chat',
+    id: event.params.id,
+    code: event.params.code,
+    fromName: clip(message.name, 40),
+    text: clip(message.text, 120),
+    roomName: clip(room.meta?.name, 40),
+  }).catch((e) => console.warn('push chat', e.message))));
+});
+
