@@ -32,6 +32,11 @@ final class WebHost {
     private float insetTop;
     private float insetBottom;
 
+    // The page, if it's running: a push arriving with the app closed has nobody to tell.
+    static synchronized WebHost peek() {
+        return instance;
+    }
+
     static synchronized WebHost get(Context context) {
         if (instance == null) instance = new WebHost(context.getApplicationContext());
         return instance;

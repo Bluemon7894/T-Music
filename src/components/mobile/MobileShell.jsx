@@ -1,6 +1,7 @@
 // The phone layout: pages on top, then the mini player and tab bar. Desktop's sidebar, top bar, side
 // panel and dock don't exist here; their jobs move to the tabs, the top bar and the full-screen player.
 import { ArrowDownToLine, ChevronLeft, Home, Library, Radio, Search, Settings, SkipForward, UserRoundPlus, Users } from 'lucide-react';
+import { InboxButton } from '../../views/Inbox.jsx';
 import { useNav, useRoute } from '../../store/nav.js';
 import { useUI } from '../../store/ui.js';
 import { usePlayer } from '../../store/player.js';
@@ -48,6 +49,7 @@ function MobileTop() {
         <UpdatePill />
         <DownloadPill />
         <button className={`icon-btn circle glass ${route.name === 'downloads' ? 'on' : ''}`} onClick={() => go('downloads')} aria-label={tr('다운로드')}><ArrowDownToLine size={17} /></button>
+        <InboxButton route={route} go={go} />
         <button className={`icon-btn circle glass ${route.name === 'settings' ? 'on' : ''}`} onClick={() => go('settings')} aria-label={tr('설정')}><Settings size={17} /></button>
         <AccountButton />
       </div>

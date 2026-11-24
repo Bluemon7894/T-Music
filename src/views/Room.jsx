@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Copy, Crown, GripVertical, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, Mic2, Plus, Radio, Send, Share2, UserPlus, Users, Wifi, WifiOff, X } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { BellRing, Check, ChevronDown, ChevronUp, Copy, Crown, GripVertical, Headphones, HeadphoneOff, Link2, ListMusic, LogOut, MessageCircle, Mic2, Plus, Radio, Send, Share2, UserPlus, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { Empty, ArtistLinks, Thumb } from '../components/common.jsx';
 import { BANDS } from '../components/RadioDial.jsx';
 import LyricsView from '../components/layout/LyricsView.jsx';
@@ -69,13 +69,68 @@ function FriendInvites({ members }) {
             <li key={uid}>
               <i className={`room-dot ${f.online ? 'on' : ''}`} />
               <span className="room-member-name room-member-open" onClick={() => useNav.getState().go('friend', { uid })}>{f.name || '...'}</span>
-              <button className="text-btn" onClick={() => inviteFriend(uid)}>{tr('초대')}</button>
+              {f.online
+                ? <button className="text-btn" onClick={() => inviteFriend(uid)}>{tr('초대')}</button>
+                : <button className="text-btn room-wake" onClick={() => inviteFriend(uid)} title={tr('앱을 켜지 않은 친구에게 같이 듣자고 알림을 보내요')}><BellRing size={13} />{' '}{tr('깨우기')}</button>}
             </li>
           ))}
         </ul>
       ) : (
         <p className="muted">{tr('초대할 친구가 없어요. 친구 메뉴에서 친구를 추가하거나, 위의 코드를 보내 주세요.')}</p>
       )}
+    </section>
+  );
+}
+
+const clock = (at) => {
+  const d = new Date(Number(at) || Date.now());
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+// Talk among the people in the room. Kept for a day (see store/room.js).
+function RoomChat() {
+  const chat = useRoom((s) => s.chat);
+  const uid = useAccount((s) => s.user?.uid);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const listRef = useRef(null);
+  const enterWhileComposing = useRef(false);
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [chat.length]);
+  const send = async () => {
+    if (!text.trim() || sending) return;
+    setSending(true);
+    if (await useRoom.getState().sendChat(text)) setText('');
+    setSending(false);
+  };
+  return (
+    <section className="room-card room-chat" data-enter>
+      <h3><MessageCircle size={16} />{' '}{tr('대화')}{' '}<small>{tr('하루가 지나면 지워져요')}</small></h3>
+      <div className="room-chat-list" ref={listRef}>
+        {chat.length ? chat.map((m) => (
+          <div key={m.id} className={`room-chat-msg ${m.uid === uid ? 'mine' : ''}`}>
+            {m.uid !== uid && <b>{m.name}</b>}
+            <p>{m.text}</p>
+            <small>{clock(m.at)}</small>
+          </div>
+        )) : <p className="muted">{tr('같은 방 사람들과 이야기해 보세요.')}</p>}
+      </div>
+      <form className="room-chat-form" onSubmit={(e) => { e.preventDefault(); send(); }}>
+        <input
+          value={text}
+          maxLength={300}
+          onChange={(e) => setText(e.target.value)}
+          // Enter while a Korean syllable is still being put together finishes the syllable first; the
+          // message goes once it's done, so the last letter isn't sent twice or lost.
+          onKeyDown={(e) => { if (e.key === 'Enter' && e.nativeEvent.isComposing) { e.preventDefault(); enterWhileComposing.current = true; } }}
+          onCompositionEnd={() => { if (enterWhileComposing.current) { enterWhileComposing.current = false; setTimeout(send, 0); } }}
+          placeholder={tr('메시지 보내기')}
+          aria-label={tr('메시지')}
+        />
+        <button className="btn-primary" disabled={!text.trim() || sending} aria-label={tr('보내기')}><Send size={15} /></button>
+      </form>
     </section>
   );
 }
@@ -107,6 +162,9 @@ function InRoom() {
   const requestFriend = useFriends((s) => s.requestFriend);
   const { leave, follow, pause, setControlMode, makeHost, kick, removeFromQueue, moveInQueue } = useRoom.getState();
   const [dropAt, setDropAt] = useState(null);
+
+  // Coming into the room clears away talk older than a day.
+  useEffect(() => { useRoom.getState().clearOldChat(); }, [code]);
 
   const isHost = meta?.hostUid === uid;
   const ownerUid = meta?.ownerUid || meta?.hostUid;
@@ -289,6 +347,8 @@ function InRoom() {
       </section>
 
       <FriendInvites members={members} />
+
+      <RoomChat />
 
       {attached && track && playerTrackId === track.id && (
         <section className="room-card room-lyrics" data-enter>

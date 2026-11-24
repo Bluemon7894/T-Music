@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search, X, Settings, PanelRight, Download, History } from 'lucide-react';
+import { InboxButton } from '../../views/Inbox.jsx';
 import { useNav, useRoute } from '../../store/nav.js';
 import { useUI } from '../../store/ui.js';
 import { useDownloads } from '../../store/downloads.js';
@@ -189,6 +190,7 @@ export default function TopBar() {
         <UpdatePill />
         <DownloadPill />
         <button className={`icon-btn circle glass ${panelOpen ? 'on' : ''}`} onClick={togglePanel} title={tr('지금 재생 중 패널')}><PanelRight size={17} /></button>
+        <InboxButton route={route} go={go} />
         <button className={`icon-btn circle glass ${route.name === 'settings' ? 'on' : ''}`} onClick={() => go('settings')} title={tr('설정')}><Settings size={17} /></button>
         <AccountButton />
       </div>

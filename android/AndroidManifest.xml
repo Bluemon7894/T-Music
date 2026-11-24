@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
@@ -47,6 +49,22 @@
                 <data android:scheme="https" android:host="t-music-b8301.web.app" android:pathPrefix="/playlist/" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".Push"
+            android:exported="true"
+            android:permission="com.google.android.c2dm.permission.SEND">
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+                <action android:name="com.google.android.c2dm.intent.REGISTRATION" />
+                <category android:name="com.bluemon7894.tmusic" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".WakeCheck"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <service
             android:name=".PlaybackService"

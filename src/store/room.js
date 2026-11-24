@@ -4,9 +4,14 @@
 // in the room, and on the next launch can join back in with one click.
 import { create } from 'zustand';
 import {
+  endAt,
   get as dbGet,
+  limitToLast,
   onDisconnect,
   onValue,
+  orderByChild,
+  query,
+  startAt,
   push,
   ref,
   remove,
@@ -52,6 +57,9 @@ const SOURCE_STALL = 0.8;
 const GENTLE_RATE_CHANGE = 0.03;
 const FAST_RATE_CHANGE = 0.06;
 
+const CHAT_KEEP_MS = 24 * 60 * 60 * 1000;
+const CHAT_SHOWN = 100;
+const CHAT_MAX = 300;
 const roomPath = (code, ...rest) => ['rooms', code, ...rest].join('/');
 const dbRef = (code, ...rest) => ref(rtdb, roomPath(code, ...rest));
 const myUid = () => auth.currentUser?.uid ?? null;
@@ -472,7 +480,7 @@ export const useRoom = create((set, get) => {
     stopFollowing();
     for (const stop of stopListening) stop();
     stopListening = [];
-    set({ code: null, meta: null, members: {}, playback: null, queue: [], modes: null, radio: null });
+    set({ code: null, meta: null, members: {}, playback: null, queue: [], modes: null, radio: null, chat: [] });
   };
 
   // Someone in the room resynced the lyrics or picked different ones.
@@ -489,6 +497,8 @@ export const useRoom = create((set, get) => {
 
   const watchRoom = (code) => {
     set({ code });
+    // Nothing older than a day stays in the database, even in a room nobody opens the page of.
+    setTimeout(() => get().clearOldChat(), 3000);
     seenLyrics = new Map();
     lyricsLoaded = false;
     stopListening = [
@@ -538,6 +548,12 @@ export const useRoom = create((set, get) => {
         }
       }),
       onValue(dbRef(code, 'radio'), (snap) => set({ radio: snap.val() || null }), () => set({ radio: null })),
+      // A day of talk at most: older messages aren't shown, and whoever comes in clears them away.
+      onValue(query(dbRef(code, 'chat'), orderByChild('at'), startAt(Date.now() - CHAT_KEEP_MS), limitToLast(CHAT_SHOWN)), (snap) => {
+        const chat = [];
+        snap.forEach((child) => { const m = child.val(); if (m && typeof m.text === 'string') chat.push({ id: child.key, ...m }); });
+        set({ chat });
+      }, () => set({ chat: [] })),
       onValue(dbRef(code, 'playback'), (snap) => {
         const playback = snap.val();
         set({ playback });
@@ -628,6 +644,31 @@ export const useRoom = create((set, get) => {
     members: {},
     playback: null,
     queue: [],
+    chat: [],
+
+    async sendChat(text) {
+      const { code } = get();
+      const clean = String(text || '').trim().slice(0, CHAT_MAX);
+      if (!code || !clean) return false;
+      try {
+        await dbSet(push(dbRef(code, 'chat')), { uid: myUid(), name: myProfile().name, text: clean, at: serverTimestamp() });
+        get().clearOldChat();
+        return true;
+      } catch (e) {
+        console.warn('[room]', e);
+        toast(tr('메시지를 보내지 못했어요'));
+        return false;
+      }
+    },
+
+    async clearOldChat() {
+      const { code } = get();
+      if (!code) return;
+      const old = await dbGet(query(dbRef(code, 'chat'), orderByChild('at'), endAt(Date.now() - CHAT_KEEP_MS))).catch(() => null);
+      const gone = {};
+      old?.forEach((child) => { gone[roomPath(code, 'chat', child.key)] = null; });
+      if (Object.keys(gone).length) await update(ref(rtdb), gone).catch(() => {});
+    },
     modes: null, // the room's shuffle and repeat, the same for everyone
     radio: null, // the radio channel the room is tuned to, if any
     attached: false, // following the room's playback right now

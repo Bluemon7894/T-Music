@@ -193,6 +193,25 @@ final class NativeBridge {
         host.main.post(() -> PlaybackService.update(host, json));
     }
 
+    // ---- friends waking this phone while the app isn't running (WakeCheck) ----
+
+    @JavascriptInterface
+    public String wakeBox() {
+        return WakeCheck.secret(app);
+    }
+
+    @JavascriptInterface
+    public void setWakeBox(String secret) {
+        WakeCheck.setSecret(app, secret);
+    }
+
+    // Asks Play services for a push address; it arrives as a "pushToken" event (Push.java).
+    @JavascriptInterface
+    public String pushToken() {
+        Push.register(app);
+        return Push.token(app);
+    }
+
     // ---- the phone's permissions, shown and asked for again in settings ----
 
     @JavascriptInterface

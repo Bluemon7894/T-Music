@@ -29,6 +29,7 @@ import Artist from './views/Artist.jsx';
 import Library from './views/Library.jsx';
 import Downloads from './views/Downloads.jsx';
 import Settings from './views/Settings.jsx';
+import Inbox from './views/Inbox.jsx';
 import Room from './views/Room.jsx';
 import Friends from './views/Friends.jsx';
 import Radio from './views/Radio.jsx';
@@ -70,6 +71,7 @@ function View({ route }) {
     case 'library': return <Library />;
     case 'downloads': return <Downloads />;
     case 'settings': return <Settings />;
+    case 'inbox': return <Inbox />;
     case 'room': return <Room />;
     case 'friends': return <Friends />;
     case 'friend': return <FriendProfile key={p.uid} uid={p.uid} />;

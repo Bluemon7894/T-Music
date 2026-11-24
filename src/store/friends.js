@@ -26,11 +26,12 @@ import { useRoom } from './room.js';
 import { toast, useUI } from './ui.js';
 import { record } from './undo.js';
 import { tr } from '../lib/i18n.js';
+import { closeWakeBox, openWakeBox, wakeFriend } from '../lib/wake.js';
 import { isLocalId } from '../../electron/localId.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 8;
-const INVITE_LIFETIME_MS = 6 * 60 * 60 * 1000;
+const INVITE_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const PRESENCE_DELAY_MS = 800;
 // Listening details stay private until someone chooses to show them: nobody agreed to this when they signed up.
 // Shown until someone turns it off.
@@ -246,6 +247,7 @@ export const useFriends = create((set, get) => {
       get().stop();
       announced = new Set();
       ensureProfile(uid).catch((e) => console.warn('[friends]', e));
+      openWakeBox(uid).catch((e) => console.warn('[friends] wake box', e));
       useProfile.getState().start(() => get().sharing);
       stopListening = [
         onValue(dbRef('profiles', uid, 'sharing'), (snap) => {
@@ -288,6 +290,7 @@ export const useFriends = create((set, get) => {
       const uid = myUid();
       get().stop();
       if (!uid) return;
+      await within(closeWakeBox(uid), OFFLINE_CLEANUP_MS).catch(() => {});
       const presence = dbRef('presence', uid);
       await within(onDisconnect(presence).cancel(), OFFLINE_CLEANUP_MS).catch(() => {});
       await within(remove(presence), OFFLINE_CLEANUP_MS).catch(() => {});
@@ -398,8 +401,16 @@ export const useFriends = create((set, get) => {
       try {
         await waitForConnection();
         const { name, photo } = myProfile();
-        await dbSet(push(dbRef('invites', uid)), { from: myUid(), fromName: name, ...(photo ? { fromPhoto: photo } : {}), code, roomName: String(meta?.name || '').slice(0, 40), at: serverTimestamp() });
-        toast(tr('{0}님을 초대했어요', get().friends[uid]?.name || tr('친구')));
+        const roomName = String(meta?.name || '').slice(0, 40);
+        await dbSet(push(dbRef('invites', uid)), { from: myUid(), fromName: name, ...(photo ? { fromPhoto: photo } : {}), code, roomName, at: serverTimestamp() });
+        const friendName = get().friends[uid]?.name || tr('친구');
+        if (get().friends[uid]?.online) {
+          toast(tr('{0}님을 초대했어요', friendName));
+        } else {
+          // Not in the app right now: the invite waits for them, and their phone is woken if it can be.
+          const reached = await wakeFriend(uid, { from: myUid(), fromName: name, code, roomName });
+          toast(reached ? tr('{0}님을 깨웠어요. 폰에 알림이 가요 (조금 걸릴 수 있어요)', friendName) : tr('{0}님에게 초대를 남겼어요. 앱을 켜면 바로 보여요', friendName));
+        }
       } catch (e) {
         console.warn('[friends]', e);
         toast(tr('초대를 보내지 못했습니다'));
