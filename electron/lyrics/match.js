@@ -25,6 +25,11 @@ const LABEL_CHANNEL = /^(?:1thek.*|hybe\s*labels|smtown|jyp\s*ent.*|yg\s*ent.*|s
 const VIDEO_NOISE = /[([【「『][^)\]】」』]*(?:official|music\s*video|m\/?v\b|audio|color\s*coded|lyrics?|가사|자막|live|라이브|lyric\s*video|딩고|dingo|4k|stage\s*mix|교차편집|노래방|반주|special\s*clip|\bclip\b|visualizer|tj\.\d+|ky\.\d+|mr제거|remaster|hd|hq|full\s*ver[^)\]】」』]*|원곡[^)\]】」』]*)[^)\]】」』]*[)\]】」』]/gi;
 const TAIL_NOISE = /\s*[|/_-]?\s*(?:official\s*(?:music\s*)?(?:video|audio|mv)?|m\/?v|music\s*video|lyrics?(?:\s*video)?|가사|자막|노래방|반주|mr제거|4k|live\s*clip|visualizer)\s*$/i;
 const INSTRUMENTAL = /(?:^|[\s([])(?:inst\.?|instrumental|mr|반주|off\s*vocal|karaoke|노래방)(?:$|[\s)\]])/i;
+// Videos about a song rather than of it: the song is talked over, cut up, or not in it at all, so its
+// lyrics would be wrong there, and a channel's captions are the talking.
+const NOT_THE_SONG = /(?:\b(?:making(?:\s*film)?|behind(?:\s*the\s*scenes?)?|reaction|reacts?|trailer|teaser|interview|vlog|unboxing|review|explained|references|breakdown|commentary|full\s*album|playlist|highlight\s*medley|episode|ep\.\s*\d+)\b|메이킹|비하인드|리액션|반응|티저|트레일러|예고편|인터뷰|브이로그|언박싱|리뷰|해석|플레이리스트|하이라이트\s*메들리|전곡\s*듣기|모음)/i;
+// A cover sung in English: the original's words are in another language.
+const ENGLISH_VERSION = /\b(?:eng(?:lish)?\.?\s*(?:ver(?:sion)?\.?|cover)|english\s*lyrics)\b|영어\s*(?:버전|커버|가사)/i;
 const VERSION_WORDS = ['remix', 'acoustic', 'live', 'instrumental', 'inst', 'karaoke', 'orchestra', 'sped up', 'slowed', 'nightcore', 'cover', '现场', '伴奏', '翻唱', '라이브', '커버'];
 
 export function norm(s) {
@@ -87,7 +92,11 @@ function stripNoise(raw) {
     .normalize('NFKC')
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ')
     .replace(/^\s*[[【][^\]】]+[\]】]\s*/, '')
-    .replace(VIDEO_NOISE, ' ');
+    .replace(VIDEO_NOISE, ' ')
+    // "37. 거리에서 l Sung Si Kyung Music": a series number in front, and after a lone l or ㅣ the channel's
+    // own tag (only when it reads like one: "Hello l Love You" keeps its words).
+    .replace(/^\s*\d{1,3}\.\s+/, '')
+    .replace(/\s+[lㅣ]\s+(?=.*(?:music|official|channel|\btv\b|entertainment|records|lyrics|노래|가사|채널|뮤직)).*$/i, '');
   for (let i = 0; i < 3; i++) s = s.replace(TAIL_NOISE, '');
   return s.replace(/\s+/g, ' ').trim();
 }
@@ -179,8 +188,11 @@ export function parseTrack(track) {
     artists,
     duration: Number(track?.duration) || 0,
     album: track?.album?.name || '',
-    isKorean,
+    isKorean: isKorean && !ENGLISH_VERSION.test(rawTitle),
+    english: ENGLISH_VERSION.test(rawTitle),
     instrumental: INSTRUMENTAL.test(rawTitle),
+    // Only words outside the song's own name count: a song can be called "Trailer".
+    notTheSong: NOT_THE_SONG.test(rawTitle) && !titles.some((t) => NOT_THE_SONG.test(t)),
   };
 }
 

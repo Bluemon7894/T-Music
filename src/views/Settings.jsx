@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Download,
   Upload,
@@ -226,6 +226,92 @@ function ConvenienceCard() {
   );
 }
 
+// Settings sit in two stacks. Which card goes in which stack is worked out from their real heights, so
+// both stacks come out nearly the same height and no card is stretched around a blank space to match.
+// The cards are written in order: the left stack's, a .settings-break, then the right stack's. The first
+// card of the left stack and the first `pinnedRight` of the right one stay where they are, on top; the
+// others may cross over, keeping their order. The app's own card (.about-app) closes the left stack, at
+// the very bottom. One stack (a narrow window, a phone) shows them in turn, that card last.
+const STACK_GAP = 14;
+function useBalancedColumns(ref, pinnedRight) {
+  useLayoutEffect(() => {
+    const box = ref.current;
+    if (!box) return undefined;
+    let shown = '';
+    const arrange = () => {
+      const kids = [...box.children];
+      const cut = kids.findIndex((k) => k.classList.contains('settings-break'));
+      if (cut < 1) return;
+      const last = kids.find((k) => k.classList.contains('about-app'));
+      const left = kids.slice(0, cut).filter((k) => k !== last);
+      const right = kids.slice(cut + 1).filter((k) => k !== last);
+      const pins = right.slice(0, pinnedRight);
+      const rest = [...left.slice(1), ...right.slice(pinnedRight)];
+      const tail = last ? [last] : [];
+      const order = new Map();
+      let height = '';
+      if (getComputedStyle(box).flexWrap === 'nowrap') {
+        // One stack. On a phone the two stacks take turns, as they always have; otherwise the pinned
+        // cards come first and then the rest.
+        const seq = IS_ANDROID
+          ? [left[0], right[0], left[1], right[1], right[2], left[2], right[3], left[3]].filter(Boolean)
+          : [left[0], ...pins];
+        for (const k of [...seq, ...left, ...right, ...tail]) if (!order.has(k)) order.set(k, order.size);
+        order.set(kids[cut], order.size);
+      } else {
+        box.classList.add('measuring');
+        const h = new Map(kids.map((k) => [k, k.offsetHeight]));
+        box.classList.remove('measuring');
+        const stack = (cards) => cards.reduce((sum, k) => sum + h.get(k), 0) + STACK_GAP * Math.max(0, cards.length - 1);
+        // Every split of the free cards is tried (there are about ten). The lowest pair of stacks wins;
+        // between nearly equal ones, the one that moves the fewest cards from where they were written.
+        const home = (1 << (left.length - 1)) - 1;
+        let best = null;
+        for (let mask = 0; mask < 1 << rest.length; mask++) {
+          const a = [left[0], ...rest.filter((_, i) => mask & (1 << i)), ...tail];
+          const b = [...pins, ...rest.filter((_, i) => !(mask & (1 << i)))];
+          const tall = Math.max(stack(a), stack(b));
+          let moved = 0;
+          for (let x = mask ^ home; x; x &= x - 1) moved++;
+          if (!best || tall < best.tall - 4 || (tall <= best.tall + 4 && moved < best.moved)) best = { tall, moved, a, b };
+        }
+        for (const k of best.a) order.set(k, order.size);
+        order.set(kids[cut], order.size);
+        for (const k of best.b) order.set(k, order.size);
+        // A few pixels spare, so rounding never pushes a stack's last card into a third column.
+        height = `${best.tall + 6}px`;
+      }
+      const key = kids.map((k) => order.get(k)).join(',') + height;
+      if (key === shown) return;
+      shown = key;
+      for (const k of kids) k.style.order = String(order.get(k));
+      box.style.height = height;
+    };
+    arrange();
+    // Again whenever the page or any card changes size (a card's text, a picture loading, the window), a
+    // frame later so it never runs inside the observer that noticed. Arranging itself only moves cards
+    // when the answer changes, so it doesn't set this off again.
+    let frame = 0;
+    const later = () => {
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; arrange(); });
+    };
+    const sizes = new ResizeObserver(later);
+    const watch = () => {
+      sizes.disconnect();
+      sizes.observe(box);
+      for (const k of box.children) sizes.observe(k);
+    };
+    watch();
+    const changes = new MutationObserver(() => { watch(); later(); });
+    changes.observe(box, { childList: true, subtree: true, characterData: true });
+    return () => {
+      sizes.disconnect();
+      changes.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [ref, pinnedRight]);
+}
+
 export default function Settings() {
   const status = useAsync(() => api.status(), []);
   const lib = useLibrary();
@@ -343,6 +429,8 @@ export default function Settings() {
 
   const ref = useRef(null);
   useEnter(ref, [], { step: 50 });
+  const columns = useRef(null);
+  useBalancedColumns(columns, IS_ANDROID ? 2 : 1);
 
   const exportLib = async () => {
     const text = JSON.stringify({ liked: lib.liked, playlists: lib.playlists, savedAlbums: lib.savedAlbums, followed: lib.followed }, null, 1);
@@ -392,8 +480,7 @@ export default function Settings() {
       <div className="page-title" data-enter><h1>{tr('설정')}</h1></div>
 
       <div className="settings-grid">
-        <div className="settings-columns">
-        <div className="settings-col">
+        <div className="settings-columns" ref={columns}>
           <AccountCard />
 
           <section className="set-card" data-enter>
@@ -461,6 +548,7 @@ export default function Settings() {
             )}
           </section>
 
+          <EqualizerCard />
 
           {!IS_ANDROID && <section className="set-card" data-enter>
             <h2><Monitor size={18} />{' '}{tr('시스템 및 연동')}</h2>
@@ -526,8 +614,7 @@ export default function Settings() {
               )}
             </div>
           </section>
-        </div>
-        <div className="settings-col">
+          <i className="settings-break" />
           {IS_ANDROID && <PhonePermissionsCard />}
           <FriendPrivacyCard />
           {!IS_ANDROID && <section className="set-card" data-enter>
@@ -588,9 +675,6 @@ export default function Settings() {
             </div>
           </section>
         </div>
-        </div>
-        {/* Full width: five sliders need the room. */}
-        <EqualizerCard />
       </div>
     </div>
   );

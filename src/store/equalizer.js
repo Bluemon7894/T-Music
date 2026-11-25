@@ -2,7 +2,7 @@
 // headphones, so they aren't synced or shared in a room. Only music goes through it; the radio plays
 // past it (see the radio player).
 import { create } from 'zustand';
-import { setEqualizer } from '../lib/audio.js';
+import { EQ_RANGE, setEqualizer } from '../lib/audio.js';
 import { tr } from '../lib/i18n.js';
 
 const KEY = 't-music-eq';
@@ -49,7 +49,7 @@ export const useEqualizer = create((set, get) => {
     // Moving a slider makes it a custom curve.
     setBand(i, db) {
       const gains = get().gains.slice();
-      gains[i] = Math.round(Math.max(-12, Math.min(12, db)));
+      gains[i] = Math.round(Math.max(-EQ_RANGE, Math.min(EQ_RANGE, db)));
       set({ gains, preset: 'custom', enabled: true });
       persist();
     },

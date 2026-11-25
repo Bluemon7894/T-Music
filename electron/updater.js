@@ -64,8 +64,76 @@ function fetchJson(urlStr) {
   });
 }
 
+// Plain text from a URL, following GitHub's redirects to where its files are kept.
+function fetchText(urlStr, depth = 0) {
+  return new Promise((resolve, reject) => {
+    if (depth > 10) return reject(new Error('Too many redirects'));
+    const req = https.get(urlStr, { headers: { 'User-Agent': 'T-Music-App' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        return resolve(fetchText(new URL(res.headers.location, urlStr).href, depth + 1));
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return reject(new Error(`HTTP ${res.statusCode}`));
+      }
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (d) => { body += d; });
+      res.on('end', () => resolve(body));
+    });
+    req.on('error', reject);
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => req.destroy(new Error('GitHub 응답이 없습니다')));
+  });
+}
+
+// GitHub's API answers sixty questions an hour from one network, and then says no. The release's own
+// latest.yml isn't limited like that and says the newest version and its installer's name, which is
+// enough to download it. Only the release notes are missing this way.
+async function fromReleaseFiles(currentVersion) {
+  const manifest = await fetchText(`https://github.com/${REPO}/releases/latest/download/latest.yml`);
+  const latestVersion = /^version:\s*(\S+)/m.exec(manifest)?.[1];
+  const file = /^path:\s*(\S+)/m.exec(manifest)?.[1];
+  if (!latestVersion || !file) throw new Error('no manifest');
+  const base = `https://github.com/${REPO}/releases/download/v${latestVersion}/`;
+  return {
+    hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
+    currentVersion,
+    latestVersion,
+    tagName: `v${latestVersion}`,
+    releaseName: `T-Music ${latestVersion}`,
+    releaseNotes: '',
+    releaseUrl: `https://github.com/${REPO}/releases/tag/v${latestVersion}`,
+    downloadUrl: base + file,
+    manifestUrl: `${base}latest.yml`,
+    assetId: null,
+    assetName: file,
+    assetSize: Number(/^\s*size:\s*(\d+)/m.exec(manifest)?.[1]) || 0,
+    downloaded: Boolean(downloadedInstallerPath && fs.existsSync(downloadedInstallerPath)),
+  };
+}
+
+let lastFound = null; // the last answer that had an installer in it
+
 export async function checkUpdate() {
   const currentVersion = app.getVersion();
+  const info = await askGitHub(currentVersion);
+  if (info.downloadUrl || info.assetId) {
+    lastFound = info;
+    return info;
+  }
+  try {
+    const fallback = await fromReleaseFiles(currentVersion);
+    // Keep the notes from an earlier answer about the same version.
+    if (lastFound?.latestVersion === fallback.latestVersion) fallback.releaseNotes = lastFound.releaseNotes;
+    lastFound = fallback;
+    return fallback;
+  } catch {
+    return info;
+  }
+}
+
+async function askGitHub(currentVersion) {
   try {
     let release = await fetchJson(`https://api.github.com/repos/${REPO}/releases/latest`);
     // If the latest release is an Android release or lacks an .exe, search recent releases for the newest desktop release

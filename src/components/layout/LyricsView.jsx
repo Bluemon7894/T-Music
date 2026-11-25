@@ -91,6 +91,55 @@ function useLyricsOffset(track, data) {
   return 0;
 }
 
+// Every timed lyric is lined up with the recording by itself, once, the way 재싱크 does it: by where the
+// voice comes in. Captions are already timed to the video. A phone does it only off mobile data, since
+// it means fetching the song a second time. Lyrics a measurement couldn't place keep their own times.
+const AUTO_ALIGN_DELAY_MS = 1500;
+const measuredThisSession = new Set();
+let measuring = Promise.resolve();
+
+function onMobileData() {
+  const c = navigator.connection;
+  return Boolean(c && (c.saveData || c.type === 'cellular'));
+}
+
+// `guess` is the offset used until then (a video's longer intro): the measurement looks around it.
+function useAutoAlign(track, data, guess) {
+  const saved = useAlignments((s) => s.map[track.id]);
+  const guessRef = useRef(guess);
+  guessRef.current = guess;
+  const key = data?.lines?.length ? lyricsKey(data) : null;
+  const done = saved && saved.lyrics === key;
+  useEffect(() => {
+    if (!key || done || data.source === SOURCE_TIMED_TO_VIDEO || measuredThisSession.has(`${track.id}|${key}`)) return undefined;
+    if (IS_ANDROID && onMobileData()) return undefined;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      measuredThisSession.add(`${track.id}|${key}`);
+      // One at a time: skipping through songs shouldn't start a download for each.
+      measuring = measuring.then(async () => {
+        if (cancelled || usePlayer.getState().current()?.id !== track.id) {
+          measuredThisSession.delete(`${track.id}|${key}`);
+          return;
+        }
+        try {
+          const base = guessRef.current || 0;
+          const shifted = data.lines.map((l) => ({ ...l, time: l.time + base }));
+          const m = await measureLyricOffset(streamUrl(track.id), shifted);
+          if (m && (m.sure || m.near)) saveAlignment(track.id, data, base + m.offset);
+        } catch (e) {
+          console.warn('[lyrics] align', e);
+          measuredThisSession.delete(`${track.id}|${key}`);
+        }
+      });
+    }, AUTO_ALIGN_DELAY_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [track.id, key, done]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 function useActiveLine(lines, offset) {
   const [active, setActive] = useState(-1);
   const playing = usePlayer((s) => s.playing);
@@ -160,14 +209,17 @@ function LyricsSkeleton() {
 }
 
 // Looks for the lyrics again, then lines them up with this recording. In a room, everyone gets the result.
-async function resyncLyrics(track) {
+async function resyncLyrics(track, guess = 0) {
   const data = await api.refreshLyrics(track);
   if (data) window.dispatchEvent(new CustomEvent('t-music:lyrics-changed', { detail: { trackId: track.id, lyrics: data } }));
   if (!data?.lines?.length) {
     toast(data?.plainLyrics ? tr('싱크 가사를 찾지 못했어요. 일반 가사로 보여드려요.') : tr('가사를 찾지 못했어요.'));
     return;
   }
-  const measured = await measureLyricOffset(streamUrl(track.id), data.lines);
+  // Measured around the current guess, so a video's long intro is looked past rather than fought.
+  const base = guess || 0;
+  const found = await measureLyricOffset(streamUrl(track.id), data.lines.map((l) => ({ ...l, time: l.time + base })));
+  const measured = found && { ...found, offset: base + found.offset };
   if (!measured || (!measured.sure && !measured.near)) {
     saveAlignment(track.id, data, null);
     useRoom.getState().shareLyrics(track.id, data, null);
@@ -190,6 +242,7 @@ async function resyncLyrics(track) {
 export default function LyricsView({ track, variant = 'panel' }) {
   const { data, loading } = useTrackLyrics(track);
   const offset = useLyricsOffset(track, data);
+  useAutoAlign(track, data, offset);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [resyncing, setResyncing] = useState(false);
   const seek = usePlayer((s) => s.seek);
@@ -220,7 +273,7 @@ export default function LyricsView({ track, variant = 'panel' }) {
   const resync = async () => {
     setResyncing(true);
     try {
-      await resyncLyrics(track);
+      await resyncLyrics(track, data?.source === SOURCE_TIMED_TO_VIDEO ? 0 : offset);
     } catch (e) {
       console.warn('[lyrics]', e);
       toast(tr('재싱크하지 못했어요. 인터넷 연결을 확인해 주세요.'));

@@ -3,10 +3,12 @@
 import { useRef, useState } from 'react';
 import { AudioLines } from 'lucide-react';
 import { EQ_LABELS, EQ_PRESETS, useEqualizer } from '../store/equalizer.js';
-import { EQ_BANDS } from '../lib/audio.js';
+import { EQ_BANDS, EQ_RANGE as RANGE } from '../lib/audio.js';
 import { tr } from '../lib/i18n.js';
 
-const RANGE = 12;
+// Room left at each end of a slider for the knob, which is drawn centred on its value, so at the very top
+// or bottom it doesn't run into the number above or the band's name below.
+const INSET = 13;
 const hz = (f) => (f >= 1000 ? `${f / 1000}k` : String(f));
 
 function BandSlider({ index, value, disabled }) {
@@ -15,7 +17,7 @@ function BandSlider({ index, value, disabled }) {
   const [dragging, setDragging] = useState(false);
   const fromPointer = (e) => {
     const r = ref.current.getBoundingClientRect();
-    const t = 1 - Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    const t = 1 - Math.min(1, Math.max(0, (e.clientY - r.top - INSET) / (r.height - 2 * INSET)));
     setBand(index, t * RANGE * 2 - RANGE);
   };
   const pct = ((value + RANGE) / (RANGE * 2)) * 100;
@@ -51,7 +53,7 @@ function BandSlider({ index, value, disabled }) {
           <i className="eq-zero" />
           <div className="eq-fill" style={{ bottom: `${fillFrom}%`, top: `${100 - fillTo}%` }} />
         </div>
-        <div className="eq-knob" style={{ bottom: `${pct}%` }} />
+        <div className="eq-knob" style={{ bottom: `calc(${INSET}px + (100% - ${2 * INSET}px) * ${pct / 100})` }} />
       </div>
       <span className="eq-name">{EQ_LABELS[index]}</span>
       <span className="eq-hz">{hz(EQ_BANDS[index])}</span>

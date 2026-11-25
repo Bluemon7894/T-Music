@@ -15,6 +15,8 @@ const FADE_CURVE_POINTS = 48;
 
 // Five bands, in Hz: low shelf, three peaks, high shelf.
 export const EQ_BANDS = [60, 250, 1000, 4000, 12000];
+// How far each band goes, up or down, in dB.
+export const EQ_RANGE = 20;
 const EQ_SMOOTH_S = 0.05;
 let eqPreamp = null;
 let eqFilters = [];
@@ -25,14 +27,16 @@ function applyEqualizer() {
   const now = ctx.currentTime;
   eqFilters.forEach((f, i) => f.gain.setTargetAtTime(eqGains[i] || 0, now, EQ_SMOOTH_S));
   // Boosting a band can push loud music past full scale and crackle; the louder the boost, the more
-  // the whole signal is lowered first.
+  // the whole signal is lowered first. Past 12 dB every extra dB is taken back in full, so the loudest
+  // band never ends up more than about 5 dB over the music.
   const boost = Math.max(0, ...eqGains);
-  eqPreamp.gain.setTargetAtTime(10 ** (-boost * 0.6 / 20), now, EQ_SMOOTH_S);
+  const lower = Math.min(boost, 12) * 0.6 + Math.max(0, boost - 12);
+  eqPreamp.gain.setTargetAtTime(10 ** (-lower / 20), now, EQ_SMOOTH_S);
 }
 
-// gains: dB per band (-12 to 12), or null for flat.
+// gains: dB per band (-EQ_RANGE to EQ_RANGE), or null for flat.
 export function setEqualizer(gains) {
-  eqGains = EQ_BANDS.map((_, i) => Math.max(-12, Math.min(12, Number(gains?.[i]) || 0)));
+  eqGains = EQ_BANDS.map((_, i) => Math.max(-EQ_RANGE, Math.min(EQ_RANGE, Number(gains?.[i]) || 0)));
   applyEqualizer();
 }
 

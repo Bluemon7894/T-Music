@@ -7,11 +7,11 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { parseLrc, cleanLines, isPlausibleTiming, isUsableText, stripTimestamps, scriptProfile, looksRomanizedKorean, decodeEntities } from './lrc.js';
-import { parseTrack, buildQueries, scoreCandidate } from './match.js';
+import { parseTrack, buildQueries, scoreCandidate, dice } from './match.js';
 import { SYNC_SOURCES, videoCaptions, youtubeMusicPlain, naverPlain } from './sources.js';
 import * as remote from '../remoteConfig.js';
 
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4; // 4: talk captions and videos about a song no longer get lyrics
 const EMPTY_TTL = 30 * 60 * 1000;
 const EMPTY_TTL_NETWORK_TROUBLE = 60 * 1000;
 const ACCEPT_SCORE = 62;
@@ -43,6 +43,7 @@ function writeDisk(id, data, custom = false) {
 
 function languageFit(text, meta) {
   const p = scriptProfile(text);
+  if (meta.english) return p.latin > 0.6 ? 10 : null;
   if (meta.isKorean) {
     if (p.hangul < 0.02 && looksRomanizedKorean(text)) return null; // transliteration
     if (p.han > 0.3 && p.hangul < 0.1) return null; // Chinese translation
@@ -139,7 +140,13 @@ function searchRound(query, meta, state) {
   });
 }
 
-async function fromCaptions(track, meta) {
+// How much two lyrics share, 0 to 1, by pairs of letters: the same song's words from two places score
+// high even when spelled or split into lines differently; another text (talk, another song) scores low.
+const letters = (text) => stripTimestamps(text).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+const MIN_SAME_WORDS = 0.35;
+export const sameWords = (a, b) => dice(letters(a), letters(b));
+
+async function fromCaptions(track, meta, known = null) {
   if (!remote.lyricsOn('captions')) return null;
   try {
     const raw = await videoCaptions(track.id, meta);
@@ -147,6 +154,9 @@ async function fromCaptions(track, meta) {
     const lines = cleanLines(raw, meta.titles);
     const text = lines.map((l) => l.text).join('\n');
     if (!isPlausibleTiming(lines, meta.duration) || languageFit(text, meta) === null) return null;
+    // A channel's captions can be anything said in the video. Where a database has the song's words,
+    // the captions have to be those words.
+    if (known && sameWords(text, known) < MIN_SAME_WORDS) return null;
     const stamp = (t) => `${String(Math.floor(t / 60)).padStart(2, '0')}:${(t % 60).toFixed(2).padStart(5, '0')}`;
     return {
       plainLyrics: text,
@@ -163,7 +173,7 @@ async function fromCaptions(track, meta) {
 
 async function search(track) {
   const meta = parseTrack(track);
-  if (meta.instrumental || !meta.titles.length) return { result: NOTHING(), answered: true };
+  if (meta.instrumental || meta.notTheSong || !meta.titles.length) return { result: NOTHING(), answered: true };
 
   const state = { seen: new Set(), text: null, answered: false, flaky: false };
   let best = null;
@@ -177,7 +187,8 @@ async function search(track) {
 
   // Nothing lines up to the second (typically a music video longer than the song):
   // the video's own captions beat a database entry for a different cut.
-  const captions = isLocalId(track.id) ? null : await fromCaptions(track, meta);
+  const knownWords = best ? (best.e.synced || best.e.plain) : state.text ? (state.text.e.synced || state.text.e.plain) : null;
+  const captions = isLocalId(track.id) ? null : await fromCaptions(track, meta, knownWords);
   if (captions) return { result: captions, answered: true };
   if (best) return { result: timedResult(best.c, best.e, meta.duration), answered: true };
 
